@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-// Importaciones de tu Feature de Ventas
-import 'features/sales/data/sales_repository.dart';
-import 'features/sales/presentation/cubit/sales_cubit.dart';
-import 'features/sales/presentation/screens/sale_form_screen.dart';
-
-// Importación de tu tema global
+// Estilos globales
 import 'core/theme/app_theme.dart';
 
+// Registro de la lógica de Ventas
+import 'features/sales/presentation/cubit/sales_cubit.dart';
+import 'features/sales/data/sales_repository.dart';
+
+// Pantallas de ambas características
+import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/sales/presentation/screens/sale_form_screen.dart';
+
 void main() {
-  // Aquí inicializás tus servicios/repositorios (Tus instancias globales)
   final salesRepository = SalesRepository();
 
   runApp(
-    // Envolvemos toda la aplicación con el Provider para inyectar el Cubit
+    // Dejamos el Cubit de ventas arriba en el árbol para que esté disponible
     BlocProvider<SalesCubit>(
       create: (context) => SalesCubit(salesRepository),
       child: const MyApp(),
@@ -28,14 +30,18 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'App Solidaridad',
+      title: 'GAS Terminal',
       debugShowCheckedModeBanner: false,
+      theme: appTheme,
 
-      // Aquí conectás el archivo de estilos que armaste en /core/theme
-      theme:
-          appTheme, // O como hayas nombrado a la variable ThemeData en tu archivo
-      // Definimos la pantalla inicial de la Fase 0 (El formulario de venta)
-      home: const SaleFormScreen(),
+      // 1. Definimos que el punto de entrada oficial es el Login
+      initialRoute: '/login',
+
+      // 2. El mapa de rutas que vincula las pantallas del MVP
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/sales_form': (context) => const SaleFormScreen(),
+      },
     );
   }
 }

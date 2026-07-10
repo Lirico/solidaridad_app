@@ -11,6 +11,7 @@ import 'features/sales/data/sales_repository.dart';
 // Pantallas de ambas características
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/sales/presentation/screens/sale_form_screen.dart';
+import 'features/sales/presentation/screens/sale_review_screen.dart';
 
 void main() {
   final salesRepository = SalesRepository();
@@ -41,6 +42,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/sales_form': (context) => const SaleFormScreen(),
+        '/sale_review': (context) => const SaleReviewScreen(),
       },
     );
   }

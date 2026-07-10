@@ -49,7 +49,11 @@ class SalesHistoryScreen extends StatelessWidget {
                   ),
                   isThreeLine: true,
                   onTap: () {
-                    // TODO: Mañana conectamos acá la pantalla del Detalle del Comprobante
+                    Navigator.pushNamed(
+                      context,
+                      '/sale_detail',
+                      arguments: operation,
+                    );
                   },
                 ),
               );

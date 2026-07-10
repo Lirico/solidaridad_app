@@ -23,7 +23,7 @@ class SalesCubit extends Cubit<SalesState> {
         amount: amount,
         cardNumber: cardNumber,
         cardHolder: cardHolder,
-        history: state.history, // Mantiene el historial que ya teníamos
+        history: state.history,
       ),
     );
   }
@@ -71,7 +71,7 @@ class SalesCubit extends Cubit<SalesState> {
           : 'OP-ERR',
       currency: currentCurrency,
       amount: currentAmount,
-      cardNumber: hiddenCard, // Tarjeta protegida en los logs de memoria
+      cardNumber: hiddenCard,
       isSuccess: response.isApproved,
       date: DateTime.now(),
     );
@@ -87,7 +87,7 @@ class SalesCubit extends Cubit<SalesState> {
           cardNumber: currentCardNumber,
           cardHolder: currentCardHolder,
           operationNumber: response.operationNumber,
-          history: currentHistory, // Guardamos la lista con el éxito metido
+          history: currentHistory,
         ),
       );
     } else {
@@ -97,10 +97,9 @@ class SalesCubit extends Cubit<SalesState> {
           amount: currentAmount,
           cardNumber: currentCardNumber,
           cardHolder: currentCardHolder,
-          errorMessage: response
-              .message, // Mensaje comprensible traducido por el backend/repo
-          errorCode: response.errorCode, // Código ISO o HTTP de error
-          history: currentHistory, // Guardamos la lista con el rechazo metido
+          errorMessage: response.message,
+          errorCode: response.errorCode,
+          history: currentHistory,
         ),
       );
     }
@@ -112,7 +111,6 @@ class SalesCubit extends Cubit<SalesState> {
   }
 }
 
-// CORREGIDO: Sumamos la constante al constructor para congelarlo de forma inmutable
 class SalesInitialWithHistory extends SalesState {
   const SalesInitialWithHistory({required super.history})
     : super(currency: 'ARS', amount: 0.0, cardNumber: '', cardHolder: '');

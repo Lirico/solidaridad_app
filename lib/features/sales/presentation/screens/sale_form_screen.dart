@@ -12,12 +12,10 @@ class SaleFormScreen extends StatefulWidget {
 }
 
 class _SaleFormScreenState extends State<SaleFormScreen> {
-  // --- LLAVE GLOBAL PARA CONTROLAR LAS VALIDACIONES DEL FORMULARIO ---
   final _formKey = GlobalKey<FormState>();
 
   String _selectedCurrency = 'ARS';
 
-  // Controladores para los inputs
   final _cardNumberController = TextEditingController();
   final _expiryController = TextEditingController();
   final _unitsController = TextEditingController();
@@ -42,7 +40,6 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
         top: false,
         child: Column(
           children: [
-            // --- CABECERA AZUL INTEGRADA CON BOTÓN DE HISTORIAL ---
             Container(
               width: double.infinity,
               height: 180,
@@ -74,8 +71,6 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                 ],
               ),
             ),
-
-            // --- CONTENEDOR FLOTANTE BLANCO (AHORA DENTRO DE UN FORM) ---
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -128,14 +123,11 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                               },
                             ),
                             const SizedBox(height: 20),
-
                             const Text(
                               'Cantidad de Unidades',
                               style: TextStyle(fontWeight: FontWeight.w500),
                             ),
                             const SizedBox(height: 8),
-
-                            // OPTIMIZADO: Cambiado a TextFormField con lógica de validación rigurosa
                             TextFormField(
                               controller: _unitsController,
                               keyboardType:
@@ -173,7 +165,6 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
 
                             ElevatedButton(
                               onPressed: () {
-                                // --- DISPARO DE LA VALIDACIÓN NATIVA ---
                                 if (_formKey.currentState!.validate()) {
                                   // Si pasa el filtro, procesamos los datos con seguridad
                                   final cubit = context.read<SalesCubit>();

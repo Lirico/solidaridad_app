@@ -13,7 +13,7 @@ import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/sales/presentation/screens/sale_form_screen.dart';
 import 'features/sales/presentation/screens/sale_review_screen.dart';
 import 'features/sales/presentation/screens/sale_status_screen.dart';
-import 'features/sales/presentation/screens/sales_history_screen.dart';
+import 'features/history/presentation/screens/sales_history_screen.dart';
 
 void main() {
   // 1. Instanciamos el repositorio global que va a manejar las peticiones HTTP a AWS

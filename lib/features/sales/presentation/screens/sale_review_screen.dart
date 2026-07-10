@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart'; // <-- CORREGIDO: Import para usar .read() y .watch()
-import '../cubit/sales_cubit.dart'; // <-- CORREGIDO: Import del Cubit de tu feature
-import '../cubit/sales_state.dart'; // <-- CORREGIDO: Import de tus estados heredados
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../cubit/sales_cubit.dart';
+import '../cubit/sales_state.dart';
 import '../widgets/sale_review_widgets.dart';
 
 class SaleReviewScreen extends StatefulWidget {
@@ -14,13 +14,11 @@ class SaleReviewScreen extends StatefulWidget {
 class _SaleReviewScreenState extends State<SaleReviewScreen> {
   bool _isProcessing = false;
 
-  // UNIFICADO: Solo una declaración limpia de confirmación
   void _onConfirmPayment() async {
     setState(() {
       _isProcessing = true;
     });
 
-    // Despachamos la simulación ISO a AWS que configuramos en tu Cubit
     final salesCubit = context.read<SalesCubit>();
     await salesCubit.sendIsoMessage();
 
@@ -30,18 +28,14 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
       _isProcessing = false;
     });
 
-    // Validamos el estado final emitido por el Cubit
     final finalState = salesCubit.state;
-    final bool success =
-        finalState is SalesSuccess; // Si es la clase SalesSuccess, es un golazo
+    final bool success = finalState is SalesSuccess;
 
-    // Navegamos pasando el resultado dinámico a la pantalla final
     Navigator.pushReplacementNamed(context, '/sale_status', arguments: success);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Escuchamos el estado actual del Cubit de forma reactiva
     final salesState = context.watch<SalesCubit>().state;
 
     return Scaffold(
@@ -76,8 +70,6 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
                 ],
               ),
             ),
-
-            // --- CONTENEDOR FLOTANTE BLANCO (RESUMEN) ---
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -99,9 +91,7 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
                     ),
                     child: _isProcessing
                         ? const ProcessingTransactionView()
-                        : _buildReviewContent(
-                            salesState,
-                          ), // <-- CORREGIDO: Le pasamos el estado capturado
+                        : _buildReviewContent(salesState),
                   ),
                 ),
               ),

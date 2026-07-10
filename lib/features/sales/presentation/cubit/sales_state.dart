@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-// --- MODELO SIMPLE PARA CADA OPERACIÓN ---
 class OperationModel {
   final String id;
   final String currency;
@@ -25,15 +24,14 @@ abstract class SalesState {
   final double amount;
   final String cardNumber;
   final String cardHolder;
-  final List<OperationModel>
-  history; // <-- NUEVO: Guardamos el historial global aquí
+  final List<OperationModel> history;
 
   const SalesState({
     required this.currency,
     required this.amount,
     required this.cardNumber,
     required this.cardHolder,
-    required this.history, // <-- NUEVO
+    required this.history,
   });
 }
 

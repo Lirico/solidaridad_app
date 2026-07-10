@@ -12,7 +12,9 @@ class SaleFormScreen extends StatefulWidget {
 }
 
 class _SaleFormScreenState extends State<SaleFormScreen> {
-  // Estado local para la moneda seleccionada (ARS por defecto)
+  // --- LLAVE GLOBAL PARA CONTROLAR LAS VALIDACIONES DEL FORMULARIO ---
+  final _formKey = GlobalKey<FormState>();
+
   String _selectedCurrency = 'ARS';
 
   // Controladores para los inputs
@@ -35,9 +37,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(
-        0xFFF4F6F9,
-      ), // Unificamos el fondo gris claro del flujo
+      backgroundColor: const Color(0xFFF4F6F9),
       body: SafeArea(
         top: false,
         child: Column(
@@ -75,7 +75,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
               ),
             ),
 
-            // --- CONTENEDOR FLOTANTE BLANCO (EL FORMULARIO) ---
+            // --- CONTENEDOR FLOTANTE BLANCO (AHORA DENTRO DE UN FORM) ---
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -93,99 +93,124 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                         ),
                       ],
                     ),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(
-                                Icons.assignment_outlined,
-                                color: Colors.grey,
+                    child: Form(
+                      key: _formKey, // <-- INYECTAMOS LA LLAVE DE CONTROL
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(
+                                  Icons.assignment_outlined,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Iniciar Nueva Venta',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 32),
+
+                            CurrencySelector(
+                              selectedCurrency: _selectedCurrency,
+                              onCurrencyChanged: (currency) {
+                                setState(() {
+                                  _selectedCurrency = currency;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 20),
+
+                            const Text(
+                              'Cantidad de Unidades',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // OPTIMIZADO: Cambiado a TextFormField con lógica de validación rigurosa
+                            TextFormField(
+                              controller: _unitsController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                hintText: 'Ingresar Unidades',
+                                prefixIcon: Icon(Icons.propane_tank_outlined),
                               ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Iniciar Nueva Venta',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'La cantidad es obligatoria';
+                                }
+                                final parsedUnits = double.tryParse(value);
+                                if (parsedUnits == null) {
+                                  return 'Ingrese un número válido';
+                                }
+                                if (parsedUnits <= 0) {
+                                  return 'La cantidad debe ser mayor a cero';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 24),
+
+                            CardFieldsContainer(
+                              cardNumberController: _cardNumberController,
+                              expiryController: _expiryController,
+                              cvvController: _cvvController,
+                              cardHolderController: _cardHolderController,
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            ElevatedButton(
+                              onPressed: () {
+                                // --- DISPARO DE LA VALIDACIÓN NATIVA ---
+                                if (_formKey.currentState!.validate()) {
+                                  // Si pasa el filtro, procesamos los datos con seguridad
+                                  final cubit = context.read<SalesCubit>();
+                                  final units =
+                                      double.tryParse(_unitsController.text) ??
+                                      0;
+
+                                  cubit.showReview(
+                                    currency: _selectedCurrency,
+                                    amount: units,
+                                    cardNumber: _cardNumberController.text,
+                                    cardHolder: _cardHolderController.text,
+                                  );
+
+                                  Navigator.pushNamed(context, '/sale_review');
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1A4F9C),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                            ],
-                          ),
-                          const Divider(height: 32),
-
-                          CurrencySelector(
-                            selectedCurrency: _selectedCurrency,
-                            onCurrencyChanged: (currency) {
-                              setState(() {
-                                _selectedCurrency = currency;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 20),
-
-                          const Text(
-                            'Cantidad de Unidades',
-                            style: TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _unitsController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: 'Ingresar Unidades',
-                              prefixIcon: Icon(Icons.propane_tank_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          CardFieldsContainer(
-                            cardNumberController: _cardNumberController,
-                            expiryController: _expiryController,
-                            cvvController: _cvvController,
-                            cardHolderController: _cardHolderController,
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          ElevatedButton(
-                            onPressed: () {
-                              final cubit = context.read<SalesCubit>();
-                              final units =
-                                  double.tryParse(_unitsController.text) ?? 0;
-
-                              // Llamamos al método correcto del Cubit para guardar la info
-                              cubit.showReview(
-                                currency: _selectedCurrency,
-                                amount: units,
-                                cardNumber: _cardNumberController
-                                    .text, // Pasamos el número completo formateado para la vista
-                                cardHolder: _cardHolderController.text,
-                              );
-
-                              // NUEVO: Agregamos el salto físico a la pantalla 3 de Resumen
-                              Navigator.pushNamed(context, '/sale_review');
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1A4F9C),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                              child: const Text(
+                                'CONTINUAR',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            child: const Text(
-                              'CONTINUAR',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

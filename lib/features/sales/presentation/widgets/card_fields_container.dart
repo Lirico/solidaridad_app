@@ -35,7 +35,9 @@ class CardFieldsContainer extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
+
+          // --- NÚMERO DE TARJETA CON VALIDACIÓN NATIVA ---
+          TextFormField(
             controller: cardNumberController,
             keyboardType: TextInputType.number,
             maxLength: 19,
@@ -48,12 +50,27 @@ class CardFieldsContainer extends StatelessWidget {
               prefixIcon: Icon(Icons.credit_card),
               counterText: '',
             ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'El número es obligatorio';
+              }
+              // Quitamos los espacios de la máscara para evaluar los dígitos puros
+              final cleanNumber = value.replaceAll(' ', '');
+              if (cleanNumber.length < 15 || cleanNumber.length > 16) {
+                return 'Debe tener entre 15 y 16 dígitos';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 12),
+
           Row(
+            crossAxisAlignment: CrossAxisAlignment
+                .start, // Evita que los errores desalineen la fila
             children: [
+              // --- VENCIMIENTO TARJETA ---
               Expanded(
-                child: TextField(
+                child: TextFormField(
                   controller: expiryController,
                   keyboardType: TextInputType.number,
                   maxLength: 5,
@@ -65,11 +82,28 @@ class CardFieldsContainer extends StatelessWidget {
                     hintText: 'MM/AA',
                     counterText: '',
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Obligatorio';
+                    }
+                    if (!value.contains('/') || value.length != 5) {
+                      return 'Formato inválido';
+                    }
+                    // Validamos que el mes sea coherente (01 a 12)
+                    final parts = value.split('/');
+                    final month = int.tryParse(parts[0]) ?? 0;
+                    if (month < 1 || month > 12) {
+                      return 'Mes inválido';
+                    }
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 12),
+
+              // --- CÓDIGO CVV ---
               Expanded(
-                child: TextField(
+                child: TextFormField(
                   controller: cvvController,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
@@ -77,14 +111,39 @@ class CardFieldsContainer extends StatelessWidget {
                     hintText: 'Código CVV',
                     counterText: '',
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Obligatorio';
+                    }
+                    if (value.length < 3 || value.length > 4) {
+                      return '3 o 4 dígitos';
+                    }
+                    return null;
+                  },
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          TextField(
+
+          // --- TITULAR DE LA TARJETA ---
+          TextFormField(
             controller: cardHolderController,
-            decoration: const InputDecoration(hintText: 'Nombre del Titular'),
+            textCapitalization: TextCapitalization
+                .characters, // Fuerza mayúsculas para estética bancaria
+            decoration: const InputDecoration(
+              hintText: 'Nombre del Titular',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'El nombre del titular es obligatorio';
+              }
+              if (value.trim().split(' ').length < 2) {
+                return 'Ingrese nombre y apellido completo';
+              }
+              return null;
+            },
           ),
         ],
       ),
@@ -92,7 +151,7 @@ class CardFieldsContainer extends StatelessWidget {
   }
 }
 
-// --- MÁSCARAS FORMATEADORAS INTERNAS ---
+// --- MÁSCARAS FORMATEADORAS INTERNAS (MANTENIDAS AL 100%) ---
 
 class _CardNumberFormatter extends TextInputFormatter {
   @override

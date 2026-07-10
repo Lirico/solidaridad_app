@@ -1,42 +1,95 @@
-abstract class SalesState {}
+import 'package:meta/meta.dart';
 
-// Pantalla 2: Formulario inicial
-class SalesInitial extends SalesState {}
+// --- MODELO SIMPLE PARA CADA OPERACIÓN ---
+class OperationModel {
+  final String id;
+  final String currency;
+  final double amount;
+  final String cardNumber;
+  final bool isSuccess;
+  final DateTime date;
 
-// Pantalla 3 (Parte A): El comerciante ve el ticket para revisar datos antes de enviar
-class SalesReviewing extends SalesState {
+  const OperationModel({
+    required this.id,
+    required this.currency,
+    required this.amount,
+    required this.cardNumber,
+    required this.isSuccess,
+    required this.date,
+  });
+}
+
+@immutable
+abstract class SalesState {
   final String currency;
   final double amount;
   final String cardNumber;
   final String cardHolder;
+  final List<OperationModel>
+  history; // <-- NUEVO: Guardamos el historial global aquí
 
-  SalesReviewing({
+  const SalesState({
     required this.currency,
     required this.amount,
     required this.cardNumber,
     required this.cardHolder,
+    required this.history, // <-- NUEVO
   });
 }
 
-// Pantalla 3 (Parte B): Animación de carga congelada ("Procesando")
-class SalesProcessing extends SalesState {}
+class SalesInitial extends SalesState {
+  const SalesInitial()
+    : super(
+        currency: 'ARS',
+        amount: 0.0,
+        cardNumber: '',
+        cardHolder: '',
+        history: const [],
+      );
+}
 
-class SalesLoading extends SalesState {}
+class SalesReviewing extends SalesState {
+  const SalesReviewing({
+    required super.currency,
+    required super.amount,
+    required super.cardNumber,
+    required super.cardHolder,
+    required super.history,
+  });
+}
 
-// Pantalla 4: Respuestas finales del sistema
+class SalesProcessing extends SalesState {
+  const SalesProcessing({
+    required super.currency,
+    required super.amount,
+    required super.cardNumber,
+    required super.cardHolder,
+    required super.history,
+  });
+}
+
 class SalesSuccess extends SalesState {
-  final String transactionId;
-  final double amount;
-  final String currency;
-  SalesSuccess({
-    required this.transactionId,
-    required this.amount,
-    required this.currency,
+  final String operationNumber;
+  const SalesSuccess({
+    required super.currency,
+    required super.amount,
+    required super.cardNumber,
+    required super.cardHolder,
+    required super.history,
+    required this.operationNumber,
   });
 }
 
 class SalesError extends SalesState {
   final String errorMessage;
-  final bool isNetworkError; // Para diferenciar el botón de reintento del PDF
-  SalesError({required this.errorMessage, this.isNetworkError = false});
+  final String errorCode;
+  const SalesError({
+    required super.currency,
+    required super.amount,
+    required super.cardNumber,
+    required super.cardHolder,
+    required super.history,
+    required this.errorMessage,
+    required this.errorCode,
+  });
 }

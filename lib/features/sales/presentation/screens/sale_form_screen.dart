@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/sales_cubit.dart';
-import '../widgets/sales_header.dart';
 import '../widgets/currency_selector.dart';
 import '../widgets/card_fields_container.dart';
 
@@ -36,11 +35,45 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(
+        0xFFF4F6F9,
+      ), // Unificamos el fondo gris claro del flujo
       body: SafeArea(
         top: false,
         child: Column(
           children: [
-            const SalesHeader(),
+            // --- CABECERA AZUL INTEGRADA CON BOTÓN DE HISTORIAL ---
+            Container(
+              width: double.infinity,
+              height: 180,
+              color: const Color(0xFF1A4F9C),
+              padding: const EdgeInsets.only(top: 60, left: 24, right: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Nueva Operación',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.history,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    tooltip: 'Ver historial de ventas',
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/sales_history');
+                    },
+                  ),
+                ],
+              ),
+            ),
 
             // --- CONTENEDOR FLOTANTE BLANCO (EL FORMULARIO) ---
             Expanded(
@@ -124,7 +157,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                               final units =
                                   double.tryParse(_unitsController.text) ?? 0;
 
-                              // Llamamos al método correcto del Cubit para mostrar la Pantalla 3 de revisión
+                              // Llamamos al método correcto del Cubit para guardar la info
                               cubit.showReview(
                                 currency: _selectedCurrency,
                                 amount: units,
@@ -132,6 +165,9 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                     .text, // Pasamos el número completo formateado para la vista
                                 cardHolder: _cardHolderController.text,
                               );
+
+                              // NUEVO: Agregamos el salto físico a la pantalla 3 de Resumen
+                              Navigator.pushNamed(context, '/sale_review');
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF1A4F9C),

@@ -6,20 +6,19 @@ import 'core/theme/app_theme.dart';
 
 // Registro de la lógica de Ventas
 import 'features/sales/presentation/cubit/sales_cubit.dart';
-import 'features/sales/data/sales_repository.dart';
 
 // Pantallas de ambas características
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/sales/presentation/screens/sale_form_screen.dart';
 import 'features/sales/presentation/screens/sale_review_screen.dart';
+import 'features/sales/presentation/screens/sale_status_screen.dart';
+import 'features/sales/presentation/screens/sales_history_screen.dart';
 
 void main() {
-  final salesRepository = SalesRepository();
-
   runApp(
     // Dejamos el Cubit de ventas arriba en el árbol para que esté disponible
     BlocProvider<SalesCubit>(
-      create: (context) => SalesCubit(salesRepository),
+      create: (context) => SalesCubit(),
       child: const MyApp(),
     ),
   );
@@ -43,6 +42,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/sales_form': (context) => const SaleFormScreen(),
         '/sale_review': (context) => const SaleReviewScreen(),
+        '/sale_status': (context) => const SaleStatusScreen(),
+        '/sales_history': (context) => const SalesHistoryScreen(),
       },
     );
   }

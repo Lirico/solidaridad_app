@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../widgets/sale_review_widgets.dart'; // <-- IMPORTAMOS LOS COMPONENTES EXTRAÍDOS
+import 'package:flutter_bloc/flutter_bloc.dart'; // <-- CORREGIDO: Import para usar .read() y .watch()
+import '../cubit/sales_cubit.dart'; // <-- CORREGIDO: Import del Cubit de tu feature
+import '../cubit/sales_state.dart'; // <-- CORREGIDO: Import de tus estados heredados
+import '../widgets/sale_review_widgets.dart';
 
 class SaleReviewScreen extends StatefulWidget {
   const SaleReviewScreen({super.key});
@@ -11,12 +14,15 @@ class SaleReviewScreen extends StatefulWidget {
 class _SaleReviewScreenState extends State<SaleReviewScreen> {
   bool _isProcessing = false;
 
+  // UNIFICADO: Solo una declaración limpia de confirmación
   void _onConfirmPayment() async {
     setState(() {
       _isProcessing = true;
     });
 
-    await Future.delayed(const Duration(seconds: 3));
+    // Despachamos la simulación ISO a AWS que configuramos en tu Cubit
+    final salesCubit = context.read<SalesCubit>();
+    await salesCubit.sendIsoMessage();
 
     if (!mounted) return;
 
@@ -24,13 +30,20 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
       _isProcessing = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mensaje ISO enviado con éxito a AWS')),
-    );
+    // Validamos el estado final emitido por el Cubit
+    final finalState = salesCubit.state;
+    final bool success =
+        finalState is SalesSuccess; // Si es la clase SalesSuccess, es un golazo
+
+    // Navegamos pasando el resultado dinámico a la pantalla final
+    Navigator.pushReplacementNamed(context, '/sale_status', arguments: success);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Escuchamos el estado actual del Cubit de forma reactiva
+    final salesState = context.watch<SalesCubit>().state;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
       body: SafeArea(
@@ -85,8 +98,10 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
                       ],
                     ),
                     child: _isProcessing
-                        ? const ProcessingTransactionView() // <-- COMPONENTE EXTRAÍDO
-                        : _buildReviewContent(),
+                        ? const ProcessingTransactionView()
+                        : _buildReviewContent(
+                            salesState,
+                          ), // <-- CORREGIDO: Le pasamos el estado capturado
                   ),
                 ),
               ),
@@ -98,11 +113,7 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
   }
 
   // --- CONTENIDO DEL RESUMEN DE COMPRA ---
-  Widget _buildReviewContent() {
-    const String selectedCurrency = 'ARS';
-    const String amountOfGas = '45.50';
-    const String maskedCard = '•••• •••• •••• 4321';
-
+  Widget _buildReviewContent(SalesState state) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -114,25 +125,27 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
         ),
         const SizedBox(height: 32),
 
-        // Usamos nuestro componente optimizado ReviewDataRow
-        const ReviewDataRow(
+        // Ahora lee directamente lo que guardaste en el formulario
+        ReviewDataRow(
           icon: Icons.monetization_on_outlined,
           label: 'Moneda de Cobro',
-          value: selectedCurrency,
+          value: state.currency,
         ),
         const Divider(height: 32),
 
-        const ReviewDataRow(
+        ReviewDataRow(
           icon: Icons.local_gas_station_outlined,
           label: 'Cantidad de Gas',
-          value: '$amountOfGas m³',
+          value: '${state.amount} m³',
         ),
         const Divider(height: 32),
 
-        const ReviewDataRow(
+        ReviewDataRow(
           icon: Icons.credit_card_outlined,
           label: 'Tarjeta Destino',
-          value: maskedCard,
+          value: state.cardNumber.isEmpty
+              ? '•••• •••• •••• 4321'
+              : state.cardNumber,
         ),
         const Spacer(),
 

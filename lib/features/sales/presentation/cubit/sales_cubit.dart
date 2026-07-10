@@ -1,13 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'sales_state.dart';
-import '../../data/sales_repository.dart';
 
 class SalesCubit extends Cubit<SalesState> {
-  final SalesRepository _repository;
+  // Inicializamos el Cubit con el estado inicial nativo
+  SalesCubit() : super(const SalesInitial());
 
-  SalesCubit(this._repository) : super(SalesInitial());
-
-  // 1. El botón CONTINUAR del formulario solo cambia el estado a modo "Revisión"
+  // 1. Al presionar "CONTINUAR", pasamos a modo Revisión arrastrando el historial actual
   void showReview({
     required String currency,
     required double amount,
@@ -20,56 +18,91 @@ class SalesCubit extends Cubit<SalesState> {
         amount: amount,
         cardNumber: cardNumber,
         cardHolder: cardHolder,
+        history: state.history, // Mantiene el historial que ya teníamos
       ),
     );
   }
 
-  // 2. Volver del resumen al formulario si se equivocó en algo
-  void cancelReview() {
-    emit(SalesInitial());
-  }
+  // 2. PASO 2: Procesamiento ISO hacia AWS guardando el resultado en la bitácora
+  Future<void> sendIsoMessage() async {
+    final currentCurrency = state.currency;
+    final currentAmount = state.amount;
+    final currentCardNumber = state.cardNumber;
+    final currentCardHolder = state.cardHolder;
 
-  // 3. El botón CONFIRMAR PAGO procesa la transacción de forma definitiva contra AWS
-  Future<void> confirmAndProcessSale({
-    required String currency,
-    required double amount,
-    required String cardNumber,
-  }) async {
-    emit(SalesProcessing()); // Cambia a la animación de carga del PDF
+    // Clonamos la lista de historial actual para no mutar el estado anterior directamente
+    final currentHistory = List<OperationModel>.from(state.history);
 
-    try {
-      final isSuccess = await _repository.processGasSale(
-        currency: currency,
-        amount: amount,
-        cardNumber: cardNumber,
+    // Emitimos el estado de carga transaccional
+    emit(
+      SalesProcessing(
+        currency: currentCurrency,
+        amount: currentAmount,
+        cardNumber: currentCardNumber,
+        cardHolder: currentCardHolder,
+        history: currentHistory,
+      ),
+    );
+
+    // Simulamos los 3 segundos de viaje del paquete de datos
+    await Future.delayed(const Duration(seconds: 3));
+
+    // Simulación: Al azar da aprobado o rechazado (80% éxito, 20% rebote)
+    final bool isApproved = DateTime.now().millisecond % 5 != 0;
+
+    // Generamos un ID de operación único basado en los últimos dígitos del timestamp
+    final String opId =
+        'OP-${DateTime.now().microsecondsSinceEpoch.toString().substring(10)}';
+
+    // Creamos el registro de la transacción actual
+    final newOperation = OperationModel(
+      id: opId,
+      currency: currentCurrency,
+      amount: currentAmount,
+      cardNumber: currentCardNumber.isNotEmpty
+          ? currentCardNumber
+          : '•••• 4321',
+      isSuccess: isApproved,
+      date: DateTime.now(),
+    );
+
+    // Insertamos la operación al principio (index 0) para que se vea arriba de todo en la lista
+    currentHistory.insert(0, newOperation);
+
+    if (isApproved) {
+      emit(
+        SalesSuccess(
+          currency: currentCurrency,
+          amount: currentAmount,
+          cardNumber: currentCardNumber,
+          cardHolder: currentCardHolder,
+          operationNumber: opId,
+          history: currentHistory, // Guardamos la lista con el éxito metido
+        ),
       );
-
-      if (isSuccess) {
-        // Simulamos un ID de transacción para el comprobante
-        emit(
-          SalesSuccess(
-            transactionId:
-                'TXN_ID: ${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
-            amount: amount,
-            currency: currency,
-          ),
-        );
-      } else {
-        emit(
-          SalesError(
-            errorMessage: 'Fondos Insuficientes\n(Rechazo del Banco)',
-            isNetworkError: false,
-          ),
-        );
-      }
-    } catch (e) {
+    } else {
       emit(
         SalesError(
-          errorMessage:
-              'No se pudo conectar con el servidor. Verifique su conexión.',
-          isNetworkError: true,
+          currency: currentCurrency,
+          amount: currentAmount,
+          cardNumber: currentCardNumber,
+          cardHolder: currentCardHolder,
+          errorMessage: 'La terminal reportó fondos insuficientes.',
+          errorCode: '51',
+          history: currentHistory, // Guardamos la lista con el rechazo metido
         ),
       );
     }
   }
+
+  // 3. Resetea el formulario pero CONSERVA el historial acumulado del día
+  void resetSale() {
+    emit(SalesInitialWithHistory(history: state.history));
+  }
+}
+
+// Pequeño helper por si al resetear la venta necesitás volver a SalesInitial sin perder la lista
+class SalesInitialWithHistory extends SalesState {
+  SalesInitialWithHistory({required super.history})
+    : super(currency: 'ARS', amount: 0.0, cardNumber: '', cardHolder: '');
 }

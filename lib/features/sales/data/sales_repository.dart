@@ -1,31 +1,121 @@
+import 'dart:async'; // <-- IMPORTANTE: Necesario para TimeoutException
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 
+// Clase para tipar la respuesta normalizada del backend
+class SaleResponse {
+  final bool isApproved;
+  final String operationNumber;
+  final String message;
+  final String errorCode;
+
+  const SaleResponse({
+    required this.isApproved,
+    required this.operationNumber,
+    required this.message,
+    required this.errorCode,
+  });
+}
+
 class SalesRepository {
-  // En Flutter las funciones asíncronas devuelven un Future (el equivalente a Promise)
-  Future<bool> processGasSale({
+  final http.Client _httpClient;
+  // TODO: Mover a un archivo de configuración de ambientes (.env) cuando configuren AWS
+  final String _baseUrl = 'https://api.solidaridad-prod.aws.com/v1';
+
+  SalesRepository({http.Client? httpClient})
+    : _httpClient = httpClient ?? http.Client();
+
+  Future<SaleResponse> registerGasSale({
     required String currency,
     required double amount,
     required String cardNumber,
+    required String cardHolder,
+    required String token, // Token de sesión de la Fase 0
   }) async {
-    final url = Uri.parse('https://api.tudominio.aws/v1/sales');
+    final url = Uri.parse('$_baseUrl/sales/gas');
+
+    final Map<String, dynamic> bodyPayload = {
+      'species_currency': currency,
+      'amount': amount,
+      'card_number': cardNumber.replaceAll(
+        ' ',
+        '',
+      ), // Quitamos la máscara visual
+      'card_holder': cardHolder,
+      'terminal_origin': 'VIRTUAL_POS_01', // ID de terminal asociada
+    };
 
     try {
-      final response = await http.post(
-        url,
-        body: jsonEncode({
-          'especie_moneda': currency,
-          'cantidad': amount,
-          'tarjeta_numero': cardNumber,
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
+      final response = await _httpClient
+          .post(
+            url,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
+            body: jsonEncode(bodyPayload),
+          )
+          .timeout(
+            const Duration(seconds: 15),
+          ); // Control de Timeout que pide el instructivo
 
-      // Si el backend normaliza un 200 OK (aprobada)
-      return response.statusCode == 200;
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Operación procesada de forma exitosa por el Gateway ISO
+        final bool approved = responseData['status'] == 'APPROVED';
+
+        return SaleResponse(
+          isApproved: approved,
+          operationNumber: responseData['operation_number'] ?? 'OP-UNKNOWN',
+          message: responseData['user_message'] ?? 'Operación procesada',
+          errorCode: responseData['error_code'] ?? '00',
+        );
+      } else {
+        // Errores de negocio reportados por el Backend/Procesador (ej: Fondos insuficientes)
+        return SaleResponse(
+          isApproved: false,
+          operationNumber: responseData['operation_number'] ?? '',
+          message:
+              responseData['user_message'] ??
+              'Venta rechazada por la entidad emisora.',
+          errorCode: responseData['error_code'] ?? '${response.statusCode}',
+        );
+      }
+    } on TimeoutException {
+      // <-- CORREGIDO: Sintaxis limpia para capturar timeouts
+      return const SaleResponse(
+        isApproved: false,
+        operationNumber: '',
+        message:
+            'Tiempo de espera agotado con el procesador de pagos (Timeout). Reintente.',
+        errorCode: '99',
+      );
+    } on SocketException {
+      // Error de conectividad física o DNS
+      return const SaleResponse(
+        isApproved: false,
+        operationNumber: '',
+        message:
+            'No se pudo establecer conexión con el servidor de AWS. Verifique su red.',
+        errorCode: 'CONN_ERR',
+      );
+    } on HttpException {
+      return const SaleResponse(
+        isApproved: false,
+        operationNumber: '',
+        message: 'Error en el protocolo de comunicación con la API.',
+        errorCode: 'HTTP_ERR',
+      );
     } catch (e) {
-      // Manejo básico de errores de comunicación solicitados en la Fase 0
-      throw Exception('Error de conexión con el servidor');
+      // <-- CORREGIDO: Catch genérico final impecable
+      return SaleResponse(
+        isApproved: false,
+        operationNumber: '',
+        message: 'Error inesperado: ${e.toString()}',
+        errorCode: 'UNKNOWN',
+      );
     }
   }
 }

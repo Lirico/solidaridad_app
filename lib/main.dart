@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/theme/app_theme.dart';
 
 // Registro de la lógica de Ventas
+import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
 
 // Pantallas de ambas características
@@ -15,10 +16,14 @@ import 'features/sales/presentation/screens/sale_status_screen.dart';
 import 'features/sales/presentation/screens/sales_history_screen.dart';
 
 void main() {
+  // 1. Instanciamos el repositorio global que va a manejar las peticiones HTTP a AWS
+  final salesRepository = SalesRepository();
+
   runApp(
     // Dejamos el Cubit de ventas arriba en el árbol para que esté disponible
     BlocProvider<SalesCubit>(
-      create: (context) => SalesCubit(),
+      // 2. CORREGIDO: Le inyectamos el repositorio al constructor del Cubit
+      create: (context) => SalesCubit(salesRepository: salesRepository),
       child: const MyApp(),
     ),
   );

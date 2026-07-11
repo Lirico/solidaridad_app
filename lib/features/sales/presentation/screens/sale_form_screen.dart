@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_routes.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/currency_selector.dart';
 import '../widgets/card_fields_container.dart';
@@ -149,7 +150,10 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                     cardHolder: _cardHolderController.text,
                                   );
 
-                                  Navigator.pushNamed(context, '/sale_review');
+                                  Navigator.pushNamed(
+                                    context,
+                                    AppRoutes.saleReview,
+                                  );
                                 }
                               },
                               style: ElevatedButton.styleFrom(

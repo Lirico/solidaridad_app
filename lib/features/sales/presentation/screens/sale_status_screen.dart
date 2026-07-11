@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_routes.dart';
 import '../widgets/sale_review_header.dart';
 import '../widgets/sale_status_content.dart';
 
@@ -59,7 +60,7 @@ class SaleStatusScreen extends StatelessWidget {
                       onFinalize: () {
                         Navigator.pushNamedAndRemoveUntil(
                           context,
-                          '/sales_form',
+                          AppRoutes.saleForm,
                           (route) => false,
                         );
                       },

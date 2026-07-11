@@ -1,22 +1,8 @@
-import 'dart:async'; // <-- IMPORTANTE: Necesario para TimeoutException
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-
-// Clase para tipar la respuesta normalizada del backend
-class SaleResponse {
-  final bool isApproved;
-  final String operationNumber;
-  final String message;
-  final String errorCode;
-
-  const SaleResponse({
-    required this.isApproved,
-    required this.operationNumber,
-    required this.message,
-    required this.errorCode,
-  });
-}
+import '../domain/sale_model.dart';
 
 class SalesRepository {
   final http.Client _httpClient;

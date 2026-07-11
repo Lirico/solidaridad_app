@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../data/models/operation_model.dart';
+import '../../../sales/domain/sale_model.dart';
 
 class SaleDetailTicket extends StatelessWidget {
   final OperationModel operation;

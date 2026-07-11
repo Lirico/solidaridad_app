@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../../core/formatters/card_formatters.dart';
 
 class CardFieldsContainer extends StatelessWidget {
   final TextEditingController cardNumberController;
@@ -43,7 +44,7 @@ class CardFieldsContainer extends StatelessWidget {
             maxLength: 19,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
-              _CardNumberFormatter(),
+              CardNumberFormatter(),
             ],
             decoration: const InputDecoration(
               hintText: 'Número de Tarjeta',
@@ -76,7 +77,7 @@ class CardFieldsContainer extends StatelessWidget {
                   maxLength: 5,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
-                    _CardExpiryFormatter(),
+                    CardExpiryFormatter(),
                   ],
                   decoration: const InputDecoration(
                     hintText: 'MM/AA',
@@ -107,6 +108,7 @@ class CardFieldsContainer extends StatelessWidget {
                   controller: cvvController,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: const InputDecoration(
                     hintText: 'Código CVV',
                     counterText: '',
@@ -147,60 +149,6 @@ class CardFieldsContainer extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// --- MÁSCARAS FORMATEADORAS INTERNAS (MANTENIDAS AL 100%) ---
-
-class _CardNumberFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    var text = newValue.text;
-    if (newValue.selection.baseOffset == 0) return newValue;
-
-    var buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      buffer.write(text[i]);
-      var nonZeroIndex = i + 1;
-      if (nonZeroIndex % 4 == 0 && nonZeroIndex != text.length) {
-        buffer.write(' ');
-      }
-    }
-
-    var string = buffer.toString();
-    return newValue.copyWith(
-      text: string,
-      selection: TextSelection.collapsed(offset: string.length),
-    );
-  }
-}
-
-class _CardExpiryFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    var text = newValue.text;
-    if (newValue.selection.baseOffset == 0) return newValue;
-
-    var buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      buffer.write(text[i]);
-      var nonZeroIndex = i + 1;
-      if (nonZeroIndex == 2 && nonZeroIndex != text.length) {
-        buffer.write('/');
-      }
-    }
-
-    var string = buffer.toString();
-    return newValue.copyWith(
-      text: string,
-      selection: TextSelection.collapsed(offset: string.length),
     );
   }
 }

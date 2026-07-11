@@ -1,44 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_routes.dart';
 import '../cubit/sales_cubit.dart';
 import '../cubit/sales_state.dart';
 import '../widgets/sale_review_widgets.dart';
-import '../widgets/sale_review_header.dart'; // 👑 NUEVO
-import '../widgets/sale_review_content.dart'; // 👑 NUEVO
+import '../widgets/sale_review_header.dart';
+import '../widgets/sale_review_content.dart';
 
-class SaleReviewScreen extends StatefulWidget {
+class SaleReviewScreen extends StatelessWidget {
   const SaleReviewScreen({super.key});
 
-  @override
-  State<SaleReviewScreen> createState() => _SaleReviewScreenState();
-}
-
-class _SaleReviewScreenState extends State<SaleReviewScreen> {
-  bool _isProcessing = false;
-
-  void _onConfirmPayment() async {
-    setState(() {
-      _isProcessing = true;
-    });
-
+  void _onConfirmPayment(BuildContext context) async {
     final salesCubit = context.read<SalesCubit>();
     await salesCubit.sendIsoMessage();
 
-    if (!mounted) return;
-
-    setState(() {
-      _isProcessing = false;
-    });
+    if (!context.mounted) return;
 
     final finalState = salesCubit.state;
-    final bool success = finalState is SalesSuccess;
+    final bool success = finalState is SalesCompleted && finalState.isSuccess;
 
-    Navigator.pushReplacementNamed(context, '/sale_status', arguments: success);
+    Navigator.pushReplacementNamed(
+      context,
+      AppRoutes.saleStatus,
+      arguments: success,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final salesState = context.watch<SalesCubit>().state;
+    final isProcessing = salesState is SalesProcessing;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
@@ -48,9 +39,7 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
           children: [
             SaleReviewHeader(
               title: 'Confirmar Operación',
-              onBackPressed: _isProcessing
-                  ? null
-                  : () => Navigator.pop(context),
+              onBackPressed: isProcessing ? null : () => Navigator.pop(context),
             ),
             Expanded(
               child: Transform.translate(
@@ -71,12 +60,11 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
                         ),
                       ],
                     ),
-                    child: _isProcessing
+                    child: isProcessing
                         ? const ProcessingTransactionView()
                         : SaleReviewContent(
-                            // 👑 CONTENIDO AISLADO AQUÍ
                             state: salesState,
-                            onConfirm: _onConfirmPayment,
+                            onConfirm: () => _onConfirmPayment(context),
                           ),
                   ),
                 ),

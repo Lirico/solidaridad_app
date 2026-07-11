@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_routes.dart';
 import '../widgets/login_form_fields.dart';
-import '../widgets/auth_header.dart'; // 👑 NUEVO IMPORT
+import '../widgets/auth_header.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,12 +24,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         top: false,
         child: Column(
           children: [
-            const AuthHeader(), // 👑 REUTILIZADO: Limpiamos por completo la visual superior
+            const AuthHeader(),
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -53,10 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const SizedBox(height: 10),
-                          const Icon(
+                          Icon(
                             Icons.lock_open_outlined,
                             size: 44,
-                            color: Color(0xFF1A4F9C),
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(height: 16),
                           const Text(
@@ -78,31 +79,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           ElevatedButton(
                             onPressed: () {
-                              // Simulación temporal de navegación para que pruebes el flujo completo
-                              print('Usuario: ${_userController.text}');
-                              print('Clave: ${_passwordController.text}');
                               Navigator.pushReplacementNamed(
                                 context,
-                                '/sales_form',
+                                AppRoutes.saleForm,
                               );
                             },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1A4F9C),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 2,
-                            ),
-                            child: const Text(
-                              'INGRESAR',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.1,
-                              ),
-                            ),
+                            child: const Text('INGRESAR'),
                           ),
                         ],
                       ),

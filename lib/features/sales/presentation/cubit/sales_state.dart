@@ -1,25 +1,8 @@
 import 'package:flutter/material.dart';
-
-class OperationModel {
-  final String id;
-  final String currency;
-  final double amount;
-  final String cardNumber;
-  final bool isSuccess;
-  final DateTime date;
-
-  const OperationModel({
-    required this.id,
-    required this.currency,
-    required this.amount,
-    required this.cardNumber,
-    required this.isSuccess,
-    required this.date,
-  });
-}
+import '../../domain/sale_model.dart';
 
 @immutable
-abstract class SalesState {
+sealed class SalesState {
   final String currency;
   final double amount;
   final String cardNumber;
@@ -66,28 +49,26 @@ class SalesProcessing extends SalesState {
   });
 }
 
-class SalesSuccess extends SalesState {
-  final String operationNumber;
-  const SalesSuccess({
+class SalesCompleted extends SalesState {
+  final bool isSuccess;
+  final String? operationNumber;
+  final String? errorMessage;
+  final String? errorCode;
+
+  const SalesCompleted({
     required super.currency,
     required super.amount,
     required super.cardNumber,
     required super.cardHolder,
     required super.history,
-    required this.operationNumber,
+    required this.isSuccess,
+    this.operationNumber,
+    this.errorMessage,
+    this.errorCode,
   });
 }
 
-class SalesError extends SalesState {
-  final String errorMessage;
-  final String errorCode;
-  const SalesError({
-    required super.currency,
-    required super.amount,
-    required super.cardNumber,
-    required super.cardHolder,
-    required super.history,
-    required this.errorMessage,
-    required this.errorCode,
-  });
+class SalesInitialWithHistory extends SalesState {
+  const SalesInitialWithHistory({required super.history})
+    : super(currency: 'ARS', amount: 0.0, cardNumber: '', cardHolder: '');
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/change_password_form_fields.dart'; // 👑 NUEVO IMPORT
+import '../widgets/change_password_form_fields.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -37,13 +37,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Seguridad',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: const Color(0xFF1A4F9C),
+        backgroundColor: Theme.of(context).colorScheme.primary,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
@@ -53,7 +53,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             Container(
               width: double.infinity,
               height: 40,
-              color: const Color(0xFF1A4F9C),
+              color: Theme.of(context).colorScheme.primary,
             ),
             Transform.translate(
               offset: const Offset(0, -20),
@@ -77,7 +77,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 👑 CONTENIDO TOTALMENTE MODULARIZADO AQUÍ abajo
                         ChangePasswordFormFields(
                           currentPasswordController: _currentPasswordController,
                           newPasswordController: _newPasswordController,
@@ -87,22 +86,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
                         ElevatedButton(
                           onPressed: _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1A4F9C),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'CONFIRMAR CAMBIO',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: const Text('CONFIRMAR CAMBIO'),
                         ),
                       ],
                     ),

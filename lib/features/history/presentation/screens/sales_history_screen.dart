@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_routes.dart';
 import '../../../sales/presentation/cubit/sales_cubit.dart';
 import '../../../sales/presentation/cubit/sales_state.dart';
 
@@ -11,7 +12,7 @@ class SalesHistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historial de Ventas'),
-        backgroundColor: const Color(0xFF0D47A1), // Azul corporativo
+        backgroundColor: Theme.of(context).colorScheme.primary,
       ),
       body: BlocBuilder<SalesCubit, SalesState>(
         builder: (context, state) {
@@ -51,7 +52,7 @@ class SalesHistoryScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.pushNamed(
                       context,
-                      '/sale_detail',
+                      AppRoutes.saleDetail,
                       arguments: operation,
                     );
                   },

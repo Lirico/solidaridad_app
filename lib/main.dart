@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/constants/app_routes.dart';
 import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
 
-// Importaciones de pantallas
 import 'features/auth/presentation/screens/login_screen.dart';
-import 'features/auth/presentation/screens/change_password_screen.dart'; // <-- NUEVO
+import 'features/auth/presentation/screens/change_password_screen.dart';
 import 'features/sales/presentation/screens/sale_form_screen.dart';
 import 'features/sales/presentation/screens/sale_review_screen.dart';
 import 'features/sales/presentation/screens/sale_status_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
-import 'features/history/presentation/screens/sale_detail_screen.dart'; // <-- NUEVO
+import 'features/history/presentation/screens/sale_detail_screen.dart';
 
 void main() {
   final salesRepository = SalesRepository();
@@ -34,16 +34,15 @@ class MyApp extends StatelessWidget {
       title: 'GAS Terminal',
       debugShowCheckedModeBanner: false,
       theme: appTheme,
-      initialRoute: '/login',
+      initialRoute: AppRoutes.login,
       routes: {
-        '/login': (context) => const LoginScreen(),
-        '/change_password': (context) =>
-            const ChangePasswordScreen(), // <-- NUEVO
-        '/sales_form': (context) => const SaleFormScreen(),
-        '/sale_review': (context) => const SaleReviewScreen(),
-        '/sale_status': (context) => const SaleStatusScreen(),
-        '/sales_history': (context) => const SalesHistoryScreen(),
-        '/sale_detail': (context) => const SaleDetailScreen(), // <-- NUEVO
+        AppRoutes.login: (context) => const LoginScreen(),
+        AppRoutes.changePassword: (context) => const ChangePasswordScreen(),
+        AppRoutes.saleForm: (context) => const SaleFormScreen(),
+        AppRoutes.saleReview: (context) => const SaleReviewScreen(),
+        AppRoutes.saleStatus: (context) => const SaleStatusScreen(),
+        AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
+        AppRoutes.saleDetail: (context) => const SaleDetailScreen(),
       },
     );
   }

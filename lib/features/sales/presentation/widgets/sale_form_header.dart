@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_routes.dart';
 
 class SaleFormHeader extends StatelessWidget {
   const SaleFormHeader({super.key});
@@ -32,7 +33,7 @@ class SaleFormHeader extends StatelessWidget {
                 ),
                 tooltip: 'Cambiar Contraseña',
                 onPressed: () {
-                  Navigator.pushNamed(context, '/change_password');
+                  Navigator.pushNamed(context, AppRoutes.changePassword);
                 },
               ),
               const SizedBox(width: 8),
@@ -40,7 +41,7 @@ class SaleFormHeader extends StatelessWidget {
                 icon: const Icon(Icons.history, color: Colors.white, size: 28),
                 tooltip: 'Ver historial de ventas',
                 onPressed: () {
-                  Navigator.pushNamed(context, '/sales_history');
+                  Navigator.pushNamed(context, AppRoutes.salesHistory);
                 },
               ),
             ],

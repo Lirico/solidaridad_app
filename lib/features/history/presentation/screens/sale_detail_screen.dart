@@ -1,26 +1,23 @@
 import 'package:flutter/material.dart';
-import '../../data/models/operation_model.dart';
-import '../widgets/sale_detail_ticket.dart'; // 👑 NUEVO IMPORT
+import '../../../sales/domain/sale_model.dart';
+import '../widgets/sale_detail_ticket.dart';
 
 class SaleDetailScreen extends StatelessWidget {
   const SaleDetailScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Recibimos la operación por los argumentos de la ruta nativa
     final operation =
         ModalRoute.of(context)!.settings.arguments as OperationModel;
 
     return Scaffold(
-      backgroundColor: const Color(
-        0xFFF4F6F9,
-      ), // Unificamos el fondo gris claro
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Detalle de Comprobante',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: const Color(0xFF1A4F9C), // Mismo azul institucional
+        backgroundColor: Theme.of(context).colorScheme.primary,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
@@ -33,7 +30,6 @@ class SaleDetailScreen extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
-            // 👑 CONTENIDO TOTALMENTE MODULARIZADO
             child: SaleDetailTicket(operation: operation),
           ),
         ),

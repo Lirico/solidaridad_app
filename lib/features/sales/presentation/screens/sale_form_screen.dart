@@ -57,16 +57,33 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.history,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                    tooltip: 'Ver historial de ventas',
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/sales_history');
-                    },
+                  // Agrupamos los botones de acción en la esquina derecha
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.lock_reset, // 👑 Ícono de reseteo de candado
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        tooltip: 'Cambiar Contraseña',
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/change_password');
+                        },
+                      ),
+                      const SizedBox(width: 8), // Separación entre botones
+                      IconButton(
+                        icon: const Icon(
+                          Icons.history,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        tooltip: 'Ver historial de ventas',
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/sales_history');
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

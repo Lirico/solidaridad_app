@@ -1,28 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-// Estilos globales
 import 'core/theme/app_theme.dart';
-
-// Registro de la lógica de Ventas
 import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
 
-// Pantallas de ambas características
+// Importaciones de pantallas
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/auth/presentation/screens/change_password_screen.dart'; // <-- NUEVO
 import 'features/sales/presentation/screens/sale_form_screen.dart';
 import 'features/sales/presentation/screens/sale_review_screen.dart';
 import 'features/sales/presentation/screens/sale_status_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
+import 'features/history/presentation/screens/sale_detail_screen.dart'; // <-- NUEVO
 
 void main() {
-  // 1. Instanciamos el repositorio global que va a manejar las peticiones HTTP a AWS
   final salesRepository = SalesRepository();
 
   runApp(
-    // Dejamos el Cubit de ventas arriba en el árbol para que esté disponible
     BlocProvider<SalesCubit>(
-      // 2. CORREGIDO: Le inyectamos el repositorio al constructor del Cubit
       create: (context) => SalesCubit(salesRepository: salesRepository),
       child: const MyApp(),
     ),
@@ -38,17 +34,16 @@ class MyApp extends StatelessWidget {
       title: 'GAS Terminal',
       debugShowCheckedModeBanner: false,
       theme: appTheme,
-
-      // 1. Definimos que el punto de entrada oficial es el Login
       initialRoute: '/login',
-
-      // 2. El mapa de rutas que vincula las pantallas del MVP
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/change_password': (context) =>
+            const ChangePasswordScreen(), // <-- NUEVO
         '/sales_form': (context) => const SaleFormScreen(),
         '/sale_review': (context) => const SaleReviewScreen(),
         '/sale_status': (context) => const SaleStatusScreen(),
         '/sales_history': (context) => const SalesHistoryScreen(),
+        '/sale_detail': (context) => const SaleDetailScreen(), // <-- NUEVO
       },
     );
   }

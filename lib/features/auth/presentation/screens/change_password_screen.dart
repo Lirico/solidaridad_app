@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/change_password_form_fields.dart'; // 👑 NUEVO IMPORT
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -36,24 +37,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Usamos el mismo gris claro de fondo que el formulario principal
       backgroundColor: const Color(0xFFF4F6F9),
       appBar: AppBar(
         title: const Text(
           'Seguridad',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        // Mismo tono de azul que el resto de los headers
         backgroundColor: const Color(0xFF1A4F9C),
-        iconTheme: const IconThemeData(
-          color: Colors.white,
-        ), // Flecha de volver en blanco
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Contenedor azul superior para darle continuidad visual al header
             Container(
               width: double.infinity,
               height: 40,
@@ -81,71 +77,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.lock_outline, color: Colors.grey),
-                            SizedBox(width: 8),
-                            Text(
-                              'Actualizar Contraseña',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 32),
-
-                        TextFormField(
-                          controller: _currentPasswordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Contraseña Actual',
-                            prefixIcon: Icon(Icons.lock_open_outlined),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Campo requerido';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-
-                        TextFormField(
-                          controller: _newPasswordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Nueva Contraseña',
-                            prefixIcon: Icon(Icons.vpn_key_outlined),
-                            hintText: 'Mínimo 6 caracteres',
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Campo requerido';
-                            }
-                            if (value.length < 6) {
-                              return 'Debe tener al menos 6 caracteres';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Confirmar Nueva Contraseña',
-                            prefixIcon: Icon(Icons.check_circle_outline),
-                          ),
-                          validator: (value) {
-                            if (value != _newPasswordController.text) {
-                              return 'Las contraseñas no coinciden';
-                            }
-                            return null;
-                          },
+                        // 👑 CONTENIDO TOTALMENTE MODULARIZADO AQUÍ abajo
+                        ChangePasswordFormFields(
+                          currentPasswordController: _currentPasswordController,
+                          newPasswordController: _newPasswordController,
+                          confirmPasswordController: _confirmPasswordController,
                         ),
                         const SizedBox(height: 32),
 

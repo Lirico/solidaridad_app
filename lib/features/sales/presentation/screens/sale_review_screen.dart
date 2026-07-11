@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/sales_cubit.dart';
 import '../cubit/sales_state.dart';
 import '../widgets/sale_review_widgets.dart';
+import '../widgets/sale_review_header.dart'; // 👑 NUEVO
+import '../widgets/sale_review_content.dart'; // 👑 NUEVO
 
 class SaleReviewScreen extends StatefulWidget {
   const SaleReviewScreen({super.key});
@@ -44,31 +46,11 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
         top: false,
         child: Column(
           children: [
-            // --- CABECERA AZUL INSTITUCIONAL ---
-            Container(
-              width: double.infinity,
-              height: 180,
-              color: const Color(0xFF1A4F9C),
-              padding: const EdgeInsets.only(top: 60, left: 24, right: 24),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: _isProcessing
-                        ? null
-                        : () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Confirmar Operación',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+            SaleReviewHeader(
+              title: 'Confirmar Operación',
+              onBackPressed: _isProcessing
+                  ? null
+                  : () => Navigator.pop(context),
             ),
             Expanded(
               child: Transform.translate(
@@ -91,7 +73,11 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
                     ),
                     child: _isProcessing
                         ? const ProcessingTransactionView()
-                        : _buildReviewContent(salesState),
+                        : SaleReviewContent(
+                            // 👑 CONTENIDO AISLADO AQUÍ
+                            state: salesState,
+                            onConfirm: _onConfirmPayment,
+                          ),
                   ),
                 ),
               ),
@@ -99,68 +85,6 @@ class _SaleReviewScreenState extends State<SaleReviewScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  // --- CONTENIDO DEL RESUMEN DE COMPRA ---
-  Widget _buildReviewContent(SalesState state) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 12),
-        const Text(
-          'Verifique los datos antes de proceder al cobro en la terminal.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.grey),
-        ),
-        const SizedBox(height: 32),
-
-        // Ahora lee directamente lo que guardaste en el formulario
-        ReviewDataRow(
-          icon: Icons.monetization_on_outlined,
-          label: 'Moneda de Cobro',
-          value: state.currency,
-        ),
-        const Divider(height: 32),
-
-        ReviewDataRow(
-          icon: Icons.local_gas_station_outlined,
-          label: 'Cantidad de Gas',
-          value: '${state.amount} m³',
-        ),
-        const Divider(height: 32),
-
-        ReviewDataRow(
-          icon: Icons.credit_card_outlined,
-          label: 'Tarjeta Destino',
-          value: state.cardNumber.isEmpty
-              ? '•••• •••• •••• 4321'
-              : state.cardNumber,
-        ),
-        const Spacer(),
-
-        // Botón Principal de Confirmación
-        ElevatedButton(
-          onPressed: _onConfirmPayment,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFE67E22),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: 2,
-          ),
-          child: const Text(
-            'CONFIRMAR COBRO',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

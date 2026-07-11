@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/currency_selector.dart';
 import '../widgets/card_fields_container.dart';
+import '../widgets/sale_form_header.dart';
 
 class SaleFormScreen extends StatefulWidget {
   const SaleFormScreen({super.key});
@@ -40,54 +41,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
         top: false,
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              height: 180,
-              color: const Color(0xFF1A4F9C),
-              padding: const EdgeInsets.only(top: 60, left: 24, right: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Nueva Operación',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  // Agrupamos los botones de acción en la esquina derecha
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.lock_reset, // 👑 Ícono de reseteo de candado
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        tooltip: 'Cambiar Contraseña',
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/change_password');
-                        },
-                      ),
-                      const SizedBox(width: 8), // Separación entre botones
-                      IconButton(
-                        icon: const Icon(
-                          Icons.history,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        tooltip: 'Ver historial de ventas',
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/sales_history');
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            const SaleFormHeader(),
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -106,7 +60,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                       ],
                     ),
                     child: Form(
-                      key: _formKey, // <-- INYECTAMOS LA LLAVE DE CONTROL
+                      key: _formKey,
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(20.0),
                         child: Column(
@@ -183,7 +137,6 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                             ElevatedButton(
                               onPressed: () {
                                 if (_formKey.currentState!.validate()) {
-                                  // Si pasa el filtro, procesamos los datos con seguridad
                                   final cubit = context.read<SalesCubit>();
                                   final units =
                                       double.tryParse(_unitsController.text) ??

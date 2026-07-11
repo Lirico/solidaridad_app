@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/login_form_fields.dart';
+import '../widgets/auth_header.dart'; // 👑 NUEVO IMPORT
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -9,7 +10,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Controladores locales de los inputs
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -28,49 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
         top: false,
         child: Column(
           children: [
-            // --- CABECERA AZUL INSTITUCIONAL ---
-            Container(
-              width: double.infinity,
-              height: 180,
-              color: const Color(0xFF1A4F9C),
-              padding: const EdgeInsets.only(top: 60, left: 24, right: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.local_gas_station,
-                    color: Colors.orange,
-                    size: 40,
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Text(
-                        'GAS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      Text(
-                        'TERMINAL',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w300,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // --- CONTENEDOR FLOTANTE BLANCO ---
+            const AuthHeader(), // 👑 REUTILIZADO: Limpiamos por completo la visual superior
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -112,20 +70,21 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const Divider(height: 40),
 
-                          // Componente de los campos extraído
                           LoginFormFields(
                             userInputController: _userController,
                             passwordInputController: _passwordController,
                           ),
                           const SizedBox(height: 40),
 
-                          // Botón de acción principal
                           ElevatedButton(
                             onPressed: () {
-                              // Acá va a disparar el Cubit de autenticación a futuro.
-                              // De momento imprimimos para validar que lea bien los inputs
+                              // Simulación temporal de navegación para que pruebes el flujo completo
                               print('Usuario: ${_userController.text}');
                               print('Clave: ${_passwordController.text}');
+                              Navigator.pushReplacementNamed(
+                                context,
+                                '/sales_form',
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF1A4F9C),

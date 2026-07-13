@@ -10,10 +10,12 @@ class AuthResponse {
   final bool isSuccess;
   final User? user;
   final String message;
+  final bool mustChangePassword;
 
   const AuthResponse({
     required this.isSuccess,
     this.user,
     required this.message,
+    this.mustChangePassword = false,
   });
 }

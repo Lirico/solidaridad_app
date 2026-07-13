@@ -5,9 +5,7 @@ import 'auth_state.dart';
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository _authRepository;
 
-  AuthCubit({required AuthRepository authRepository})
-    : _authRepository = authRepository,
-      super(const AuthInitial());
+  AuthCubit({required this._authRepository}) : super(const AuthInitial());
 
   Future<void> login({
     required String usernameOrEmail,
@@ -21,7 +19,13 @@ class AuthCubit extends Cubit<AuthState> {
     );
 
     if (response.isSuccess && response.user != null) {
-      emit(AuthSuccess(user: response.user!, message: response.message));
+      emit(
+        AuthSuccess(
+          user: response.user!,
+          message: response.message,
+          mustChangePassword: response.mustChangePassword,
+        ),
+      );
     } else {
       emit(AuthError(message: response.message));
     }
@@ -51,6 +55,9 @@ class AuthCubit extends Cubit<AuthState> {
     required String currentPassword,
     required String newPassword,
   }) async {
+    final previousUser = state is AuthSuccess
+        ? (state as AuthSuccess).user
+        : null;
     emit(const AuthLoading(loadingMessage: 'Cambiando contraseña...'));
 
     final response = await _authRepository.changePassword(
@@ -59,7 +66,7 @@ class AuthCubit extends Cubit<AuthState> {
     );
 
     if (response.isSuccess) {
-      emit(AuthSuccess(message: response.message));
+      emit(AuthSuccess(user: previousUser, message: response.message));
     } else {
       emit(AuthError(message: response.message));
     }

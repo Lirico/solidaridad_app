@@ -8,8 +8,16 @@ class AuthRepository {
   final http.Client _httpClient;
   final String _baseUrl = 'https://api.solidaridad-prod.aws.com/v1';
 
+  // Mock: conjunto de usuarios que ya cambiaron su contraseña
+  static final Set<String> _usersWithPasswordChanged = {};
+
   AuthRepository({http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
+
+  /// Marca a un usuario como que ya cambió su contraseña (mock)
+  static void markPasswordAsChanged(String username) {
+    _usersWithPasswordChanged.add(username.toLowerCase());
+  }
 
   Future<AuthResponse> login({
     required String usernameOrEmail,
@@ -32,6 +40,9 @@ class AuthRepository {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
+        final String email = (data['email'] ?? '').toString().toLowerCase();
+        final bool mustChange = !_usersWithPasswordChanged.contains(email);
+
         return AuthResponse(
           isSuccess: true,
           user: User(
@@ -40,6 +51,7 @@ class AuthRepository {
             token: data['token'] ?? '',
           ),
           message: 'Inicio de sesión exitoso',
+          mustChangePassword: mustChange,
         );
       } else {
         return AuthResponse(

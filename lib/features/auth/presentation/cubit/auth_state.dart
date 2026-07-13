@@ -18,7 +18,13 @@ class AuthLoading extends AuthState {
 }
 
 class AuthSuccess extends AuthState {
-  const AuthSuccess({super.user, super.message});
+  final bool mustChangePassword;
+
+  const AuthSuccess({
+    super.user,
+    super.message,
+    this.mustChangePassword = false,
+  });
 }
 
 class AuthError extends AuthState {

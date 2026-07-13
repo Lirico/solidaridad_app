@@ -44,7 +44,6 @@ class _LoginFormFieldsState extends State<LoginFormFields> {
         TextFormField(
           controller: widget.passwordInputController,
           obscureText: _obscurePassword, // Oculta el texto dinámicamente
-          validator: validatePassword,
           decoration: InputDecoration(
             hintText: 'Ingrese su contraseña',
             prefixIcon: const Icon(Icons.lock_outline),

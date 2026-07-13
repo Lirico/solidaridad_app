@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/validators/auth_validators.dart';
 
 class ChangePasswordFormFields extends StatelessWidget {
   final TextEditingController currentPasswordController;
@@ -55,17 +56,9 @@ class ChangePasswordFormFields extends StatelessWidget {
           decoration: const InputDecoration(
             labelText: 'Nueva Contraseña',
             prefixIcon: Icon(Icons.vpn_key_outlined),
-            hintText: 'Mínimo 6 caracteres',
+            hintText: '8-20 caracteres, mayúscula, número y especial',
           ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Campo requerido';
-            }
-            if (value.length < 6) {
-              return 'Debe tener al menos 6 caracteres';
-            }
-            return null;
-          },
+          validator: validatePassword,
         ),
         const SizedBox(height: 20),
 
@@ -76,12 +69,8 @@ class ChangePasswordFormFields extends StatelessWidget {
             labelText: 'Confirmar Nueva Contraseña',
             prefixIcon: Icon(Icons.check_circle_outline),
           ),
-          validator: (value) {
-            if (value != newPasswordController.text) {
-              return 'Las contraseñas no coinciden';
-            }
-            return null;
-          },
+          validator: (value) =>
+              validateConfirmPassword(value, newPasswordController.text),
         ),
       ],
     );

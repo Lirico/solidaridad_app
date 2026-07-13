@@ -1,37 +1,34 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 
 final ThemeData appTheme = ThemeData(
   useMaterial3: true,
-  scaffoldBackgroundColor: const Color(
-    0xFFF4F6F9,
-  ), // Fondo gris claro de las pantallas
+  scaffoldBackgroundColor: AppColors.scaffoldBackground,
 
   colorScheme: ColorScheme.fromSeed(
-    seedColor: const Color(0xFF1A4F9C), // Azul institucional de la cabecera
-    primary: const Color(0xFF1A4F9C),
-    secondary: const Color(
-      0xFFE67E22,
-    ), // Naranja para acentos/alertas comerciales
+    seedColor: AppColors.primaryBlue,
+    primary: AppColors.primaryBlue,
+    secondary: AppColors.primaryOrange,
   ),
 
   inputDecorationTheme: InputDecorationTheme(
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(8.0),
-      borderSide: const BorderSide(color: Color(0xFFCED4DA)),
+      borderSide: const BorderSide(color: AppColors.inputBorder),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(8.0),
-      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      borderSide: const BorderSide(color: AppColors.inputBorderEnabled),
     ),
     filled: true,
-    fillColor: Colors.white,
+    fillColor: AppColors.cardBackground,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
   ),
 
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF1A4F9C), // Botón azul principal
-      foregroundColor: Colors.white,
+      backgroundColor: AppColors.primaryBlue,
+      foregroundColor: AppColors.textWhite,
       padding: const EdgeInsets.symmetric(vertical: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),

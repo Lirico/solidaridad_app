@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/app_spacing.dart';
 
 class AuthHeader extends StatelessWidget {
   const AuthHeader({super.key});
@@ -7,9 +10,13 @@ class AuthHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 180,
-      color: const Color(0xFF1A4F9C),
-      padding: const EdgeInsets.only(top: 60, left: 24, right: 24),
+      height: AppSpacing.headerHeight,
+      color: AppColors.primaryBlue,
+      padding: const EdgeInsets.only(
+        top: AppSpacing.headerTopPadding,
+        left: AppSpacing.xl,
+        right: AppSpacing.xl,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -19,23 +26,8 @@ class AuthHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              Text(
-                'GAS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              Text(
-                'TERMINAL',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w300,
-                ),
-              ),
+              Text('GAS', style: AppTextStyles.headerTitle),
+              Text('TERMINAL', style: AppTextStyles.headerSubtitle),
             ],
           ),
         ],

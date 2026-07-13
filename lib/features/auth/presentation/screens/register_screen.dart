@@ -2,26 +2,30 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../widgets/login_form_fields.dart';
+import '../widgets/register_form_fields.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/auth_card.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _userController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   @override
   void dispose() {
-    _userController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -47,21 +51,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           SizedBox(height: AppSpacing.sm),
                           Icon(
-                            Icons.lock_open_outlined,
+                            Icons.person_add_outlined,
                             size: 44,
                             color: Theme.of(context).colorScheme.primary,
                           ),
                           SizedBox(height: AppSpacing.md),
                           const Text(
-                            'Ingresar a su Cuenta',
+                            'Crear una Cuenta',
                             textAlign: TextAlign.center,
                             style: AppTextStyles.screenTitle,
                           ),
                           const Divider(height: 40),
 
-                          LoginFormFields(
-                            userInputController: _userController,
-                            passwordInputController: _passwordController,
+                          RegisterFormFields(
+                            nameController: _nameController,
+                            emailController: _emailController,
+                            passwordController: _passwordController,
+                            confirmPasswordController:
+                                _confirmPasswordController,
                           ),
                           SizedBox(height: AppSpacing.xxl),
 
@@ -70,22 +77,23 @@ class _LoginScreenState extends State<LoginScreen> {
                               if (_formKey.currentState!.validate()) {
                                 Navigator.pushReplacementNamed(
                                   context,
-                                  AppRoutes.saleForm,
+                                  AppRoutes.login,
                                 );
                               }
                             },
-                            child: const Text('INGRESAR'),
+                            child: const Text('REGISTRARSE'),
                           ),
                           SizedBox(height: AppSpacing.md),
+
                           TextButton(
                             onPressed: () {
                               Navigator.pushReplacementNamed(
                                 context,
-                                AppRoutes.register,
+                                AppRoutes.login,
                               );
                             },
                             child: const Text(
-                              '¿No tiene una cuenta? Registrarse',
+                              '¿Ya tiene una cuenta? Iniciar sesión',
                               style: AppTextStyles.linkButton,
                             ),
                           ),

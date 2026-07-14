@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../cubit/sales_cubit.dart';
+import '../widgets/amount_input_formatter.dart';
 import '../widgets/currency_selector.dart';
 import '../widgets/card_fields_container.dart';
 import '../widgets/sale_form_header.dart';
@@ -106,6 +107,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
+                              inputFormatters: [AmountInputFormatter()],
                               decoration: const InputDecoration(
                                 hintText: 'Ingresar Unidades',
                                 prefixIcon: Icon(Icons.propane_tank_outlined),
@@ -114,7 +116,8 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'La cantidad es obligatoria';
                                 }
-                                final parsedUnits = double.tryParse(value);
+                                final normalized = value.replaceAll(',', '.');
+                                final parsedUnits = double.tryParse(normalized);
                                 if (parsedUnits == null) {
                                   return 'Ingrese un número válido';
                                 }
@@ -140,7 +143,12 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                 if (_formKey.currentState!.validate()) {
                                   final cubit = context.read<SalesCubit>();
                                   final units =
-                                      double.tryParse(_unitsController.text) ??
+                                      double.tryParse(
+                                        _unitsController.text.replaceAll(
+                                          ',',
+                                          '.',
+                                        ),
+                                      ) ??
                                       0;
 
                                   cubit.showReview(

@@ -1,0 +1,10 @@
+[project]
+name = "solidaridad-api"
+version = "0.1.0"
+description = "Backend API for Solidaridad"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.120.0",
+    "uvicorn>=0.38.0",
+]

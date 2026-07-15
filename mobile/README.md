@@ -7,7 +7,7 @@ Aplicación móvil POS (Point of Sale) virtual desarrollada en Flutter para la g
 ## 🏗️ Arquitectura
 
 ```
-solidaridad_app/
+mobile/
 ├── lib/
 │   ├── core/                     # Capa transversal compartida
 │   │   ├── constants/            # Constantes de la aplicación
@@ -186,9 +186,8 @@ SDK: Dart ^3.12.2 / Flutter 3.44.4
 ### Instalación
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/Lirico/solidaridad_app.git
-cd solidaridad_app
+# Desde la raíz del monorepo
+cd mobile
 
 # Instalar dependencias
 flutter pub get
@@ -200,6 +199,8 @@ flutter run
 ### Build de producción
 
 ```bash
+cd mobile
+
 # Android APK
 flutter build apk --release
 
@@ -215,6 +216,8 @@ flutter build web
 ## 🧪 Calidad de Código
 
 ```bash
+cd mobile
+
 # Análisis estático
 flutter analyze
 
@@ -230,8 +233,8 @@ El proyecto sigue las reglas de linting recomendadas por `flutter_lints`. No se 
 
 La aplicación se conecta a una API REST alojada en AWS. La URL base se encuentra configurada en los repositorios:
 
-- `lib/features/auth/data/auth_repository.dart` — Endpoints de autenticación
-- `lib/features/sales/data/sales_repository.dart` — Endpoints de ventas
+- `mobile/lib/features/auth/data/auth_repository.dart` — Endpoints de autenticación
+- `mobile/lib/features/sales/data/sales_repository.dart` — Endpoints de ventas
 
 **Endpoints esperados:**
 | Método | Endpoint | Descripción |

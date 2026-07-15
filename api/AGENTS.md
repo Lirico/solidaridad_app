@@ -40,6 +40,7 @@ Do not consider the task done if lint, typecheck, or tests fail. Fix issues intr
 - Do not commit secrets; use `.env` (gitignored) from `.env.example`.
 - Keep HTTP contracts additive when possible (`/v1`); see auth plan for compatibility notes.
 - Seed data is local-only (`APP_ENV=local`).
+- Target Python 3.12 only: **do not** add retrocompatibility shims (e.g. `from __future__ import annotations`, `typing.Optional`/`List`/`Dict` when `|` / builtins work, `typing_extensions` for features already in 3.12).
 
 ## Local commands (quick)
 

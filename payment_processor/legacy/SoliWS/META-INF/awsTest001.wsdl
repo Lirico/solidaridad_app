@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:axis2="http://aws/" xmlns:ns1="http://org.apache.axis2/xsd" xmlns:wsaw="http://www.w3.org/2006/05/addressing/wsdl" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:ns0="http://aws/xsd" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" targetNamespace="http://aws/">
+    <wsdl:types>
+        <xs:schema xmlns:ns="http://aws/xsd" attributeFormDefault="qualified" elementFormDefault="qualified" targetNamespace="http://aws/xsd">
+            <xs:element name="Login">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="usr" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="pass" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="LoginResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="getDiariaByComercio">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="sessid" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="comer" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="termid" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="dni" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="fecha_ini" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="fecha_fin" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="getDiariaByComercioResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="xs:anyType"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="getPendientesByComercio">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="sessid" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="comer" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="termid" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="dni" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="getPendientesByComercioResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="xs:anyType"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+    </wsdl:types>
+    <wsdl:message name="LoginRequest">
+        <wsdl:part name="parameters" element="ns0:Login"/>
+    </wsdl:message>
+    <wsdl:message name="LoginResponse">
+        <wsdl:part name="parameters" element="ns0:LoginResponse"/>
+    </wsdl:message>
+    <wsdl:message name="getPendientesByComercioRequest">
+        <wsdl:part name="parameters" element="ns0:getPendientesByComercio"/>
+    </wsdl:message>
+    <wsdl:message name="getPendientesByComercioResponse">
+        <wsdl:part name="parameters" element="ns0:getPendientesByComercioResponse"/>
+    </wsdl:message>
+    <wsdl:message name="getDiariaByComercioRequest">
+        <wsdl:part name="parameters" element="ns0:getDiariaByComercio"/>
+    </wsdl:message>
+    <wsdl:message name="getDiariaByComercioResponse">
+        <wsdl:part name="parameters" element="ns0:getDiariaByComercioResponse"/>
+    </wsdl:message>
+    <wsdl:portType name="awsTest001PortType">
+        <wsdl:operation name="Login">
+            <wsdl:input message="axis2:LoginRequest" wsaw:Action="urn:Login"/>
+            <wsdl:output message="axis2:LoginResponse" wsaw:Action="urn:LoginResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="getPendientesByComercio">
+            <wsdl:input message="axis2:getPendientesByComercioRequest" wsaw:Action="urn:getPendientesByComercio"/>
+            <wsdl:output message="axis2:getPendientesByComercioResponse" wsaw:Action="urn:getPendientesByComercioResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="getDiariaByComercio">
+            <wsdl:input message="axis2:getDiariaByComercioRequest" wsaw:Action="urn:getDiariaByComercio"/>
+            <wsdl:output message="axis2:getDiariaByComercioResponse" wsaw:Action="urn:getDiariaByComercioResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+    <wsdl:binding name="awsTest001SOAP11Binding" type="axis2:awsTest001PortType">
+        <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+        <wsdl:operation name="Login">
+            <soap:operation soapAction="urn:Login" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="getPendientesByComercio">
+            <soap:operation soapAction="urn:getPendientesByComercio" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="getDiariaByComercio">
+            <soap:operation soapAction="urn:getDiariaByComercio" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+    <wsdl:binding name="awsTest001SOAP12Binding" type="axis2:awsTest001PortType">
+        <soap12:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+        <wsdl:operation name="Login">
+            <soap12:operation soapAction="urn:Login" style="document"/>
+            <wsdl:input>
+                <soap12:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap12:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="getPendientesByComercio">
+            <soap12:operation soapAction="urn:getPendientesByComercio" style="document"/>
+            <wsdl:input>
+                <soap12:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap12:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="getDiariaByComercio">
+            <soap12:operation soapAction="urn:getDiariaByComercio" style="document"/>
+            <wsdl:input>
+                <soap12:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap12:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+    <wsdl:binding name="awsTest001HttpBinding" type="axis2:awsTest001PortType">
+        <http:binding verb="POST"/>
+        <wsdl:operation name="Login">
+            <http:operation location="awsTest001/Login"/>
+            <wsdl:input>
+                <mime:content type="text/xml" part="Login"/>
+            </wsdl:input>
+            <wsdl:output>
+                <mime:content type="text/xml" part="Login"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="getPendientesByComercio">
+            <http:operation location="awsTest001/getPendientesByComercio"/>
+            <wsdl:input>
+                <mime:content type="text/xml" part="getPendientesByComercio"/>
+            </wsdl:input>
+            <wsdl:output>
+                <mime:content type="text/xml" part="getPendientesByComercio"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="getDiariaByComercio">
+            <http:operation location="awsTest001/getDiariaByComercio"/>
+            <wsdl:input>
+                <mime:content type="text/xml" part="getDiariaByComercio"/>
+            </wsdl:input>
+            <wsdl:output>
+                <mime:content type="text/xml" part="getDiariaByComercio"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+    <wsdl:service name="awsTest001">
+        <wsdl:port name="awsTest001SOAP11port_http" binding="axis2:awsTest001SOAP11Binding">
+            <soap:address location="http://localhost:8080/axis2/services/awsTest001"/>
+        </wsdl:port>
+        <wsdl:port name="awsTest001SOAP12port_http" binding="axis2:awsTest001SOAP12Binding">
+            <soap12:address location="http://localhost:8080/axis2/services/awsTest001"/>
+        </wsdl:port>
+        <wsdl:port name="awsTest001Httpport" binding="axis2:awsTest001HttpBinding">
+            <http:address location="http://localhost:8080/axis2/services/awsTest001"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>

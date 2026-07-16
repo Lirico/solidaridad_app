@@ -1,0 +1,14 @@
+# Build artifacts from bin/compile.sh
+*.o
+*.so
+*.a
+
+# Compiled binaries
+bin/authkig-bin3
+bin/procesa_notas
+bin/procesa_carga
+bin/abm_terminal
+
+# Placeholders / logs
+**/dummy
+*.log

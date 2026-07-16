@@ -1,0 +1,68 @@
+#!/usr/bin/php
+<?php
+
+require("cierre_lote/PHPMailer/PHPMailerAutoload.php");
+
+echo "mail_sender INIT........\n";
+
+$cuenta  = $argv[1];
+$nombre  = $argv[2];
+
+$mail = new PHPMailer;
+$mail->CharSet = 'UTF-8';
+$mail->SMTPDebug = 0;
+$mail->isSMTP();
+//$mail->Host = 'mailtdfcard.ath.cx';
+$mail->Host = '192.168.1.233';
+$mail->Port = 25;
+$mail->SMTPAuth = true;
+$mail->Username = 'agenteret';
+$mail->Password = 'age$%ret';
+
+$encoding = "base64";
+$type = "application/text";
+
+$mail->From = "solidaridad@tdfcard.com";
+$mail->FromName = 'ARAUCARIA S.A.';
+
+$mail->WordWrap = 70;
+$mail->isHTML(false);
+
+$asunto="Extravio - ".date('Y-m-d')." # ".$nombre;
+
+$cuerpo = "Se ha generado el archivo: \n/public/tarjetas/SOLI/PACHECO/TJ-".$cuenta.".TXT\n\n";
+
+$mail->addAddress('yamilacirulli@tdfcard.com', "Yamila Cirulli");
+$mail->addAddress('karinaurrutia@tdfcard.com', "Karina Urrutia");
+
+$mail->addAddress('pazschwager@tdfcard.com', 'Paz Schwager');
+$mail->addAddress('yamilaprimo@tdfcard.com', 'Yamila Primo');
+
+#$mail->addAddress('jesicabenitez@mailtdfcard.ath.cx', 'Jesica Benitez');
+$mail->addAddress('jesicabenitez@tdfcard.com', 'Jesica Benitez');
+
+$mail->addAddress('casandraponce@tdfcard.com', 'Casandra Ponce');
+
+$mail->addCC('inesgarcia@tdfcard.com', "Ines Garcia");
+$mail->addCC('avismara@araucaria.net.ar', "Adriano");
+$mail->addCC('equadri@araucaria.net.ar', "Ezequiel");
+
+
+$mail->Subject = $asunto;
+$mail->Body = $cuerpo;
+
+echo "Antes de enviar........ ";
+if(!$mail->Send()){
+    echo "No se pudo enviar el Mensaje.\n";
+} else{
+    echo "Mensaje enviado!!\n";
+}
+
+$mail->clearCCs();
+$mail->clearBCCs();
+$mail->clearAddresses();
+$mail->clearAttachments();
+
+echo "mail_sender END........\n";
+
+?>

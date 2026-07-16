@@ -1,5 +1,5 @@
 .PHONY: install run db-up db-down db-logs db-reset migrate migrate-new db-seed \
-	dev lint lint-fix typecheck test check
+	dev lint lint-fix typecheck test test-cov check
 
 install:
 	uv sync
@@ -44,4 +44,7 @@ typecheck:
 test:
 	uv run pytest
 
-check: lint typecheck test
+test-cov:
+	uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
+
+check: lint typecheck test-cov

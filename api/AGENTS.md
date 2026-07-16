@@ -26,13 +26,21 @@ Or the combined target:
 make check
 ```
 
-Do not consider the task done if lint, typecheck, or tests fail. Fix issues introduced by the change (and pre-existing ones in files you touched, when straightforward).
+`make check` includes coverage. Do not consider the task done if lint, typecheck, tests, or coverage fail. Fix issues introduced by the change (and pre-existing ones in files you touched, when straightforward).
+
+### Coverage (≥ 90%)
+
+- Total line coverage for the API packages must stay **at or above 90%**.
+- Verify with `make test-cov` (or via `make check`). The run fails if coverage drops below 90%.
+- If a change lowers coverage under the threshold, add or extend tests before finishing.
+- Excluded from the gate (not production request path): `persistence/migrations/`, `persistence/seed.py`.
 
 | Command | Tool | Purpose |
 |---------|------|---------|
 | `make lint` | Ruff | Lint + import sorting (auto-fix with `make lint-fix`) |
 | `make typecheck` | mypy | Static types |
 | `make test` | pytest | Unit / API tests |
+| `make test-cov` | pytest-cov | Tests + coverage report; fails under 90% |
 
 ## Conventions
 

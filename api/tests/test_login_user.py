@@ -120,3 +120,16 @@ def test_login_user_rejects_blank_installation_id() -> None:
         )
 
     users.get_by_email.assert_not_called()
+
+
+def test_login_user_rejects_oversized_installation_id() -> None:
+    use_case, users, _installations, _tokens, _hasher, _ = _build_use_case()
+
+    with pytest.raises(InvalidInstallationId, match="no puede superar"):
+        use_case.execute(
+            username="ada@example.com",
+            password="password1",
+            installation_id="x" * 129,
+        )
+
+    users.get_by_email.assert_not_called()

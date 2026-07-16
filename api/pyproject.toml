@@ -21,6 +21,7 @@ dev = [
     "httpx>=0.28.1",
     "mypy>=2.3.0",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.21",
 ]
 
@@ -68,3 +69,26 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
+
+[tool.coverage.run]
+branch = false
+source = [
+    "application",
+    "domain",
+    "presentation",
+    "persistence",
+    "config",
+]
+omit = [
+    "persistence/migrations/*",
+    "persistence/seed.py",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]

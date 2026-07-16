@@ -42,5 +42,8 @@ api/.venv/
 api/__pycache__/
 api/**/__pycache__/
 api/*.pyc
+api/.coverage
+api/htmlcov/
+api/coverage.xml
 api/node_modules/
 api/dist/

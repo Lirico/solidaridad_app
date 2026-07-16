@@ -5,16 +5,30 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
+from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
 from domain.exceptions import (
     EmailAlreadyExists,
     InvalidCredentials,
+    InvalidCurrentPassword,
     InvalidInstallationId,
     WeakPassword,
 )
-from presentation.dependencies import get_login_user, get_register_user
-from presentation.schemas.auth import AuthTokenResponse, LoginRequest, RegisterRequest
+from presentation.dependencies import (
+    CurrentUser,
+    get_change_password,
+    get_current_user,
+    get_login_user,
+    get_register_user,
+)
+from presentation.schemas.auth import (
+    AuthTokenResponse,
+    ChangePasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    RegisterRequest,
+)
 
 router = APIRouter()
 
@@ -126,3 +140,55 @@ def login(
         token=result.token,
         must_change_password=result.must_change_password,
     )
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": (
+                            "La nueva contraseña debe ser distinta a la actual"
+                        )
+                    }
+                }
+            },
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing/invalid token or wrong current password",
+            "content": {
+                "application/json": {
+                    "example": {"message": "Contraseña actual incorrecta"}
+                }
+            },
+        },
+    },
+)
+def change_password(
+    body: ChangePasswordRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[ChangePassword, Depends(get_change_password)],
+) -> MessageResponse | JSONResponse:
+    try:
+        use_case.execute(
+            user_id=current_user.user_id,
+            current_password=body.current_password,
+            new_password=body.new_password,
+        )
+    except InvalidCurrentPassword as exc:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"message": str(exc)},
+        )
+    except WeakPassword as exc:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": str(exc)},
+        )
+
+    return MessageResponse(message="Contraseña actualizada correctamente")

@@ -1,0 +1,6 @@
+# Local secrets / desa dump credentials
+.env
+
+# Runtime logs
+*.log
+**/authkig.log

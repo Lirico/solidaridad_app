@@ -1,0 +1,10 @@
+.git
+.env
+*.log
+legacy/bin/*.o
+legacy/bin/*.so
+legacy/bin/authkig-bin3
+legacy/bin/procesa_carga
+legacy/bin/procesa_notas
+legacy/bin/abm_terminal
+docker/mysql/02_seed.sql

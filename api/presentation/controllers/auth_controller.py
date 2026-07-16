@@ -5,10 +5,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
+from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
-from domain.exceptions import EmailAlreadyExists, InvalidInstallationId, WeakPassword
-from presentation.dependencies import get_register_user
-from presentation.schemas.auth import AuthTokenResponse, RegisterRequest
+from domain.exceptions import (
+    EmailAlreadyExists,
+    InvalidCredentials,
+    InvalidInstallationId,
+    WeakPassword,
+)
+from presentation.dependencies import get_login_user, get_register_user
+from presentation.schemas.auth import AuthTokenResponse, LoginRequest, RegisterRequest
 
 router = APIRouter()
 
@@ -57,6 +63,58 @@ def register(
             content={"message": str(exc)},
         )
     except (WeakPassword, InvalidInstallationId) as exc:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": str(exc)},
+        )
+
+    return AuthTokenResponse(
+        name=result.name,
+        email=result.email,
+        token=result.token,
+        must_change_password=result.must_change_password,
+    )
+
+
+@router.post(
+    "/login",
+    status_code=status.HTTP_200_OK,
+    response_model=AuthTokenResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "example": {"message": "installation_id es requerido"}
+                }
+            },
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Invalid credentials",
+            "content": {
+                "application/json": {
+                    "example": {"message": "Credenciales inválidas"}
+                }
+            },
+        },
+    },
+)
+def login(
+    body: LoginRequest,
+    use_case: Annotated[LoginUser, Depends(get_login_user)],
+) -> AuthTokenResponse | JSONResponse:
+    try:
+        result = use_case.execute(
+            username=body.username,
+            password=body.password,
+            installation_id=body.installation_id,
+        )
+    except InvalidCredentials as exc:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"message": str(exc)},
+        )
+    except InvalidInstallationId as exc:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": str(exc)},

@@ -10,6 +10,12 @@ class RegisterRequest(BaseModel):
     installation_id: str = Field(min_length=1, max_length=128)
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=320)
+    password: str = Field(min_length=1, max_length=128)
+    installation_id: str = Field(min_length=1, max_length=128)
+
+
 class AuthTokenResponse(BaseModel):
     name: str
     email: str

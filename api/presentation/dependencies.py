@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from config import Settings, get_settings
@@ -33,6 +34,18 @@ def get_register_user(
     tokens: Annotated[TokenService, Depends(get_token_service)],
 ) -> RegisterUser:
     return RegisterUser(
+        session=db,
+        users=UserRepository(db),
+        installations=InstallationRepository(db),
+        tokens=tokens,
+    )
+
+
+def get_login_user(
+    db: Annotated[Session, Depends(get_db)],
+    tokens: Annotated[TokenService, Depends(get_token_service)],
+) -> LoginUser:
+    return LoginUser(
         session=db,
         users=UserRepository(db),
         installations=InstallationRepository(db),

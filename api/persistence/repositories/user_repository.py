@@ -54,3 +54,18 @@ class UserRepository:
         self._session.add(row)
         self._session.flush()
         return _to_domain(row)
+
+    def update_password(
+        self,
+        user_id: UUID,
+        *,
+        password_hash: str,
+        must_change_password: bool = False,
+    ) -> User | None:
+        row = self._session.get(UserModel, user_id)
+        if row is None:
+            return None
+        row.password_hash = password_hash
+        row.must_change_password = must_change_password
+        self._session.flush()
+        return _to_domain(row)

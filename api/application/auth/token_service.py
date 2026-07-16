@@ -34,7 +34,7 @@ class TokenService:
         return jwt.encode(payload, self._secret, algorithm=self._algorithm)
 
     def verify(self, token: str) -> dict[str, Any]:
-        """Decode and validate a JWT. Used by Phase 3 Bearer dependency."""
+        """Decode and validate a JWT access token."""
         return jwt.decode(
             token,
             self._secret,

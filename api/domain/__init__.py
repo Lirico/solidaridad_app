@@ -4,6 +4,7 @@ from domain.exceptions import (
     DomainError,
     EmailAlreadyExists,
     InvalidCredentials,
+    InvalidCurrentPassword,
     InvalidInstallationId,
     WeakPassword,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "EmailAlreadyExists",
     "Installation",
     "InvalidCredentials",
+    "InvalidCurrentPassword",
     "InvalidInstallationId",
     "User",
     "WeakPassword",

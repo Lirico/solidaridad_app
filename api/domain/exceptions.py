@@ -41,3 +41,13 @@ class InvalidCredentials(DomainError):
         message: str = "Credenciales inválidas",
     ) -> None:
         super().__init__(message)
+
+
+class InvalidCurrentPassword(DomainError):
+    """Raised when change-password current_password does not match."""
+
+    def __init__(
+        self,
+        message: str = "Contraseña actual incorrecta",
+    ) -> None:
+        super().__init__(message)

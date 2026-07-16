@@ -31,3 +31,13 @@ class InvalidInstallationId(DomainError):
         message: str = "installation_id es requerido",
     ) -> None:
         super().__init__(message)
+
+
+class InvalidCredentials(DomainError):
+    """Raised on login failure without revealing whether the user exists."""
+
+    def __init__(
+        self,
+        message: str = "Credenciales inválidas",
+    ) -> None:
+        super().__init__(message)

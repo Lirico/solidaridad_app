@@ -47,3 +47,18 @@ api/htmlcov/
 api/coverage.xml
 api/node_modules/
 api/dist/
+
+# Payment gateway
+payment-gateway/.env
+payment-gateway/.env.*
+!payment-gateway/.env.example
+payment-gateway/.venv/
+payment-gateway/__pycache__/
+payment-gateway/**/__pycache__/
+payment-gateway/*.pyc
+payment-gateway/.coverage
+payment-gateway/htmlcov/
+payment-gateway/coverage.xml
+payment-gateway/.mypy_cache/
+payment-gateway/.pytest_cache/
+payment-gateway/.ruff_cache/

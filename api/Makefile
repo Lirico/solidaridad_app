@@ -1,6 +1,8 @@
 .PHONY: install run db-up db-down db-logs db-reset migrate migrate-new db-seed \
 	dev lint lint-fix typecheck test test-cov check
 
+HOST ?= 127.0.0.1
+
 install:
 	uv sync
 
@@ -27,7 +29,7 @@ db-seed:
 	uv run python -m persistence.seed
 
 run:
-	uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+	uv run uvicorn main:app --host $(HOST) --port 8000 --reload
 
 dev: db-up migrate run
 

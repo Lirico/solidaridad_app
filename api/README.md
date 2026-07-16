@@ -10,6 +10,9 @@ REST API built with FastAPI.
 
 ## Local setup
 
+Para levantar el backend local completo para mobile, usar `make dev` desde la
+raíz del monorepo. El flujo manual de este componente es:
+
 ```bash
 cp .env.example .env
 make install
@@ -58,6 +61,7 @@ make db-seed
 | `make migrate-new MSG="..."` | Nueva revisión autogenerada |
 | `make db-seed` | Puebla datos demo (solo `local`) |
 | `make run` | Uvicorn con reload |
+| `make run HOST=0.0.0.0` | Uvicorn accesible desde emulador/LAN |
 | `make dev` | `db-up` + `migrate` + `run` |
 | `make lint` | Ruff check |
 | `make lint-fix` | Ruff check --fix + format |
@@ -85,7 +89,10 @@ Copy `.env.example` → `.env` (`.env` is gitignored).
 
 - Host machine / iOS simulator: `http://127.0.0.1:8000/v1`
 - Android emulator: `http://10.0.2.2:8000/v1`
-- Physical device on same LAN: `http://<your-lan-ip>:8000/v1` (bind uvicorn to `0.0.0.0` if needed)
+- Physical device on same LAN: `http://<your-lan-ip>:8000/v1`
+
+Para Android o un dispositivo físico, ejecutar `make run HOST=0.0.0.0`. El
+comando raíz `make dev` ya aplica esta configuración.
 
 Auth plan: [docs/auth-plan.md](docs/auth-plan.md).
 

@@ -1,11 +1,14 @@
-.PHONY: help up down \
-	api-up api-down api-run api-dev api-install api-check \
+.PHONY: help env setup dev up down \
+	api-up api-down api-run api-dev api-install api-migrate api-seed api-check \
 	gateway-install gateway-run gateway-check \
 	processor-up processor-down processor-logs processor-reset processor-seed-refresh
 
 help:
 	@echo "Solidaridad monorepo"
 	@echo ""
+	@echo "  make dev                Prepare and run the complete local backend"
+	@echo "                          (API :8000 + gateway :8001 + Postgres + MySQL/auth)"
+	@echo "  make setup              Create local env files and install Python dependencies"
 	@echo "  make up                 Start API Postgres + payment processor (MySQL + auth)"
 	@echo "  make down               Stop both stacks"
 	@echo ""
@@ -26,6 +29,28 @@ help:
 	@echo "  make processor-reset    Wipe processor DB volume and recreate"
 	@echo "  make processor-seed-refresh  Re-dump seed from desa"
 
+env:
+	@test -f api/.env || cp api/.env.example api/.env
+	@test -f payment-gateway/.env || cp payment-gateway/.env.example payment-gateway/.env
+	@test -f payment_processor/.env || cp payment_processor/.env.example payment_processor/.env
+
+setup: env api-install gateway-install
+
+dev: setup
+	@$(MAKE) up
+	@$(MAKE) api-migrate
+	@$(MAKE) api-seed
+	@echo ""
+	@echo "Local backend ready:"
+	@echo "  API:     http://0.0.0.0:8000 (Android: http://10.0.2.2:8000/v1)"
+	@echo "  Gateway: http://0.0.0.0:8001 (Android: http://10.0.2.2:8001)"
+	@echo "Press Ctrl-C to stop API and gateway; run 'make down' to stop containers."
+	@set -e; \
+	$(MAKE) api-run HOST=0.0.0.0 & api_pid=$$!; \
+	ISO_TRANSPORT=tcp $(MAKE) gateway-run HOST=0.0.0.0 & gateway_pid=$$!; \
+	trap 'kill "$$api_pid" "$$gateway_pid" 2>/dev/null || true; wait "$$api_pid" "$$gateway_pid" 2>/dev/null || true' EXIT INT TERM; \
+	wait -n "$$api_pid" "$$gateway_pid"
+
 up: api-up processor-up
 
 down: processor-down api-down
@@ -44,6 +69,12 @@ api-dev:
 
 api-install:
 	$(MAKE) -C api install
+
+api-migrate:
+	$(MAKE) -C api migrate
+
+api-seed:
+	$(MAKE) -C api db-seed
 
 api-check:
 	$(MAKE) -C api check

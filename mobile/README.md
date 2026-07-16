@@ -231,10 +231,24 @@ El proyecto sigue las reglas de linting recomendadas por `flutter_lints`. No se 
 
 ## 🌐 API REST
 
-La aplicación se conecta a una API REST alojada en AWS. La URL base se encuentra configurada en los repositorios:
+Para levantar todo el backend local desde la raíz del monorepo:
+
+```bash
+make dev
+```
+
+Ver requisitos, datos demo y puertos en el
+[README principal](../README.md#levantar-el-backend-local-para-mobile).
+
+La URL base se encuentra configurada actualmente en los repositorios:
 
 - `mobile/lib/features/auth/data/auth_repository.dart` — Endpoints de autenticación
 - `mobile/lib/features/sales/data/sales_repository.dart` — Endpoints de ventas
+
+Para probar desde Android Emulator, el entorno mobile debe usar
+`http://10.0.2.2:8000/v1`; para iOS Simulator,
+`http://127.0.0.1:8000/v1`. La URL incluida actualmente en el código apunta a
+producción.
 
 **Endpoints esperados:**
 | Método | Endpoint | Descripción |
@@ -244,7 +258,9 @@ La aplicación se conecta a una API REST alojada en AWS. La URL base se encuentr
 | POST | `/v1/auth/change-password` | Cambio de contraseña |
 | POST | `/v1/sales/gas` | Registro de venta de gas |
 
-> **Nota:** La URL base debe configurarse según el entorno (desarrollo, QA, producción).
+> **Estado local actual:** autenticación está disponible, pero
+> `/v1/sales/gas` todavía no está implementado en la API local. El gateway y el
+> autorizador pueden probarse por separado; ver el README principal.
 
 ---
 

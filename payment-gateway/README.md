@@ -10,6 +10,9 @@ Adaptador HTTP → ISO8583 hacia el autorizador (`authkig`). Sin contexto de cli
 
 ## Local setup
 
+Para levantar el backend local completo, incluido `authkig`, usar `make dev`
+desde la raíz del monorepo. El flujo manual del gateway es:
+
 ```bash
 cp .env.example .env
 make install
@@ -43,6 +46,7 @@ ISO_PORT=4452
 |--------|--------|
 | `make install` | `uv sync` |
 | `make run` | Uvicorn `:8001` con reload |
+| `make run HOST=0.0.0.0` | Uvicorn accesible desde emulador/LAN |
 | `make lint` | Ruff check |
 | `make lint-fix` | Ruff fix + format |
 | `make typecheck` | mypy |

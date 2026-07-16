@@ -22,6 +22,10 @@ make reset         # borrar volumen MySQL y volver a cargar schema+seed
 
 Desde la raíz del monorepo: `make processor-up` / `make up`.
 
+## Terminales (DE41)
+
+El autorizador resuelve **comercio** (`merchid_42`) y **moneda** (`currcode_49`) solo con el código de terminal (DE41 / `terminales.codigo_terminales`). No exige que DE42 del mensaje coincida con la DB; si la terminal está vigente (`situacion = 'V'`), completa esos campos desde `terminales`.
+
 ## Schema y seed
 
 Solo las **15 tablas** que usa el código C (no el resto de desa).

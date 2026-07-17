@@ -6,21 +6,76 @@ Monorepo del proyecto Solidaridad (GAS Terminal / POS Virtual).
 
 ### Requisitos
 
-- Docker con el plugin Docker Compose v2 (debe soportar `docker compose up --wait`)
-- Python 3.12
-- [`uv`](https://docs.astral.sh/uv/)
-- GNU Make
-- Bash
+- [Docker](https://docs.docker.com/engine/install/) con el plugin Docker Compose
+  v2 (debe soportar `docker compose up --wait`)
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+- [GNU Make](https://www.gnu.org/software/make/) y Bash
+
+No hace falta instalar Python por separado. Los proyectos declaran Python 3.12
+en sus archivos `.python-version` y `pyproject.toml`; `uv` descarga y administra
+una versión compatible automáticamente cuando se ejecuta `uv sync`.
 
 No hace falta instalar Postgres ni MySQL en el host: ambos se ejecutan en
 contenedores. Antes de comenzar, verificar que Docker esté iniciado:
 
 ```bash
 docker compose version
-python3 --version
 uv --version
 make --version
 ```
+
+### Windows (WSL2)
+
+En Windows se recomienda ejecutar el proyecto dentro de
+[WSL2](https://learn.microsoft.com/windows/wsl/install). El `Makefile` usa
+funcionalidades de Bash que no son compatibles de forma confiable con
+PowerShell o `cmd.exe`.
+
+1. Abrir PowerShell como administrador e instalar WSL:
+
+   ```powershell
+   wsl --install
+   ```
+
+   Reiniciar Windows si el instalador lo solicita y completar la configuración
+   inicial de Ubuntu.
+
+2. Instalar [Docker Desktop para Windows](https://docs.docker.com/desktop/setup/install/windows-install/)
+   y habilitar la integración con la distribución WSL en **Settings → Resources
+   → WSL Integration**.
+
+3. Abrir la terminal de Ubuntu e instalar las herramientas necesarias:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y git make curl
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+   Cerrar y volver a abrir la terminal para que `uv` quede disponible.
+
+4. Clonar el repositorio dentro del filesystem de WSL (por ejemplo, bajo
+   `~/dev`) y no en `/mnt/c`, para evitar problemas de rendimiento y permisos:
+
+   ```bash
+   mkdir -p ~/dev
+   cd ~/dev
+   git clone <URL-DEL-REPOSITORIO>
+   cd solidaridad_app
+   ```
+
+5. Comprobar los requisitos y levantar el backend:
+
+   ```bash
+   docker compose version
+   uv --version
+   make --version
+   make dev
+   ```
+
+Todos estos comandos deben ejecutarse desde la terminal WSL. Docker Desktop
+puede permanecer abierto en Windows; los comandos `docker` de WSL se conectan
+automáticamente a su motor.
 
 Desde la raíz del repositorio:
 

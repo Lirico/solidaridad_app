@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from application.auth.login_user import LoginResult, LoginUser
-from domain.exceptions import InvalidCredentials, InvalidInstallationId
+from domain.exceptions import InvalidCredentials
 from main import app
 from presentation.dependencies import get_login_user
 
@@ -90,22 +90,29 @@ def test_login_returns_400_when_installation_id_missing() -> None:
     assert "message" in response.json()
 
 
-def test_login_returns_400_when_installation_id_invalid_from_use_case() -> None:
-    use_case = MagicMock(spec=LoginUser)
-    use_case.execute.side_effect = InvalidInstallationId()
-    _override_login_user(use_case)
-
-    try:
-        response = client.post(
-            "/v1/auth/login",
-            json={
-                "username": "ada@example.com",
-                "password": "password1",
-                "installation_id": "inst-1",
-            },
-        )
-    finally:
-        _clear_overrides()
+def test_login_returns_400_when_installation_id_is_blank() -> None:
+    response = client.post(
+        "/v1/auth/login",
+        json={
+            "username": "ada@example.com",
+            "password": "password1",
+            "installation_id": "   ",
+        },
+    )
 
     assert response.status_code == 400
-    assert response.json() == {"message": "installation_id es requerido"}
+    assert "message" in response.json()
+
+
+def test_login_returns_400_when_installation_id_exceeds_8_characters() -> None:
+    response = client.post(
+        "/v1/auth/login",
+        json={
+            "username": "ada@example.com",
+            "password": "password1",
+            "installation_id": "123456789",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "message" in response.json()

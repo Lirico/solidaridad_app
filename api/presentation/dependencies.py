@@ -3,7 +3,6 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Annotated
-from uuid import UUID
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -27,7 +26,7 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 @dataclass(frozen=True, slots=True)
 class CurrentUser:
-    user_id: UUID
+    user_id: int
     email: str
     installation_id: str
 
@@ -147,7 +146,7 @@ def get_current_user(
         )
 
     try:
-        user_id = UUID(sub)
+        user_id = int(sub)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

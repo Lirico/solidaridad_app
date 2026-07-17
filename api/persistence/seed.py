@@ -38,9 +38,8 @@ DEMO_USERS: list[DemoUser] = [
     },
 ]
 
-DEMO_INSTALLATION_ID = "local-dev-installation"
+DEMO_INSTALLATION_ID = "05000001"
 DEMO_INSTALLATION_PLATFORM = "local"
-DEMO_TERMINAL_ID = "05000001"
 
 password_hasher = PasswordHash.recommended()
 
@@ -72,14 +71,17 @@ def seed() -> None:
             else:
                 print(f"User {email} already exists — skipped")
 
-        installation = session.get(Installation, DEMO_INSTALLATION_ID)
+        installation = session.scalar(
+            select(Installation).where(
+                Installation.installation_id == DEMO_INSTALLATION_ID
+            )
+        )
         now = datetime.now(UTC)
         if installation is None:
             session.add(
                 Installation(
-                    id=DEMO_INSTALLATION_ID,
+                    installation_id=DEMO_INSTALLATION_ID,
                     platform=DEMO_INSTALLATION_PLATFORM,
-                    terminal_id=DEMO_TERMINAL_ID,
                     last_seen_at=now,
                 )
             )
@@ -88,8 +90,6 @@ def seed() -> None:
             installation.last_seen_at = now
             if installation.platform is None:
                 installation.platform = DEMO_INSTALLATION_PLATFORM
-            if installation.terminal_id is None:
-                installation.terminal_id = DEMO_TERMINAL_ID
             print(
                 f"Installation {DEMO_INSTALLATION_ID} already exists "
                 "— updated last_seen_at"

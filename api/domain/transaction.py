@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
 from domain.product import Product
 from domain.transaction_status import TransactionStatus
@@ -12,8 +11,8 @@ from domain.transaction_status import TransactionStatus
 class Transaction:
     id: int
     transaction_number: str
-    user_id: UUID
-    installation_id: str
+    user_id: int
+    installation_id: int
     terminal_id: str
     product: Product
     processor_product_code: str

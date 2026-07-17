@@ -1,7 +1,5 @@
 """User persistence repository."""
 
-from uuid import UUID
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -31,7 +29,7 @@ class UserRepository:
             return None
         return _to_domain(row)
 
-    def get_by_id(self, user_id: UUID) -> User | None:
+    def get_by_id(self, user_id: int) -> User | None:
         row = self._session.get(UserModel, user_id)
         if row is None:
             return None
@@ -57,7 +55,7 @@ class UserRepository:
 
     def update_password(
         self,
-        user_id: UUID,
+        user_id: int,
         *,
         password_hash: str,
         must_change_password: bool = False,

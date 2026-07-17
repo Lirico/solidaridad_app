@@ -5,7 +5,6 @@ from domain.exceptions import (
     EmailAlreadyExists,
     InvalidCredentials,
     InvalidCurrentPassword,
-    InvalidInstallationId,
     WeakPassword,
 )
 from domain.installation import Installation
@@ -17,7 +16,6 @@ __all__ = [
     "Installation",
     "InvalidCredentials",
     "InvalidCurrentPassword",
-    "InvalidInstallationId",
     "User",
     "WeakPassword",
 ]

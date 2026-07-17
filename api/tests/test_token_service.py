@@ -1,7 +1,6 @@
 """Unit tests for JWT TokenService."""
 
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 import jwt
 import pytest
@@ -22,7 +21,7 @@ def _settings(**overrides: object) -> Settings:
 
 def test_create_access_token_includes_required_claims() -> None:
     service = TokenService(_settings())
-    user_id = uuid4()
+    user_id = 42
 
     token = service.create_access_token(
         user_id=user_id,
@@ -46,7 +45,7 @@ def test_create_access_token_includes_required_claims() -> None:
 def test_verify_rejects_tampered_token() -> None:
     service = TokenService(_settings())
     token = service.create_access_token(
-        user_id=uuid4(),
+        user_id=42,
         email="ada@example.com",
         installation_id="inst-1",
     )
@@ -59,7 +58,7 @@ def test_verify_rejects_tampered_token() -> None:
 def test_verify_rejects_expired_token() -> None:
     service = TokenService(_settings(jwt_expire_minutes=-1))
     token = service.create_access_token(
-        user_id=uuid4(),
+        user_id=42,
         email="ada@example.com",
         installation_id="inst-1",
     )
@@ -67,7 +66,7 @@ def test_verify_rejects_expired_token() -> None:
     # Force clock skew aside: craft an already-expired token explicitly.
     expired = jwt.encode(
         {
-            "sub": str(uuid4()),
+            "sub": "42",
             "email": "ada@example.com",
             "installation_id": "inst-1",
             "jti": "jti",

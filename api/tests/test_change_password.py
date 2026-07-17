@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
@@ -14,7 +13,7 @@ from domain.user import User
 def _user(*, must_change_password: bool = True) -> User:
     now = datetime.now(UTC)
     return User(
-        id=uuid4(),
+        id=1,
         name="Ada",
         email="ada@example.com",
         password_hash="hashed-current",
@@ -83,7 +82,7 @@ def test_change_password_rejects_wrong_current() -> None:
 def test_change_password_rejects_missing_user() -> None:
     use_case, users, _hasher, _user = _build_use_case()
     users.get_by_id.return_value = None
-    user_id = uuid4()
+    user_id = 999
 
     with pytest.raises(InvalidCurrentPassword):
         use_case.execute(

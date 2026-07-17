@@ -2,12 +2,11 @@
 
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
 from application.auth.login_user import LoginUser
-from domain.exceptions import InvalidCredentials, InvalidInstallationId
+from domain.exceptions import InvalidCredentials
 from domain.user import User
 
 
@@ -18,7 +17,7 @@ def _user(
 ) -> User:
     now = datetime.now(UTC)
     return User(
-        id=uuid4(),
+        id=1,
         name="Ada",
         email=email,
         password_hash="hashed",
@@ -107,29 +106,3 @@ def test_login_user_rejects_bad_password() -> None:
 
     installations.upsert.assert_not_called()
     tokens.create_access_token.assert_not_called()
-
-
-def test_login_user_rejects_blank_installation_id() -> None:
-    use_case, users, _installations, _tokens, _hasher, _ = _build_use_case()
-
-    with pytest.raises(InvalidInstallationId):
-        use_case.execute(
-            username="ada@example.com",
-            password="password1",
-            installation_id="   ",
-        )
-
-    users.get_by_email.assert_not_called()
-
-
-def test_login_user_rejects_oversized_installation_id() -> None:
-    use_case, users, _installations, _tokens, _hasher, _ = _build_use_case()
-
-    with pytest.raises(InvalidInstallationId, match="no puede superar"):
-        use_case.execute(
-            username="ada@example.com",
-            password="password1",
-            installation_id="x" * 129,
-        )
-
-    users.get_by_email.assert_not_called()

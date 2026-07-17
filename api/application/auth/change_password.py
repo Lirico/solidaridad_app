@@ -1,7 +1,5 @@
 """Change password for an authenticated user."""
 
-from uuid import UUID
-
 from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 
@@ -27,7 +25,7 @@ class ChangePassword:
     def execute(
         self,
         *,
-        user_id: UUID,
+        user_id: int,
         current_password: str,
         new_password: str,
     ) -> None:

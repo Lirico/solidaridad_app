@@ -5,7 +5,6 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
-from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -109,7 +108,7 @@ class CreateTransaction:
     def execute(
         self,
         *,
-        user_id: UUID,
+        user_id: int,
         installation_id: str,
         idempotency_key: str | None,
         product: str,
@@ -144,10 +143,10 @@ class CreateTransaction:
         if existing is not None:
             return self._replay(existing, fingerprint)
 
-        installation = self._installations.get_by_id(installation_id)
-        if installation is None or not installation.terminal_id:
+        installation = self._installations.get_by_installation_id(installation_id)
+        if installation is None:
             raise MissingTerminalId()
-        terminal_id = installation.terminal_id.strip()
+        terminal_id = installation.installation_id.strip()
         if not terminal_id:
             raise MissingTerminalId()
 
@@ -160,7 +159,7 @@ class CreateTransaction:
             pending = self._transactions.create_pending(
                 transaction_number=transaction_number,
                 user_id=user_id,
-                installation_id=installation_id,
+                installation_id=installation.id,
                 terminal_id=terminal_id[:8],
                 product=parsed_product,
                 processor_product_code=proc_code,

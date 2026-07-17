@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
-from uuid import UUID, uuid4
 
 import jwt
 import pytest
@@ -23,10 +22,10 @@ def _settings() -> Settings:
     )
 
 
-def _user(*, user_id: UUID | None = None) -> User:
+def _user(*, user_id: int = 1) -> User:
     now = datetime.now(UTC)
     return User(
-        id=user_id or uuid4(),
+        id=user_id,
         name="Ada",
         email="ada@example.com",
         password_hash="hash",
@@ -98,7 +97,7 @@ def test_get_current_user_rejects_malformed_token() -> None:
 def test_get_current_user_rejects_expired_token() -> None:
     expired = jwt.encode(
         {
-            "sub": str(uuid4()),
+            "sub": "1",
             "email": "ada@example.com",
             "installation_id": "inst-1",
             "jti": "jti",
@@ -127,7 +126,7 @@ def test_get_current_user_rejects_unknown_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tokens = TokenService(_settings())
-    user_id = uuid4()
+    user_id = 999
     token = tokens.create_access_token(
         user_id=user_id,
         email="ghost@example.com",

@@ -2,19 +2,18 @@
 
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
 from application.auth.register_user import RegisterUser
-from domain.exceptions import EmailAlreadyExists, InvalidInstallationId, WeakPassword
+from domain.exceptions import EmailAlreadyExists, WeakPassword
 from domain.user import User
 
 
 def _user(*, email: str = "new@example.com") -> User:
     now = datetime.now(UTC)
     return User(
-        id=uuid4(),
+        id=1,
         name="Ada",
         email=email,
         password_hash="hashed",
@@ -108,34 +107,6 @@ def test_register_user_rejects_short_password() -> None:
             email="ada@example.com",
             password="short",
             installation_id="inst-1",
-        )
-
-    users.get_by_email.assert_not_called()
-
-
-def test_register_user_rejects_blank_installation_id() -> None:
-    use_case, users, _installations, _tokens = _build_use_case()
-
-    with pytest.raises(InvalidInstallationId):
-        use_case.execute(
-            name="Ada",
-            email="ada@example.com",
-            password="password1",
-            installation_id="   ",
-        )
-
-    users.get_by_email.assert_not_called()
-
-
-def test_register_user_rejects_oversized_installation_id() -> None:
-    use_case, users, _installations, _tokens = _build_use_case()
-
-    with pytest.raises(InvalidInstallationId, match="no puede superar"):
-        use_case.execute(
-            name="Ada",
-            email="ada@example.com",
-            password="password1",
-            installation_id="x" * 129,
         )
 
     users.get_by_email.assert_not_called()

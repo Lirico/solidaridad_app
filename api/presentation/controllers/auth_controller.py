@@ -12,7 +12,6 @@ from domain.exceptions import (
     EmailAlreadyExists,
     InvalidCredentials,
     InvalidCurrentPassword,
-    InvalidInstallationId,
     WeakPassword,
 )
 from presentation.dependencies import (
@@ -76,7 +75,7 @@ def register(
             status_code=status.HTTP_409_CONFLICT,
             content={"message": str(exc)},
         )
-    except (WeakPassword, InvalidInstallationId) as exc:
+    except WeakPassword as exc:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": str(exc)},
@@ -128,12 +127,6 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"message": str(exc)},
         )
-    except InvalidInstallationId as exc:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": str(exc)},
-        )
-
     return AuthTokenResponse(
         name=result.name,
         email=result.email,

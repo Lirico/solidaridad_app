@@ -118,6 +118,36 @@ def test_register_returns_400_when_installation_id_missing() -> None:
     assert "message" in response.json()
 
 
+def test_register_returns_400_when_installation_id_is_blank() -> None:
+    response = client.post(
+        "/v1/auth/register",
+        json={
+            "name": "Ada",
+            "email": "ada@example.com",
+            "password": "password1",
+            "installation_id": "   ",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "message" in response.json()
+
+
+def test_register_returns_400_when_installation_id_exceeds_8_characters() -> None:
+    response = client.post(
+        "/v1/auth/register",
+        json={
+            "name": "Ada",
+            "email": "ada@example.com",
+            "password": "password1",
+            "installation_id": "123456789",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "message" in response.json()
+
+
 def test_register_returns_400_when_email_invalid() -> None:
     response = client.post(
         "/v1/auth/register",

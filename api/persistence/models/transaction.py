@@ -1,7 +1,6 @@
 """Transaction ORM model."""
 
 from datetime import date, datetime
-from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
@@ -14,7 +13,6 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from persistence.models.base import Base
@@ -36,13 +34,13 @@ class Transaction(Base):
         nullable=False,
         unique=True,
     )
-    user_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
         ForeignKey("users.id"),
         nullable=False,
     )
-    installation_id: Mapped[str] = mapped_column(
-        String(128),
+    installation_id: Mapped[int] = mapped_column(
+        BigInteger,
         ForeignKey("installations.id"),
         nullable=False,
     )

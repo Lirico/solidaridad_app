@@ -6,12 +6,11 @@ from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 
 from application.auth.token_service import TokenService
-from domain.exceptions import EmailAlreadyExists, InvalidInstallationId, WeakPassword
+from domain.exceptions import EmailAlreadyExists, WeakPassword
 from persistence.repositories.installation_repository import InstallationRepository
 from persistence.repositories.user_repository import UserRepository
 
 MIN_PASSWORD_LENGTH = 8
-MAX_INSTALLATION_ID_LENGTH = 128
 
 password_hasher = PasswordHash.recommended()
 
@@ -52,7 +51,6 @@ class RegisterUser:
         normalized_installation_id = installation_id.strip()
 
         self._validate_password(password)
-        self._validate_installation_id(normalized_installation_id)
 
         if self._users.get_by_email(normalized_email) is not None:
             raise EmailAlreadyExists(normalized_email)
@@ -82,13 +80,3 @@ class RegisterUser:
     def _validate_password(password: str) -> None:
         if len(password) < MIN_PASSWORD_LENGTH:
             raise WeakPassword()
-
-    @staticmethod
-    def _validate_installation_id(installation_id: str) -> None:
-        if not installation_id:
-            raise InvalidInstallationId()
-        if len(installation_id) > MAX_INSTALLATION_ID_LENGTH:
-            max_len = MAX_INSTALLATION_ID_LENGTH
-            raise InvalidInstallationId(
-                f"installation_id no puede superar {max_len} caracteres"
-            )

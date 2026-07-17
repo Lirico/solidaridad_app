@@ -1,7 +1,6 @@
 """Transaction persistence repository."""
 
 from datetime import UTC, date, datetime
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -45,7 +44,7 @@ class TransactionRepository:
     def get_by_idempotency(
         self,
         *,
-        user_id: UUID,
+        user_id: int,
         idempotency_key: str,
     ) -> Transaction | None:
         stmt = select(TransactionModel).where(
@@ -86,8 +85,8 @@ class TransactionRepository:
         self,
         *,
         transaction_number: str,
-        user_id: UUID,
-        installation_id: str,
+        user_id: int,
+        installation_id: int,
         terminal_id: str,
         product: Product,
         processor_product_code: str,

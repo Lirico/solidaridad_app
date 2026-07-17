@@ -23,16 +23,6 @@ class WeakPassword(DomainError):
         super().__init__(message)
 
 
-class InvalidInstallationId(DomainError):
-    """Raised when installation_id is missing or invalid."""
-
-    def __init__(
-        self,
-        message: str = "installation_id es requerido",
-    ) -> None:
-        super().__init__(message)
-
-
 class InvalidCredentials(DomainError):
     """Raised on login failure without revealing whether the user exists."""
 

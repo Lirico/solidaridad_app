@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import jwt
 from fastapi.testclient import TestClient
@@ -30,7 +29,7 @@ def _override_auth(
     current_user: CurrentUser | None = None,
 ) -> CurrentUser:
     user = current_user or CurrentUser(
-        user_id=uuid4(),
+        user_id=1,
         email="ada@example.com",
         installation_id="inst-1",
     )
@@ -127,7 +126,7 @@ def test_change_password_returns_401_when_bearer_missing() -> None:
 def test_change_password_returns_401_when_token_expired() -> None:
     expired = jwt.encode(
         {
-            "sub": str(uuid4()),
+            "sub": "1",
             "email": "ada@example.com",
             "installation_id": "inst-1",
             "jti": "jti",

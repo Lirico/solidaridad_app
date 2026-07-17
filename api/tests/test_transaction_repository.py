@@ -1,6 +1,5 @@
 from datetime import UTC, date, datetime
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
@@ -20,8 +19,8 @@ def test_to_domain_maps_fields() -> None:
     row = MagicMock(spec=TransactionModel)
     row.id = 7
     row.transaction_number = "OP-260716-0007"
-    row.user_id = uuid4()
-    row.installation_id = "inst"
+    row.user_id = 1
+    row.installation_id = 10
     row.terminal_id = "05000001"
     row.product = "GARRAFA_10"
     row.processor_product_code = "993"
@@ -47,7 +46,7 @@ def test_get_by_idempotency_none() -> None:
     session = MagicMock()
     session.scalars.return_value.first.return_value = None
     repo = TransactionRepository(session)
-    assert repo.get_by_idempotency(user_id=uuid4(), idempotency_key="k") is None
+    assert repo.get_by_idempotency(user_id=1, idempotency_key="k") is None
 
 
 def test_next_transaction_number_creates_counter() -> None:
@@ -74,12 +73,12 @@ def test_next_transaction_number_exhausted() -> None:
 def test_create_pending_and_update_result() -> None:
     session = MagicMock()
     repo = TransactionRepository(session)
-    user_id = uuid4()
+    user_id = 1
 
     created = repo.create_pending(
         transaction_number="OP-260716-0001",
         user_id=user_id,
-        installation_id="inst",
+        installation_id=10,
         terminal_id="05000001",
         product=Product.GARRAFA_10,
         processor_product_code="993",
@@ -98,7 +97,7 @@ def test_create_pending_and_update_result() -> None:
     row.id = 1
     row.transaction_number = "OP-260716-0001"
     row.user_id = user_id
-    row.installation_id = "inst"
+    row.installation_id = 10
     row.terminal_id = "05000001"
     row.product = "GARRAFA_10"
     row.processor_product_code = "993"

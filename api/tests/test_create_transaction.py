@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
@@ -25,8 +24,8 @@ def _tx(**overrides: object) -> Transaction:
     base = dict(
         id=1,
         transaction_number="OP-260716-0001",
-        user_id=uuid4(),
-        installation_id="inst-1",
+        user_id=1,
+        installation_id=10,
         terminal_id="05000001",
         product=Product.GARRAFA_10,
         processor_product_code="993",
@@ -51,7 +50,7 @@ def _build(
     *,
     existing: Transaction | None = None,
     gateway_result: AuthorizeResult | None = None,
-    terminal_id: str | None = "05000001",
+    installation_code: str | None = "05000001",
 ) -> tuple[CreateTransaction, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
@@ -59,12 +58,16 @@ def _build(
     gateway = MagicMock()
 
     transactions.get_by_idempotency.return_value = existing
-    installations.get_by_id.return_value = Installation(
-        id="inst-1",
-        platform="local",
-        terminal_id=terminal_id,
-        last_seen_at=datetime.now(UTC),
-        created_at=datetime.now(UTC),
+    installations.get_by_installation_id.return_value = (
+        Installation(
+            id=10,
+            installation_id=installation_code,
+            platform="local",
+            last_seen_at=datetime.now(UTC),
+            created_at=datetime.now(UTC),
+        )
+        if installation_code is not None
+        else None
     )
     transactions.next_transaction_number.return_value = "OP-260716-0001"
     pending = _tx(status=TransactionStatus.PENDING, user_message="pending")
@@ -91,7 +94,7 @@ def _build(
 def test_create_approves() -> None:
     use_case, transactions, _, gateway = _build()
     result = use_case.execute(
-        user_id=uuid4(),
+        user_id=1,
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
@@ -109,7 +112,7 @@ def test_missing_idempotency_key() -> None:
     use_case, *_ = _build()
     with pytest.raises(MissingIdempotencyKey):
         use_case.execute(
-            user_id=uuid4(),
+            user_id=1,
             installation_id="inst-1",
             idempotency_key=None,
             product="GARRAFA_10",
@@ -123,7 +126,7 @@ def test_invalid_pan() -> None:
     use_case, *_ = _build()
     with pytest.raises(InvalidCardNumber):
         use_case.execute(
-            user_id=uuid4(),
+            user_id=1,
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
@@ -134,10 +137,10 @@ def test_invalid_pan() -> None:
 
 
 def test_missing_terminal() -> None:
-    use_case, *_ = _build(terminal_id=None)
+    use_case, *_ = _build(installation_code=None)
     with pytest.raises(MissingTerminalId):
         use_case.execute(
-            user_id=uuid4(),
+            user_id=1,
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
@@ -220,7 +223,7 @@ def test_gateway_timeout_maps_to_unknown() -> None:
     )
     transactions.update_result.return_value = _tx(status=TransactionStatus.UNKNOWN)
     result = use_case.execute(
-        user_id=uuid4(),
+        user_id=1,
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
@@ -239,7 +242,7 @@ def test_gateway_connect_failure_maps_to_failed() -> None:
     )
     transactions.update_result.return_value = _tx(status=TransactionStatus.FAILED)
     result = use_case.execute(
-        user_id=uuid4(),
+        user_id=1,
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
@@ -259,7 +262,7 @@ def test_gateway_declined() -> None:
     )
     transactions.update_result.return_value = _tx(status=TransactionStatus.DECLINED)
     result = use_case.execute(
-        user_id=uuid4(),
+        user_id=1,
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
@@ -277,7 +280,7 @@ def test_invalid_cvv() -> None:
     use_case, *_ = _build()
     with pytest.raises(InvalidCvv):
         use_case.execute(
-            user_id=uuid4(),
+            user_id=1,
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
@@ -288,10 +291,10 @@ def test_invalid_cvv() -> None:
 
 
 def test_empty_terminal_string() -> None:
-    use_case, *_ = _build(terminal_id="   ")
+    use_case, *_ = _build(installation_code="   ")
     with pytest.raises(MissingTerminalId):
         use_case.execute(
-            user_id=uuid4(),
+            user_id=1,
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",

@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -27,8 +26,8 @@ def _tx(**overrides: object) -> Transaction:
     base = dict(
         id=1,
         transaction_number="OP-260716-0001",
-        user_id=uuid4(),
-        installation_id="inst-1",
+        user_id=1,
+        installation_id=1,
         terminal_id="05000001",
         product=Product.GARRAFA_10,
         processor_product_code="993",
@@ -52,7 +51,7 @@ def _tx(**overrides: object) -> Transaction:
 def _override(use_case: MagicMock) -> None:
     app.dependency_overrides[get_create_transaction] = lambda: use_case
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        user_id=uuid4(),
+        user_id=1,
         email="demo@solidaridad.local",
         installation_id="inst-1",
     )

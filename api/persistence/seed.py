@@ -40,6 +40,7 @@ DEMO_USERS: list[DemoUser] = [
 
 DEMO_INSTALLATION_ID = "local-dev-installation"
 DEMO_INSTALLATION_PLATFORM = "local"
+DEMO_TERMINAL_ID = "05000001"
 
 password_hasher = PasswordHash.recommended()
 
@@ -78,6 +79,7 @@ def seed() -> None:
                 Installation(
                     id=DEMO_INSTALLATION_ID,
                     platform=DEMO_INSTALLATION_PLATFORM,
+                    terminal_id=DEMO_TERMINAL_ID,
                     last_seen_at=now,
                 )
             )
@@ -86,6 +88,8 @@ def seed() -> None:
             installation.last_seen_at = now
             if installation.platform is None:
                 installation.platform = DEMO_INSTALLATION_PLATFORM
+            if installation.terminal_id is None:
+                installation.terminal_id = DEMO_TERMINAL_ID
             print(
                 f"Installation {DEMO_INSTALLATION_ID} already exists "
                 "— updated last_seen_at"

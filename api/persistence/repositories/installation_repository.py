@@ -12,6 +12,7 @@ def _to_domain(row: InstallationModel) -> Installation:
     return Installation(
         id=row.id,
         platform=row.platform,
+        terminal_id=row.terminal_id,
         last_seen_at=row.last_seen_at,
         created_at=row.created_at,
     )

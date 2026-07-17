@@ -335,11 +335,15 @@ int valida_terminal(MYSQL* con, struct iso8583* iso)
                 iso->flag_ingenico = 2;
             }
 
-            /* Comercio y moneda siempre desde terminales (solo DE41). */
+            /* Comercio siempre desde terminales (solo DE41). */
             memset(iso->merchid_42, '\0', 16);
             sprintf(iso->merchid_42, "%s", row[3]);
 
-            if (row[2] != NULL && row[2][0] != '\0')
+            /* Producto/DE49: solo Ingenico lo toma de terminales.cod_moneda.
+             * VeriFone/IVR conservan el DE49 enviado en el mensaje. */
+            if (iso->flag_ingenico == 1
+                && row[2] != NULL
+                && row[2][0] != '\0')
             {
                 memset(iso->currcode_49, '\0', 4);
                 sprintf(iso->currcode_49, "%s", row[2]);

@@ -24,7 +24,12 @@ Desde la raíz del monorepo: `make processor-up` / `make up`.
 
 ## Terminales (DE41)
 
-El autorizador resuelve **comercio** (`merchid_42`) y **moneda** (`currcode_49`) solo con el código de terminal (DE41 / `terminales.codigo_terminales`). No exige que DE42 del mensaje coincida con la DB; si la terminal está vigente (`situacion = 'V'`), completa esos campos desde `terminales`.
+Si la terminal está vigente (`situacion = 'V'`) y tiene `cod_comercio` no vacío:
+
+- **Comercio** (`merchid_42`): siempre se completa desde `terminales` vía DE41. No exige que DE42 del mensaje coincida con la DB. Sin `cod_comercio` → terminal desconocida / mal configurada.
+- **Producto** (`currcode_49` / DE49): no es moneda ISO; es el código de producto (`sgas_productos.cod_moneda`, p.ej. `993`–`997`).
+  - **Ingenico**: sobrescribe DE49 con `terminales.cod_moneda`.
+  - **VeriFone / IVR**: conserva el DE49 enviado en el mensaje (producto elegido en la terminal).
 
 ## Schema y seed
 

@@ -51,3 +51,72 @@ class InvalidCurrentPassword(DomainError):
         message: str = "Contraseña actual incorrecta",
     ) -> None:
         super().__init__(message)
+
+
+class UnsupportedProduct(DomainError):
+    """Raised when the product code is not in the supported catalog."""
+
+    def __init__(self, product: str = "") -> None:
+        self.product = product
+        super().__init__("Producto no soportado")
+
+
+class InvalidAmount(DomainError):
+    """Raised when amount is missing, non-positive, or has wrong scale."""
+
+    def __init__(self, message: str = "Monto inválido") -> None:
+        super().__init__(message)
+
+
+class InvalidCardNumber(DomainError):
+    """Raised when the PAN fails basic format/Luhn checks."""
+
+    def __init__(self, message: str = "Número de tarjeta inválido") -> None:
+        super().__init__(message)
+
+
+class InvalidCvv(DomainError):
+    """Raised when CVV is not 3 or 4 digits."""
+
+    def __init__(self, message: str = "CVV inválido") -> None:
+        super().__init__(message)
+
+
+class MissingIdempotencyKey(DomainError):
+    """Raised when Idempotency-Key header is absent."""
+
+    def __init__(
+        self,
+        message: str = "Idempotency-Key es requerido",
+    ) -> None:
+        super().__init__(message)
+
+
+class IdempotencyConflict(DomainError):
+    """Raised when the same key is reused with a different payload."""
+
+    def __init__(
+        self,
+        message: str = "Idempotency-Key ya usada con otro request",
+    ) -> None:
+        super().__init__(message)
+
+
+class MissingTerminalId(DomainError):
+    """Raised when the installation has no processor terminal configured."""
+
+    def __init__(
+        self,
+        message: str = "La instalación no tiene terminal configurada",
+    ) -> None:
+        super().__init__(message)
+
+
+class TransactionNumberExhausted(DomainError):
+    """Raised when the daily transaction_number counter overflows."""
+
+    def __init__(
+        self,
+        message: str = "Se alcanzó el límite diario de operaciones",
+    ) -> None:
+        super().__init__(message)

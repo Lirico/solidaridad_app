@@ -6,10 +6,21 @@ Monorepo del proyecto Solidaridad (GAS Terminal / POS Virtual).
 
 ### Requisitos
 
-- Docker con Docker Compose
+- Docker con el plugin Docker Compose v2 (debe soportar `docker compose up --wait`)
 - Python 3.12
 - [`uv`](https://docs.astral.sh/uv/)
 - GNU Make
+- Bash
+
+No hace falta instalar Postgres ni MySQL en el host: ambos se ejecutan en
+contenedores. Antes de comenzar, verificar que Docker esté iniciado:
+
+```bash
+docker compose version
+python3 --version
+uv --version
+make --version
+```
 
 Desde la raíz del repositorio:
 
@@ -21,10 +32,15 @@ Ese único comando:
 
 1. crea los `.env` locales a partir de los `.env.example` si no existen;
 2. instala las dependencias de `api` y `payment-gateway`;
-3. levanta Postgres, MySQL 5.7 y el autorizador `authkig`;
-4. ejecuta las migraciones y carga los usuarios demo de forma idempotente;
-5. inicia la API en el puerto `8000` y el gateway en el `8001`;
-6. conecta el gateway al autorizador local por TCP.
+3. levanta MySQL 5.7 y espera al procesador `authkig`;
+4. levanta Postgres, aplica todas las migraciones y ejecuta el seed idempotente;
+5. inicia el gateway, espera que escuche en el puerto `8001`;
+6. inicia la API, espera que escuche en el puerto `8000` y recién entonces
+   informa que todo está listo.
+
+El orden efectivo del flujo de pagos es procesador → gateway → API. Si una
+dependencia no queda disponible en 90 segundos, `make dev` termina con un
+mensaje de error en lugar de dejar un backend parcialmente iniciado.
 
 Dejar esa terminal abierta mientras se prueba la app. `Ctrl-C` detiene la API y
 el gateway; los contenedores se detienen por separado:
@@ -34,7 +50,9 @@ make down
 ```
 
 En ejecuciones posteriores se usa el mismo `make dev`; no pisa ningún `.env`
-existente ni borra datos locales.
+existente ni borra datos locales. Las migraciones y el seed de la API pueden
+ejecutarse varias veces. El esquema y seed de MySQL se cargan automáticamente
+al crear su volumen por primera vez.
 
 ### URLs desde el emulador
 
@@ -70,14 +88,28 @@ curl http://127.0.0.1:8001/ping
 
 Ambos deben responder `{"status":"ok"}`.
 
+### OpenAPI y documentación interactiva
+
+FastAPI publica Swagger UI y el esquema OpenAPI de ambos servicios:
+
+- API:
+  - Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+  - OpenAPI JSON: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
+- Payment gateway:
+  - Swagger UI: [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
+  - OpenAPI JSON: [http://127.0.0.1:8001/openapi.json](http://127.0.0.1:8001/openapi.json)
+
+Desde Android Emulator, reemplazar `127.0.0.1` por `10.0.2.2`.
+
 ### Alcance actual del flujo local
 
 - La API implementa autenticación bajo `/v1/auth`.
+- La API implementa `POST /v1/transactions`, persiste la transacción y llama al
+  gateway.
 - El gateway implementa `POST /v1/authorize` y se comunica con `authkig`.
-- La API todavía no está conectada al gateway.
-- El endpoint `/v1/sales/gas` que consume mobile todavía no existe en la API
-  local; por lo tanto, hoy puede probarse autenticación local y el gateway por
-  separado, pero no una venta completa desde la app.
+- El backend local soporta el flujo completo API → gateway → procesador.
+- Mobile todavía consume el contrato anterior `/v1/sales/gas`; para probar una
+  venta desde la app debe migrarse ese cliente a `/v1/transactions`.
 
 ## Estructura
 

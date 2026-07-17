@@ -3,6 +3,7 @@ SHELL := /bin/bash
 DEV_STARTUP_TIMEOUT ?= 90
 
 .PHONY: help env setup dev up down \
+	catalog-install catalog-check \
 	api-up api-down api-run api-dev api-install api-migrate api-seed api-check \
 	gateway-install gateway-run gateway-check \
 	processor-up processor-down processor-logs processor-reset processor-seed-refresh
@@ -15,6 +16,9 @@ help:
 	@echo "  make setup              Create local env files and install Python dependencies"
 	@echo "  make up                 Start API Postgres + payment processor (MySQL + auth)"
 	@echo "  make down               Stop both stacks"
+	@echo ""
+	@echo "  make catalog-install    uv sync (packages/catalog)"
+	@echo "  make catalog-check      lint + typecheck + tests (catalog)"
 	@echo ""
 	@echo "  make api-up             Start API Postgres"
 	@echo "  make api-down           Stop API Postgres"
@@ -38,7 +42,7 @@ env:
 	@test -f payment-gateway/.env || cp payment-gateway/.env.example payment-gateway/.env
 	@test -f payment_processor/.env || cp payment_processor/.env.example payment_processor/.env
 
-setup: env api-install gateway-install
+setup: env catalog-install api-install gateway-install
 
 dev: setup
 	@$(MAKE) processor-up
@@ -100,6 +104,12 @@ dev: setup
 up: processor-up api-up
 
 down: processor-down api-down
+
+catalog-install:
+	cd packages/catalog && uv sync
+
+catalog-check:
+	cd packages/catalog && uv run ruff check . && uv run mypy src && uv run pytest
 
 api-up:
 	$(MAKE) -C api db-up

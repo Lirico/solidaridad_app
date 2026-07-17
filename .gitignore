@@ -34,6 +34,17 @@ mobile/android/app/debug
 mobile/android/app/profile
 mobile/android/app/release
 
+# Shared packages
+packages/**/.venv/
+packages/**/__pycache__/
+packages/**/*.pyc
+packages/**/.coverage
+packages/**/.mypy_cache/
+packages/**/.pytest_cache/
+packages/**/.ruff_cache/
+packages/**/dist/
+packages/**/*.egg-info/
+
 # API
 api/.env
 api/.env.*

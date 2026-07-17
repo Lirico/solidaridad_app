@@ -28,10 +28,10 @@ class InvalidStan(DomainError):
         super().__init__(message)
 
 
-class UnsupportedCurrency(DomainError):
-    def __init__(self, currency: str) -> None:
-        self.currency = currency
-        super().__init__(f"Moneda no soportada: {currency}")
+class UnsupportedProduct(DomainError):
+    def __init__(self, product_code: str) -> None:
+        self.product_code = product_code
+        super().__init__(f"Producto no soportado: {product_code}")
 
 
 class ProcessorUnavailable(DomainError):

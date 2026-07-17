@@ -11,7 +11,7 @@ from infrastructure.iso.tcp_processor import TcpIsoProcessor
 
 def _cmd() -> AuthorizeCommand:
     return AuthorizeCommand(
-        currency="ARS",
+        product_code="993",
         amount_minor=100,
         card_number="4111111111111111",
         terminal_id="TERM0001",

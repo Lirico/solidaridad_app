@@ -17,7 +17,7 @@ client = TestClient(app)
 
 def _payload(**overrides: Any) -> dict[str, Any]:
     body: dict[str, Any] = {
-        "currency": "ARS",
+        "product_code": "993",
         "amount_minor": 150050,
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
@@ -88,7 +88,7 @@ def test_authorize_http_generic_domain_error() -> None:
 def test_authorize_http_with_processor_override() -> None:
     class FixedProcessor:
         def authorize(self, command: AuthorizeCommand) -> AuthorizationResult:
-            assert command.currency == "USD"
+            assert command.product_code == "994"
             return AuthorizationResult(
                 status=AuthorizationStatus.APPROVED,
                 response_code="00",
@@ -99,7 +99,7 @@ def test_authorize_http_with_processor_override() -> None:
 
     app.dependency_overrides[get_iso_processor] = lambda: FixedProcessor()
     try:
-        response = client.post("/v1/authorize", json=_payload(currency="USD"))
+        response = client.post("/v1/authorize", json=_payload(product_code="994"))
         assert response.status_code == 200
         assert response.json()["auth_id"] == "FIX001"
     finally:

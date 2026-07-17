@@ -14,7 +14,7 @@ from domain.exceptions import (
     InvalidStan,
     InvalidTerminalId,
     ProcessorUnavailable,
-    UnsupportedCurrency,
+    UnsupportedProduct,
 )
 from presentation.dependencies import get_authorize_payment
 from presentation.schemas.authorize import AuthorizeRequest, AuthorizeResponse
@@ -50,7 +50,7 @@ def authorize(
     use_case: Annotated[AuthorizePayment, Depends(get_authorize_payment)],
 ) -> AuthorizeResponse | JSONResponse:
     command = AuthorizeCommand(
-        currency=body.currency,
+        product_code=body.product_code,
         amount_minor=body.amount_minor,
         card_number=body.card_number,
         terminal_id=body.terminal_id,
@@ -64,7 +64,7 @@ def authorize(
         InvalidCardNumber,
         InvalidStan,
         InvalidTerminalId,
-        UnsupportedCurrency,
+        UnsupportedProduct,
     ) as exc:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,

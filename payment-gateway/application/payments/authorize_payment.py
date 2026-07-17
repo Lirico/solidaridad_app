@@ -2,13 +2,13 @@
 
 from application.payments.ports import IsoProcessor
 from domain.authorization import AuthorizationResult, AuthorizeCommand
-from domain.currency import currency_numeric
 from domain.exceptions import (
     InvalidAmount,
     InvalidCardNumber,
     InvalidStan,
     InvalidTerminalId,
 )
+from domain.product import product_code_de49
 
 
 def _luhn_ok(pan: str) -> bool:
@@ -34,7 +34,7 @@ class AuthorizePayment:
         pan = command.card_number.strip()
         if not pan.isdigit() or not (13 <= len(pan) <= 19) or not _luhn_ok(pan):
             raise InvalidCardNumber()
-        currency_numeric(command.currency)
+        product_code_de49(command.product_code)
         if not command.terminal_id.strip():
             raise InvalidTerminalId()
         stan = command.stan.strip()
@@ -42,7 +42,7 @@ class AuthorizePayment:
             raise InvalidStan()
 
         normalized = AuthorizeCommand(
-            currency=command.currency.upper(),
+            product_code=command.product_code,
             amount_minor=command.amount_minor,
             card_number=pan,
             terminal_id=command.terminal_id.strip()[:8].ljust(8),

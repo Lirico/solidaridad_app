@@ -4,7 +4,7 @@ from datetime import datetime
 
 from config.settings import Settings
 from domain.authorization import AuthorizeCommand
-from domain.currency import currency_numeric
+from domain.product import product_code_de49
 from infrastructure.iso.packer import IsoMessage, set_present
 
 
@@ -29,7 +29,7 @@ def build_purchase_request(
         nii_24=_pad_digits(settings.iso_nii, 4),
         poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
         termid_41=command.terminal_id[:8].ljust(8),
-        currcode_49=currency_numeric(command.currency),
+        currcode_49=product_code_de49(command.product_code),
     )
     bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 41, 49]
     if command.expiration_date:

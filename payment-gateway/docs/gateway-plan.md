@@ -10,7 +10,7 @@ Adaptador sin contexto de clientes: recibe `POST /v1/authorize`, arma ISO8583 (d
 
 ```json
 {
-  "currency": "ARS",
+  "product_code": "993",
   "amount_minor": 150050,
   "card_number": "4111111111111111",
   "terminal_id": "05000001",
@@ -18,6 +18,9 @@ Adaptador sin contexto de clientes: recibe `POST /v1/authorize`, arma ISO8583 (d
   "expiration_date": "2912"
 }
 ```
+
+`product_code` es un enum cerrado (`993` | `994` | `995` | `996` | `997`) y se usa
+directamente para construir DE49 (no hay mapeo ISO 4217).
 
 `expiration_date` (`YYMM`) es opcional.
 

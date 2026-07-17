@@ -9,14 +9,14 @@ from domain.exceptions import (
     InvalidCardNumber,
     InvalidStan,
     InvalidTerminalId,
-    UnsupportedCurrency,
+    UnsupportedProduct,
 )
 from infrastructure.iso.mock_processor import MockIsoProcessor
 
 
 def _cmd(**overrides: object) -> AuthorizeCommand:
     base: dict[str, object] = {
-        "currency": "ARS",
+        "product_code": "993",
         "amount_minor": 150050,
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
@@ -59,12 +59,12 @@ def test_authorize_rejects_bad_pan() -> None:
         pass
 
 
-def test_authorize_rejects_unsupported_currency() -> None:
+def test_authorize_rejects_unsupported_product() -> None:
     uc = AuthorizePayment(MockIsoProcessor())
     try:
-        uc.execute(_cmd(currency="EUR"))
-        raise AssertionError("expected UnsupportedCurrency")
-    except UnsupportedCurrency:
+        uc.execute(_cmd(product_code="998"))
+        raise AssertionError("expected UnsupportedProduct")
+    except UnsupportedProduct:
         pass
 
 

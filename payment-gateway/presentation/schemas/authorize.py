@@ -1,10 +1,12 @@
 """HTTP schemas for authorize."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class AuthorizeRequest(BaseModel):
-    currency: str = Field(min_length=3, max_length=3)
+    product_code: Literal["993", "994", "995", "996", "997"]
     amount_minor: int = Field(gt=0)
     card_number: str = Field(min_length=13, max_length=19)
     terminal_id: str = Field(min_length=1, max_length=8)

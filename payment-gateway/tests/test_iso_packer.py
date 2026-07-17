@@ -149,7 +149,7 @@ def test_unpack_rejects_short_and_incomplete() -> None:
 def test_build_purchase_request_sets_fields() -> None:
     settings = Settings()
     cmd = AuthorizeCommand(
-        currency="ARS",
+        product_code="993",
         amount_minor=150050,
         card_number="4111111111111111",
         terminal_id="TERM0001",
@@ -166,7 +166,7 @@ def test_build_purchase_request_sets_fields() -> None:
     assert iso.timetrx_12 == "121530"
     assert iso.datetrx_13 == "0716"
     assert iso.dateexpire_14 == "2912"
-    assert iso.currcode_49 == "032"
+    assert iso.currcode_49 == "993"
     assert iso.termid_41 == "TERM0001"
     assert not bitmap_get(iso.bitmap, 42)
 

@@ -12,7 +12,7 @@ class AuthorizationStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class AuthorizeCommand:
-    currency: str
+    product_code: str
     amount_minor: int
     card_number: str
     terminal_id: str

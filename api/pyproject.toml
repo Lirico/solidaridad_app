@@ -13,9 +13,13 @@ dependencies = [
     "pwdlib[argon2]>=0.3.0",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.13.0",
+    "solidaridad-catalog",
     "sqlalchemy>=2.0",
     "uvicorn>=0.38.0",
 ]
+
+[tool.uv.sources]
+solidaridad-catalog = { path = "../packages/catalog", editable = true }
 
 [dependency-groups]
 dev = [

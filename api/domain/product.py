@@ -1,35 +1,25 @@
-"""Product catalog (API-facing codes → processor DE49 codes)."""
+"""Product catalog adapters (shared package → API domain errors)."""
 
-from enum import StrEnum
+from solidaridad_catalog import Product, UnknownProduct, list_products
+from solidaridad_catalog import parse_product as _parse_product
+from solidaridad_catalog import processor_code as _processor_code
 
 from domain.exceptions import UnsupportedProduct
 
-
-class Product(StrEnum):
-    GARRAFA_10 = "GARRAFA_10"
-    GARRAFA_15 = "GARRAFA_15"
-    GARRAFA_30 = "GARRAFA_30"
-    TUBO_45 = "TUBO_45"
-    GRANEL = "GRANEL"
-
-
-_PRODUCT_TO_PROCESSOR: dict[Product, str] = {
-    Product.GARRAFA_10: "993",
-    Product.GARRAFA_15: "994",
-    Product.GARRAFA_30: "995",
-    Product.TUBO_45: "996",
-    Product.GRANEL: "997",
-}
-
-AMOUNT_EXPONENT = 2
+__all__ = [
+    "Product",
+    "list_products",
+    "parse_product",
+    "processor_product_code",
+]
 
 
 def parse_product(value: str) -> Product:
     try:
-        return Product(value.strip().upper())
-    except ValueError as exc:
+        return _parse_product(value)
+    except UnknownProduct as exc:
         raise UnsupportedProduct(value) from exc
 
 
 def processor_product_code(product: Product) -> str:
-    return _PRODUCT_TO_PROCESSOR[product]
+    return _processor_code(product)

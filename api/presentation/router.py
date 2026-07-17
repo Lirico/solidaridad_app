@@ -1,6 +1,11 @@
 from fastapi import APIRouter
 
-from presentation.controllers import auth_router, ping_router, transactions_router
+from presentation.controllers import (
+    auth_router,
+    ping_router,
+    products_router,
+    transactions_router,
+)
 
 
 def create_router() -> APIRouter:
@@ -9,6 +14,7 @@ def create_router() -> APIRouter:
 
     v1 = APIRouter(prefix="/v1")
     v1.include_router(auth_router, prefix="/auth", tags=["auth"])
+    v1.include_router(products_router, prefix="/products", tags=["products"])
     v1.include_router(
         transactions_router,
         prefix="/transactions",

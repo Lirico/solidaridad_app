@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from domain.exceptions import InvalidAmount
-from domain.product import AMOUNT_EXPONENT
+
+AMOUNT_EXPONENT = 2
 
 
 @dataclass(frozen=True, slots=True)

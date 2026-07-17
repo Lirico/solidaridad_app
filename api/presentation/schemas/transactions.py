@@ -1,19 +1,13 @@
 """HTTP schemas for transactions."""
 
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
+from solidaridad_catalog import Product
 
 
 class CreateTransactionRequest(BaseModel):
-    product: Literal[
-        "GARRAFA_10",
-        "GARRAFA_15",
-        "GARRAFA_30",
-        "TUBO_45",
-        "GRANEL",
-    ]
+    product: Product
     amount: str = Field(min_length=1, max_length=32)
     card_number: str = Field(min_length=13, max_length=19)
     cvv: str = Field(min_length=3, max_length=4)

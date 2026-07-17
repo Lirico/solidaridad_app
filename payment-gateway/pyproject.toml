@@ -7,8 +7,12 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.120.0",
     "pydantic-settings>=2.14.2",
+    "solidaridad-catalog",
     "uvicorn>=0.38.0",
 ]
+
+[tool.uv.sources]
+solidaridad-catalog = { path = "../packages/catalog", editable = true }
 
 [dependency-groups]
 dev = [

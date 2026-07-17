@@ -1,20 +1,13 @@
-"""Product code helpers (DE49 is built directly from product_code)."""
+"""Product code helpers (shared catalog → gateway domain errors)."""
 
-from enum import StrEnum
+from solidaridad_catalog import UnknownProduct
+from solidaridad_catalog import parse_processor_code as _parse_processor_code
 
 from domain.exceptions import UnsupportedProduct
 
 
-class ProductCode(StrEnum):
-    CODE_993 = "993"
-    CODE_994 = "994"
-    CODE_995 = "995"
-    CODE_996 = "996"
-    CODE_997 = "997"
-
-
 def product_code_de49(product_code: str) -> str:
     try:
-        return ProductCode(product_code).value
-    except ValueError as exc:
+        return _parse_processor_code(product_code)
+    except UnknownProduct as exc:
         raise UnsupportedProduct(product_code) from exc

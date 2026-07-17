@@ -33,6 +33,8 @@ API: `http://127.0.0.1:8000`
 Endpoints:
 
 - `GET /ping` → `{"status": "ok"}`
+- Auth: see [docs/auth-plan.md](docs/auth-plan.md)
+- Payments: `POST /v1/transactions` — see [docs/payments-plan.md](docs/payments-plan.md)
 
 ### Demo seed users (`APP_ENV=local` only)
 

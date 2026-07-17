@@ -14,9 +14,12 @@ from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
+from application.payments.create_transaction import CreateTransaction
 from config import Settings, get_settings
+from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.transaction_repository import TransactionRepository
 from persistence.repositories.user_repository import UserRepository
 
 _bearer_scheme = HTTPBearer(auto_error=False)
@@ -73,6 +76,27 @@ def get_change_password(
     return ChangePassword(
         session=db,
         users=UserRepository(db),
+    )
+
+
+def get_payment_gateway(
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> HttpPaymentGateway:
+    return HttpPaymentGateway(
+        base_url=settings.payment_gateway_url,
+        timeout_seconds=settings.payment_gateway_timeout_seconds,
+    )
+
+
+def get_create_transaction(
+    db: Annotated[Session, Depends(get_db)],
+    gateway: Annotated[HttpPaymentGateway, Depends(get_payment_gateway)],
+) -> CreateTransaction:
+    return CreateTransaction(
+        session=db,
+        transactions=TransactionRepository(db),
+        installations=InstallationRepository(db),
+        gateway=gateway,
     )
 
 

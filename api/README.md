@@ -43,7 +43,7 @@ Endpoints:
 | `demo@solidaridad.local` | `demo1234` | Usuario demo |
 | `mustchange@solidaridad.local` | `changeme1` | `must_change_password=true` |
 
-Installation de ejemplo: `local-dev-installation`
+Instalación/terminal de ejemplo: `05000001`
 
 Re-ejecutar seed es seguro (idempotente):
 

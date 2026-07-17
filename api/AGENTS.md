@@ -48,6 +48,17 @@ make check
 - Do not commit secrets; use `.env` (gitignored) from `.env.example`.
 - Keep HTTP contracts additive when possible (`/v1`); see auth plan for compatibility notes.
 - Seed data is local-only (`APP_ENV=local`).
+- Every SQL table must use an `id` column as its primary key. It must be an
+  auto-incrementing signed 64-bit integer (`BIGINT`/`BigInteger` with
+  `Identity`) and must remain independent from business logic.
+- Business identifiers must use separate, explicitly named columns with unique
+  constraints. Never use a business identifier, UUID, email, code, date, or
+  composite value as a table's primary key. Foreign keys must reference the
+  surrogate `id`, while API/domain lookup methods may resolve records through
+  their business keys.
+- `installations.installation_id` is the terminal's functional identifier. It
+  is required, unique, and limited to 8 characters; it is not the table's
+  primary key.
 - Target Python 3.12 only: **do not** add retrocompatibility shims (e.g. `from __future__ import annotations`, `typing.Optional`/`List`/`Dict` when `|` / builtins work, `typing_extensions` for features already in 3.12).
 
 ## Local commands (quick)

@@ -8,7 +8,8 @@ Exponer autenticación por email/usuario + contraseña con token Bearer, de form
 
 - El mobile pueda dejar de depender de mocks (`mustChangePassword` en memoria).
 - Las rutas protegidas (p. ej. `/v1/sales/gas`) validen `Authorization: Bearer <token>`.
-- Cada sesión autenticada quede asociada a un `installation_id` (origen del client), sin acoplar el modelo a “terminal POS”.
+- Cada sesión autenticada quede asociada al `installation_id` de 8 caracteres
+  configurado en la terminal.
 - La implementación respete las capas existentes: `presentation` → `application` → `domain` ← `persistence`.
 
 ## 2. Decisiones cerradas
@@ -16,14 +17,14 @@ Exponer autenticación por email/usuario + contraseña con token Bearer, de form
 | Tema | Decisión | Motivo |
 |------|----------|--------|
 | Modelo de sesión | JWT access token (Bearer) | El client ya espera `token` y lo envía como Bearer |
-| Origen del client | `installation_id` (no `terminal_id`) | Neutro a plataforma: POS Verifone hoy, mobile mañana |
+| Terminal de origen | `installation_id` | Identificador funcional de 8 caracteres configurado en la terminal |
 | Identity provider | Auth propia (sin Cognito/Auth0) | Flujos simples; evita acoplamiento AWS en esta fase |
 | Hash de contraseña | Argon2 | Estándar actual recomendado para passwords nuevos |
 | Persistencia | PostgreSQL + SQLAlchemy 2 + Alembic | Encaja en `persistence/`; migraciones versionadas |
 | Refresh tokens | Fuera de alcance (fase 1) | Simplifica; se puede agregar después |
 | Reset por email | Fuera de alcance | Distinto de change-password autenticado |
 | Roles / RBAC | Fuera de alcance | No requerido por el contrato actual |
-| Allowlist de instalaciones | Fuera de alcance (fase 1) | En fase 1 se acepta y propaga; restricciones User↔Installation después |
+| Validación de terminal | Procesador existente | El procesador confirma que la terminal esté dada de alta |
 
 ## 3. `installation_id` — por qué existe
 
@@ -39,7 +40,9 @@ Un usuario puede operar desde **más de un client** (p. ej. varias V660p, y a fu
 
 **Por qué no confundirlo con sesión:** la sesión es efímera (el JWT). El `installation_id` es **estable** entre logins de la misma instalación: sirve para auditoría, atribución de ventas y, más adelante, autorizar qué instalaciones puede usar un usuario.
 
-**Quién lo genera:** el client. En POS puede derivarse del serial del equipo o de un UUID persistido en primer launch; en mobile, un UUID de instalación guardado en storage local. El API lo trata como string opaco (no interpreta formato de Verifone).
+**Quién lo configura:** se provisiona en la terminal y el client lo envía a la
+API. Es un identificador funcional estable de hasta 8 caracteres; el procesador
+existente valida que corresponda a una terminal dada de alta.
 
 **Fase 1:** el client lo envía en login/register; el API lo valida como requerido, lo registra/actualiza si hace falta, y lo mete en el JWT. **No** se exige aún que el usuario tenga esa instalación preautorizada.
 
@@ -162,7 +165,7 @@ Respuestas de error con cuerpo legible por el client:
 
 | Campo | Tipo | Notas |
 |-------|------|--------|
-| `id` | UUID | PK |
+| `id` | int64 | PK autoincremental, sin significado de negocio |
 | `name` | str | Display name |
 | `email` | str | Único, normalizado a lowercase |
 | `password_hash` | str | Argon2; nunca se expone |
@@ -178,22 +181,25 @@ Reglas:
 
 ### 5.2 Entidad `Installation`
 
-Representa una instalación concreta del client (POS, mobile, etc.). No se llama “terminal”.
+Representa una terminal configurada.
 
 | Campo | Tipo | Notas |
 |-------|------|--------|
-| `id` | str | PK = `installation_id` opaco enviado por el client |
+| `id` | int64 | PK autoincremental, sin significado de negocio |
+| `installation_id` | str(8) | Clave funcional única configurada en la terminal |
 | `platform` | str \| null | Opcional a futuro: `pos` / `mobile` / … (no requerido en fase 1) |
 | `last_seen_at` | datetime | Último login/register exitoso |
 | `created_at` | datetime | UTC |
 
-Relación fase 1: al autenticarse, se hace upsert de `Installation` y se asocia la sesión (JWT) a ese `id`. Persistencia de vínculo User↔Installation (allowlist) queda para una fase posterior.
+Al autenticarse, se hace upsert por la clave funcional `installation_id` y se
+asocia la sesión JWT a ese valor. Las relaciones SQL usan siempre el `id`
+surrogado; el procesador valida que la terminal funcional esté dada de alta.
 
 ### 5.3 Token JWT (claims mínimos)
 
 | Claim | Valor |
 |-------|--------|
-| `sub` | user id (UUID) |
+| `sub` | user id (int64 serializado como string) |
 | `email` | email |
 | `installation_id` | instalación del client (§3) |
 | `jti` | id único de esta sesión (opcional pero recomendado) |
@@ -243,7 +249,7 @@ Principios:
 - Controllers sin lógica de negocio: parsean request, llaman use case, mapean errores a status HTTP.
 - Use cases dependen de abstracciones del repo (puerto), no de SQLAlchemy directo si se puede mantener simple.
 - `password_hash` no sale del application/persistence hacia response.
-- `installation_id` se trata como string opaco; la API no asume serial Verifone ni formato de fabricante.
+- `installation_id` se valida como string requerido de hasta 8 caracteres.
 
 ## 7. Configuración y dependencias
 
@@ -321,7 +327,7 @@ Objetivo: un developer puede clonar, levantar Postgres, migrar, seedear y correr
 1. Script o comando idempotente de seed, p. ej. `python -m persistence.seed` o `make db-seed`.
 2. Datos mínimos de desarrollo (documentados en README):
    - Usuario demo: email/password conocidos (solo `APP_ENV=local`).
-   - Al menos un `installation_id` de ejemplo (p. ej. `local-dev-installation`).
+   - Al menos un `installation_id` de ejemplo (p. ej. `05000001`).
    - Usuario con `must_change_password=true` para probar el flujo de primer login.
 3. El seed **no** corre en prod automáticamente; solo manual / Make en local (y CI de integration si aplica).
 4. Passwords del seed hasheadas con Argon2 (mismo path que producción), nunca plaintext en DB.
@@ -376,7 +382,7 @@ Objetivo: un developer puede clonar, levantar Postgres, migrar, seedear y correr
 
 ### Fase 4 — Alineación mobile
 
-1. Generar o leer `installation_id` estable en el device (UUID persistido; en POS puede basarse en serial si se prefiere).
+1. Leer el `installation_id` de 8 caracteres configurado en la terminal.
 2. Enviar `installation_id` en login y register.
 3. Enviar `Authorization: Bearer <token>` en `changePassword`.
 4. Consumir `must_change_password` del JSON de login (eliminar mock `_usersWithPasswordChanged`).

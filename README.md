@@ -77,7 +77,7 @@ físico puede ser necesario habilitar los puertos `8000` y `8001` en el firewall
 
 - Usuario: `demo@solidaridad.local`
 - Contraseña: `demo1234`
-- Instalación: `local-dev-installation`
+- Instalación/terminal: `05000001`
 
 Health checks:
 

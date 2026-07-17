@@ -45,7 +45,8 @@ Notas:
 
 - `amount` es cantidad decimal (string); se convierte a unidades menores (exponente 2).
 - `cvv` se valida pero no se reenvía al gateway en v1.
-- `terminal_id` sale de la installation del JWT, no del body.
+- El `installation_id` del JWT identifica la terminal configurada; la API lo
+  resuelve en `installations` y envía ese valor como `terminal_id` al procesador.
 
 ## Response
 

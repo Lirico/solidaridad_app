@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-07-17
+Última revisión: 2026-07-18
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -24,13 +24,13 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P0-01 | Mobile no usa el contrato vivo de ventas | open | Cliente: `POST /v1/sales/gas` (`mobile/.../sales_repository.dart`). API: `POST /v1/transactions`. |
-| G-P0-02 | Auth mobile incompleto vs API | open | Login/register sin `installation_id`; API lo exige. `must_change_password` ignorado. Change-password sin Bearer. |
+| G-P0-02 | Auth mobile incompleto vs API | partial | Login/register ya envían `installation_id` y manejan `must_change_password`. Pendiente: change-password sin Bearer. |
 | G-P0-03 | Token de venta no enlazado a sesión real | open | `SalesCubit` usa token mock; no consume el JWT de auth. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | open | Solo `POST /v1/transactions`. PDF/alcance piden listado y detalle. Historial mobile = mock. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | open | Mobile: ARS/USD y no envía CVV/expiry. API: enum productos gas + `cvv`/`expiration_date` requeridos. |
 | G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
-| G-P0-08 | `installation_id` desde config de terminal | open | No se lee de configuración del device; login/register hacen upsert libre en API. Alta real de terminal vive en el procesador. |
+| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. Pendiente: lectura runtime desde config del device. |
 
 ---
 
@@ -42,7 +42,7 @@ Verifone (banda + térmica).
 | G-P1-02 | Reintentos e idempotencia en mobile | open | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`; mobile no reintenta con la misma clave ni maneja 202. |
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
-| G-P1-05 | Base URL / ambientes en mobile | open | URL de producción hardcodeada en repositorios; sin flavors/env locales. |
+| G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
 | G-P1-06 | Entry mode ISO acorde al modo de captura | open | DE22 fijo `012` (manual). Falta track/swipe cuando haya banda. |
 
 ---
@@ -72,6 +72,8 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — UI presente; contrato/backend incompletos (ver P0) |
 | `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
+| Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
+| RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |
 
 ---
 

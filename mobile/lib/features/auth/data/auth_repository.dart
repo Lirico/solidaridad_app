@@ -2,17 +2,31 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../../../core/config/api_config.dart';
 import '../domain/auth_model.dart';
+
+/// Simple in-memory installation ID generator.
+///
+/// In a production app this would be persisted (e.g. SharedPreferences).
+String _resolveInstallationId() {
+  // Use a compile-time constant or fall back to a dev default.
+  const fromDefine = String.fromEnvironment(
+    'INSTALLATION_ID',
+    defaultValue: 'dev-term',
+  );
+  return fromDefine;
+}
 
 class AuthRepository {
   final http.Client _httpClient;
-  final String _baseUrl = 'https://api.solidaridad-prod.aws.com/v1';
+  final String _baseUrl;
 
   // Mock: conjunto de usuarios que ya cambiaron su contraseña
   static final Set<String> _usersWithPasswordChanged = {};
 
-  AuthRepository({http.Client? httpClient})
-    : _httpClient = httpClient ?? http.Client();
+  AuthRepository({http.Client? httpClient, String? baseUrl})
+    : _httpClient = httpClient ?? http.Client(),
+      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   /// Marca a un usuario como que ya cambió su contraseña (mock)
   static void markPasswordAsChanged(String username) {
@@ -33,6 +47,7 @@ class AuthRepository {
             body: jsonEncode({
               'username': usernameOrEmail,
               'password': password,
+              'installation_id': _resolveInstallationId(),
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -93,6 +108,7 @@ class AuthRepository {
               'name': name,
               'email': email,
               'password': password,
+              'installation_id': _resolveInstallationId(),
             }),
           )
           .timeout(const Duration(seconds: 15));

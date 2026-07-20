@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class SaleFormHeader extends StatelessWidget {
   const SaleFormHeader({super.key});
@@ -44,6 +45,8 @@ class SaleFormHeader extends StatelessWidget {
                   Navigator.pushNamed(context, AppRoutes.salesHistory);
                 },
               ),
+              const SizedBox(width: 8),
+              const UserMenuButton(),
             ],
           ),
         ],

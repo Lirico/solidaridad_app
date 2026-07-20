@@ -149,6 +149,12 @@ class AuthRepository {
     }
   }
 
+  Future<void> logout() async {
+    // Limpiar indicador de cambio de contraseña para este terminal
+    _usersWithPasswordChanged.clear();
+    // En un entorno real aquí se invalidaría el token en backend
+  }
+
   Future<AuthResponse> changePassword({
     required String currentPassword,
     required String newPassword,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class SaleReviewHeader extends StatelessWidget {
   final String title;
@@ -12,7 +13,7 @@ class SaleReviewHeader extends StatelessWidget {
       width: double.infinity,
       height: 180,
       color: const Color(0xFF1A4F9C),
-      padding: const EdgeInsets.only(top: 60, left: 24, right: 24),
+      padding: const EdgeInsets.only(top: 60, left: 24, right: 16),
       child: Row(
         children: [
           IconButton(
@@ -20,14 +21,17 @@ class SaleReviewHeader extends StatelessWidget {
             onPressed: onBackPressed,
           ),
           const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
+          const UserMenuButton(),
         ],
       ),
     );

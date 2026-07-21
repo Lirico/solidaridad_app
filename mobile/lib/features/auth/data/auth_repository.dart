@@ -21,17 +21,9 @@ class AuthRepository {
   final http.Client _httpClient;
   final String _baseUrl;
 
-  // Mock: conjunto de usuarios que ya cambiaron su contraseña
-  static final Set<String> _usersWithPasswordChanged = {};
-
   AuthRepository({http.Client? httpClient, String? baseUrl})
     : _httpClient = httpClient ?? http.Client(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
-
-  /// Marca a un usuario como que ya cambió su contraseña (mock)
-  static void markPasswordAsChanged(String username) {
-    _usersWithPasswordChanged.add(username.toLowerCase());
-  }
 
   Future<AuthResponse> login({
     required String usernameOrEmail,
@@ -55,8 +47,7 @@ class AuthRepository {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
-        final String email = (data['email'] ?? '').toString().toLowerCase();
-        final bool mustChange = !_usersWithPasswordChanged.contains(email);
+        final bool mustChange = data['must_change_password'] == true;
 
         return AuthResponse(
           isSuccess: true,
@@ -150,8 +141,6 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    // Limpiar indicador de cambio de contraseña para este terminal
-    _usersWithPasswordChanged.clear();
     // En un entorno real aquí se invalidaría el token en backend
   }
 

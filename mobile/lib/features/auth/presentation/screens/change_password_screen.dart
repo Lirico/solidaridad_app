@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
-import '../../data/auth_repository.dart';
 import '../widgets/change_password_form_fields.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
@@ -47,14 +46,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  String? get _userEmail {
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthSuccess && authState.user != null) {
-      return authState.user!.email;
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,11 +69,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         listener: (context, state) {
           if (state is AuthSuccess) {
             if (_isFirstLogin) {
-              // Marcar como que ya cambió la contraseña y navegar a SaleForm
-              final userEmail = _userEmail;
-              if (userEmail != null) {
-                AuthRepository.markPasswordAsChanged(userEmail);
-              }
+              // El backend ya marcó must_change_password=false,
+              // navegar directamente al formulario de ventas
               Navigator.pushReplacementNamed(context, AppRoutes.saleForm);
             } else {
               ScaffoldMessenger.of(context).showSnackBar(

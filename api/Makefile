@@ -1,7 +1,7 @@
 .PHONY: install run db-up db-down db-logs db-reset migrate migrate-new db-seed \
 	dev lint lint-fix typecheck test test-cov check
 
-HOST ?= 127.0.0.1
+HOST ?= 0.0.0.0
 
 install:
 	uv sync

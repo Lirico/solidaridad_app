@@ -1,5 +1,6 @@
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from presentation import create_router
@@ -32,6 +33,15 @@ def _http_exception_message(exc: HTTPException) -> str:
 
 def create_app(router: APIRouter) -> FastAPI:
     app = FastAPI(title="Solidaridad API")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.include_router(router)
 
     @app.exception_handler(RequestValidationError)
@@ -65,4 +75,4 @@ app = create_app(router)
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

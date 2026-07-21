@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-07-18
+Última revisión: 2026-07-20
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -31,6 +31,8 @@ Verifone (banda + térmica).
 | G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. Pendiente: lectura runtime desde config del device. |
+| G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
+| G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | Se mejoró `api_config.dart` para detectar plataforma automáticamente: web usa `localhost`, Android emulador usa `10.0.2.2`, otros usan `localhost`. Sigue siendo sobreescribible con `--dart-define=API_BASE_URL`. |
 
 ---
 

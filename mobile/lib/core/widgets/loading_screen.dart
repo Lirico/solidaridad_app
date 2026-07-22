@@ -26,13 +26,27 @@ class _LoadingScreenState extends State<LoadingScreen> {
     return const Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: SizedBox(
-          width: 60,
-          height: 60,
-          child: CircularProgressIndicator(
-            color: AppColors.primaryOrange,
-            strokeWidth: 4,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 60,
+              height: 60,
+              child: CircularProgressIndicator(
+                color: AppColors.primaryOrange,
+                strokeWidth: 4,
+              ),
+            ),
+            SizedBox(height: 24),
+            Text(
+              'Iniciando',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 24,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -16,6 +16,7 @@ import 'features/sales/presentation/screens/sale_review_screen.dart';
 import 'features/sales/presentation/screens/sale_status_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
 import 'features/history/presentation/screens/sale_detail_screen.dart';
+import 'core/widgets/loading_screen.dart';
 
 void main() {
   final salesRepository = SalesRepository();
@@ -45,7 +46,7 @@ class MyApp extends StatelessWidget {
       title: 'GAS Terminal',
       debugShowCheckedModeBanner: false,
       theme: appTheme,
-      initialRoute: AppRoutes.login,
+      initialRoute: AppRoutes.loading,
       routes: {
         AppRoutes.login: (context) => const LoginScreen(),
         AppRoutes.register: (context) => const RegisterScreen(),
@@ -55,6 +56,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.saleStatus: (context) => const SaleStatusScreen(),
         AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
         AppRoutes.saleDetail: (context) => const SaleDetailScreen(),
+        AppRoutes.loading: (context) => const LoadingScreen(),
       },
     );
   }

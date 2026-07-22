@@ -7,4 +7,5 @@ class AppRoutes {
   static const String changePassword = '/change_password';
   static const String salesHistory = '/sales_history';
   static const String saleDetail = '/sale_detail';
+  static const String loading = '/loading';
 }

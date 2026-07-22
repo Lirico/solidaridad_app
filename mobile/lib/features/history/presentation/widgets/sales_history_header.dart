@@ -10,7 +10,7 @@ class SalesHistoryHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: AppSpacing.headerHeight,
-      color: AppColors.primaryBlue,
+      color: AppColors.primaryOrange,
       padding: const EdgeInsets.only(
         top: AppSpacing.headerTopPadding,
         left: AppSpacing.xl,

@@ -6,8 +6,8 @@ final ThemeData appTheme = ThemeData(
   scaffoldBackgroundColor: AppColors.scaffoldBackground,
 
   colorScheme: ColorScheme.fromSeed(
-    seedColor: AppColors.primaryBlue,
-    primary: AppColors.primaryBlue,
+    seedColor: AppColors.primaryOrange,
+    primary: AppColors.primaryOrange,
     secondary: AppColors.primaryOrange,
   ),
 
@@ -27,7 +27,7 @@ final ThemeData appTheme = ThemeData(
 
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColors.primaryBlue,
+      backgroundColor: AppColors.primaryOrange,
       foregroundColor: AppColors.textWhite,
       padding: const EdgeInsets.symmetric(vertical: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

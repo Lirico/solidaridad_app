@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class SaleFormHeader extends StatelessWidget {
@@ -10,7 +11,7 @@ class SaleFormHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: 180,
-      color: const Color(0xFF1A4F9C),
+      color: AppColors.primaryOrange,
       padding: const EdgeInsets.only(top: 60, left: 24, right: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

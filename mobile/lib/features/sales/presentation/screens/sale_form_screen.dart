@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/amount_input_formatter.dart';
 import '../widgets/currency_selector.dart';
@@ -165,7 +166,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                 }
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1A4F9C),
+                                backgroundColor: AppColors.primaryOrange,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 16,

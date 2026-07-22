@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../widgets/change_password_form_fields.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
@@ -129,7 +130,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               const Icon(
                                 Icons.lock_reset_outlined,
                                 size: 44,
-                                color: Color(0xFF1A4F9C),
+                                color: AppColors.primaryOrange,
                               ),
                               const SizedBox(height: 16),
                               const Text(

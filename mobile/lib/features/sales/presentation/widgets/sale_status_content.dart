@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 
 class SaleStatusContent extends StatelessWidget {
   final bool isSuccess;
@@ -76,7 +77,7 @@ class SaleStatusContent extends StatelessWidget {
         ElevatedButton(
           onPressed: onFinalize,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A4F9C),
+            backgroundColor: AppColors.primaryOrange,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(

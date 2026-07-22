@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 
 class AppTextStyles {
   AppTextStyles._();
@@ -32,7 +33,7 @@ class AppTextStyles {
 
   // Link buttons
   static const TextStyle linkButton = TextStyle(
-    color: Color(0xFF1A4F9C),
+    color: AppColors.primaryOrange,
     fontWeight: FontWeight.w500,
   );
 }

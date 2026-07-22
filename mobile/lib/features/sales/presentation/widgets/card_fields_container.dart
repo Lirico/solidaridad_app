@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/formatters/card_formatters.dart';
+import '../../../../core/theme/app_colors.dart';
 
 class CardFieldsContainer extends StatelessWidget {
   final TextEditingController cardNumberController;
@@ -32,7 +33,7 @@ class CardFieldsContainer extends StatelessWidget {
             'Datos de Tarjeta',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1A4F9C),
+              color: AppColors.primaryOrange,
             ),
           ),
           const SizedBox(height: 12),

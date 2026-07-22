@@ -2,34 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../cubit/sales_cubit.dart';
-import '../cubit/sales_state.dart';
-import '../widgets/sale_review_widgets.dart';
 import '../widgets/sale_review_header.dart';
 import '../widgets/sale_review_content.dart';
 
 class SaleReviewScreen extends StatelessWidget {
   const SaleReviewScreen({super.key});
 
-  void _onConfirmPayment(BuildContext context) async {
-    final salesCubit = context.read<SalesCubit>();
-    await salesCubit.sendIsoMessage();
+  void _onConfirmPayment(BuildContext context) {
+    // Kick off the ISO message sending
+    context.read<SalesCubit>().sendIsoMessage();
 
-    if (!context.mounted) return;
-
-    final finalState = salesCubit.state;
-    final bool success = finalState is SalesCompleted && finalState.isSuccess;
-
-    Navigator.pushReplacementNamed(
-      context,
-      AppRoutes.saleStatus,
-      arguments: success,
-    );
+    // Navigate to the full-screen processing page
+    Navigator.pushNamed(context, AppRoutes.saleProcessing);
   }
 
   @override
   Widget build(BuildContext context) {
     final salesState = context.watch<SalesCubit>().state;
-    final isProcessing = salesState is SalesProcessing;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
@@ -39,7 +28,7 @@ class SaleReviewScreen extends StatelessWidget {
           children: [
             SaleReviewHeader(
               title: 'Confirmar Operación',
-              onBackPressed: isProcessing ? null : () => Navigator.pop(context),
+              onBackPressed: () => Navigator.pop(context),
             ),
             Expanded(
               child: Transform.translate(
@@ -60,12 +49,10 @@ class SaleReviewScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: isProcessing
-                        ? const ProcessingTransactionView()
-                        : SaleReviewContent(
-                            state: salesState,
-                            onConfirm: () => _onConfirmPayment(context),
-                          ),
+                    child: SaleReviewContent(
+                      state: salesState,
+                      onConfirm: () => _onConfirmPayment(context),
+                    ),
                   ),
                 ),
               ),

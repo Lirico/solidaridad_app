@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 
 class CurrencySelector extends StatelessWidget {
   final String selectedCurrency;
   final ValueChanged<String> onCurrencyChanged;
 
   static final _currencies = ['ARS', 'USD'];
-  static const _primaryColor = Color(0xFF1A4F9C);
+  static const _primaryColor = AppColors.primaryOrange;
 
   const CurrencySelector({
     super.key,

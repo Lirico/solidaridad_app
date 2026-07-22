@@ -12,6 +12,7 @@ import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
 import 'features/auth/presentation/screens/change_password_screen.dart';
 import 'features/sales/presentation/screens/sale_form_screen.dart';
+import 'features/sales/presentation/screens/sale_processing_screen.dart';
 import 'features/sales/presentation/screens/sale_review_screen.dart';
 import 'features/sales/presentation/screens/sale_status_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
@@ -54,6 +55,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.changePassword: (context) => const ChangePasswordScreen(),
         AppRoutes.saleForm: (context) => const SaleFormScreen(),
         AppRoutes.saleReview: (context) => const SaleReviewScreen(),
+        AppRoutes.saleProcessing: (context) => const SaleProcessingScreen(),
         AppRoutes.saleStatus: (context) => const SaleStatusScreen(),
         AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
         AppRoutes.saleDetail: (context) => const SaleDetailScreen(),

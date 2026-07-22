@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 
 // --- WIDGET 1: FILA DE DATOS DEL RESUMEN ---
 class ReviewDataRow extends StatelessWidget {
@@ -17,7 +18,7 @@ class ReviewDataRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF1A4F9C), size: 28),
+        Icon(icon, color: AppColors.primaryOrange, size: 28),
         const SizedBox(width: 16),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,38 +37,6 @@ class ReviewDataRow extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ],
-    );
-  }
-}
-
-// --- WIDGET 2: VISTA DE PROCESAMIENTO / LOADING ---
-class ProcessingTransactionView extends StatelessWidget {
-  const ProcessingTransactionView({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: const [
-        CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1A4F9C)),
-        ),
-        SizedBox(height: 24),
-        Text(
-          'Procesando Transacción...',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          'Enviando mensaje ISO de seguridad a AWS. Por favor, no cierre la aplicación.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Colors.grey),
         ),
       ],
     );

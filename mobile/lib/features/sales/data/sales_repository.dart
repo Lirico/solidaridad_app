@@ -70,13 +70,14 @@ class SalesRepository {
         );
       }
     } on TimeoutException {
-      // <-- CORREGIDO: Sintaxis limpia para capturar timeouts
+      // Tiempo de espera agotado = error de conectividad
       return const SaleResponse(
         isApproved: false,
         operationNumber: '',
         message:
             'Tiempo de espera agotado con el procesador de pagos (Timeout). Reintente.',
         errorCode: '99',
+        connectionError: true,
       );
     } on SocketException {
       // Error de conectividad física o DNS
@@ -86,6 +87,7 @@ class SalesRepository {
         message:
             'No se pudo establecer conexión con el servidor de AWS. Verifique su red.',
         errorCode: 'CONN_ERR',
+        connectionError: true,
       );
     } on HttpException {
       return const SaleResponse(
@@ -93,9 +95,10 @@ class SalesRepository {
         operationNumber: '',
         message: 'Error en el protocolo de comunicación con la API.',
         errorCode: 'HTTP_ERR',
+        connectionError: true,
       );
     } catch (e) {
-      // <-- CORREGIDO: Catch genérico final impecable
+      // Catch genérico final
       return SaleResponse(
         isApproved: false,
         operationNumber: '',

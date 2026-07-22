@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../sales/domain/sale_model.dart';
 import '../../../sales/presentation/cubit/sales_cubit.dart';
 import '../../../sales/presentation/cubit/sales_state.dart';
 import '../widgets/sales_history_header.dart';
@@ -70,8 +71,16 @@ class SalesHistoryScreen extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListTile(
                 leading: Icon(
-                  operation.isSuccess ? Icons.check_circle : Icons.error,
-                  color: operation.isSuccess ? Colors.green : Colors.red,
+                  operation.result == PaymentResult.approved
+                      ? Icons.check_circle
+                      : operation.result == PaymentResult.connectionError
+                      ? Icons.wifi_off
+                      : Icons.error,
+                  color: operation.result == PaymentResult.approved
+                      ? Colors.green
+                      : operation.result == PaymentResult.connectionError
+                      ? Colors.orange
+                      : Colors.red,
                   size: 32,
                 ),
                 title: Text(

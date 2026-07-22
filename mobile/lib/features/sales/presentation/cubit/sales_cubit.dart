@@ -17,7 +17,7 @@ class SalesCubit extends Cubit<SalesState> {
         currency: 'ARS',
         amount: 15250.00,
         cardNumber: '•••• 4582',
-        isSuccess: true,
+        result: PaymentResult.approved,
         date: now.subtract(const Duration(minutes: 12)),
       ),
       OperationModel(
@@ -25,7 +25,7 @@ class SalesCubit extends Cubit<SalesState> {
         currency: 'USD',
         amount: 120.50,
         cardNumber: '•••• 9237',
-        isSuccess: true,
+        result: PaymentResult.approved,
         date: now.subtract(const Duration(hours: 1, minutes: 5)),
       ),
       OperationModel(
@@ -33,7 +33,7 @@ class SalesCubit extends Cubit<SalesState> {
         currency: 'ARS',
         amount: 8900.75,
         cardNumber: '•••• 6712',
-        isSuccess: false,
+        result: PaymentResult.declined,
         date: now.subtract(const Duration(hours: 2, minutes: 30)),
       ),
       OperationModel(
@@ -41,7 +41,7 @@ class SalesCubit extends Cubit<SalesState> {
         currency: 'ARS',
         amount: 31200.00,
         cardNumber: '•••• 3348',
-        isSuccess: true,
+        result: PaymentResult.approved,
         date: now.subtract(const Duration(days: 1, hours: 4)),
       ),
       OperationModel(
@@ -49,7 +49,7 @@ class SalesCubit extends Cubit<SalesState> {
         currency: 'USD',
         amount: 85.00,
         cardNumber: '•••• 1056',
-        isSuccess: true,
+        result: PaymentResult.approved,
         date: now.subtract(const Duration(days: 1, hours: 8)),
       ),
       OperationModel(
@@ -57,7 +57,7 @@ class SalesCubit extends Cubit<SalesState> {
         currency: 'ARS',
         amount: 6700.00,
         cardNumber: '•••• 7823',
-        isSuccess: false,
+        result: PaymentResult.declined,
         date: now.subtract(const Duration(days: 1, hours: 10)),
       ),
     ];
@@ -111,6 +111,12 @@ class SalesCubit extends Cubit<SalesState> {
         ? '•••• ${currentCardNumber.replaceAll(' ', '').substring(currentCardNumber.replaceAll(' ', '').length - 4)}'
         : '•••• 4321';
 
+    final PaymentResult paymentResult = response.connectionError
+        ? PaymentResult.connectionError
+        : response.isApproved
+        ? PaymentResult.approved
+        : PaymentResult.declined;
+
     final newOperation = OperationModel(
       id: response.operationNumber.isNotEmpty
           ? response.operationNumber
@@ -118,7 +124,7 @@ class SalesCubit extends Cubit<SalesState> {
       currency: currentCurrency,
       amount: currentAmount,
       cardNumber: hiddenCard,
-      isSuccess: response.isApproved,
+      result: paymentResult,
       date: DateTime.now(),
     );
 
@@ -131,10 +137,16 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: currentCardNumber,
         cardHolder: currentCardHolder,
         history: currentHistory,
-        isSuccess: response.isApproved,
-        operationNumber: response.isApproved ? response.operationNumber : null,
-        errorMessage: response.isApproved ? null : response.message,
-        errorCode: response.isApproved ? null : response.errorCode,
+        result: paymentResult,
+        operationNumber: paymentResult == PaymentResult.approved
+            ? response.operationNumber
+            : null,
+        errorMessage: paymentResult != PaymentResult.approved
+            ? response.message
+            : null,
+        errorCode: paymentResult != PaymentResult.approved
+            ? response.errorCode
+            : null,
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../domain/sale_model.dart';
 import '../widgets/sale_review_header.dart';
 import '../widgets/sale_status_content.dart';
 
@@ -8,21 +9,33 @@ class SaleStatusScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isSuccess =
-        (ModalRoute.of(context)?.settings.arguments as bool?) ?? true;
+    final PaymentResult result =
+        (ModalRoute.of(context)?.settings.arguments as PaymentResult?) ??
+        PaymentResult.approved;
 
-    final Color statusColor = isSuccess
-        ? const Color(0xFF2ECC71)
-        : const Color(0xFFE74C3C);
-    final IconData statusIcon = isSuccess
-        ? Icons.check_circle_outline
-        : Icons.error_outline;
-    final String statusTitle = isSuccess
-        ? '¡Transacción Aprobada!'
-        : 'Transacción Rechazada';
-    final String statusSubtitle = isSuccess
-        ? 'El mensaje ISO fue procesado con éxito por AWS.'
-        : 'La terminal reportó un error en la autorización.';
+    final Color statusColor;
+    final IconData statusIcon;
+    final String statusTitle;
+    final String statusSubtitle;
+
+    switch (result) {
+      case PaymentResult.approved:
+        statusColor = const Color(0xFF2ECC71);
+        statusIcon = Icons.check_circle_outline;
+        statusTitle = '¡Transacción Aprobada!';
+        statusSubtitle = 'El mensaje ISO fue procesado con éxito por AWS.';
+      case PaymentResult.declined:
+        statusColor = const Color(0xFFE74C3C);
+        statusIcon = Icons.error_outline;
+        statusTitle = 'Transacción Rechazada';
+        statusSubtitle = 'La terminal reportó un error en la autorización.';
+      case PaymentResult.connectionError:
+        statusColor = const Color(0xFFFF8C00);
+        statusIcon = Icons.wifi_off_outlined;
+        statusTitle = 'Error de Conexión';
+        statusSubtitle =
+            'No se pudo contactar con el POSNET. Verifique su conectividad y reintente.';
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
@@ -52,7 +65,7 @@ class SaleStatusScreen extends StatelessWidget {
                       ],
                     ),
                     child: SaleStatusContent(
-                      isSuccess: isSuccess,
+                      result: result,
                       statusColor: statusColor,
                       statusIcon: statusIcon,
                       statusTitle: statusTitle,

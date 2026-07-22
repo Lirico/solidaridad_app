@@ -50,7 +50,7 @@ class SalesProcessing extends SalesState {
 }
 
 class SalesCompleted extends SalesState {
-  final bool isSuccess;
+  final PaymentResult result;
   final String? operationNumber;
   final String? errorMessage;
   final String? errorCode;
@@ -61,11 +61,13 @@ class SalesCompleted extends SalesState {
     required super.cardNumber,
     required super.cardHolder,
     required super.history,
-    required this.isSuccess,
+    required this.result,
     this.operationNumber,
     this.errorMessage,
     this.errorCode,
   });
+
+  bool get isSuccess => result == PaymentResult.approved;
 }
 
 class SalesInitialWithHistory extends SalesState {

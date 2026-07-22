@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../domain/sale_model.dart';
 
 class SaleStatusContent extends StatelessWidget {
-  final bool isSuccess;
+  final PaymentResult result;
   final Color statusColor;
   final IconData statusIcon;
   final String statusTitle;
@@ -11,7 +12,7 @@ class SaleStatusContent extends StatelessWidget {
 
   const SaleStatusContent({
     super.key,
-    required this.isSuccess,
+    required this.result,
     required this.statusColor,
     required this.statusIcon,
     required this.statusTitle,
@@ -61,13 +62,10 @@ class SaleStatusContent extends StatelessWidget {
               const Divider(height: 20),
               _buildTicketRow(
                 'Nro. Operación',
-                isSuccess ? 'OP-987452' : '---',
+                result == PaymentResult.approved ? 'OP-987452' : '---',
               ),
               const Divider(height: 20),
-              _buildTicketRow(
-                'Código Respuesta',
-                isSuccess ? '00 (OK)' : '51 (Fondos Insuf.)',
-              ),
+              _buildTicketRow('Código Respuesta', _responseCode(result)),
             ],
           ),
         ),
@@ -96,6 +94,17 @@ class SaleStatusContent extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _responseCode(PaymentResult result) {
+    switch (result) {
+      case PaymentResult.approved:
+        return '00 (OK)';
+      case PaymentResult.declined:
+        return '51 (Fondos Insuf.)';
+      case PaymentResult.connectionError:
+        return '99 (Timeout)';
+    }
   }
 
   Widget _buildTicketRow(String label, String value) {

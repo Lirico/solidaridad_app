@@ -30,7 +30,7 @@ class SaleProcessingScreen extends StatelessWidget {
         Navigator.pushReplacementNamed(
           context,
           AppRoutes.saleStatus,
-          arguments: salesState.isSuccess,
+          arguments: salesState.result,
         );
       });
     }

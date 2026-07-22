@@ -8,24 +8,40 @@ class SaleDetailTicket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isSuccess = operation.result == PaymentResult.approved;
+    final bool isConnectionError =
+        operation.result == PaymentResult.connectionError;
+
+    final Color statusColor = isSuccess
+        ? Colors.green
+        : isConnectionError
+        ? Colors.orange
+        : Colors.red;
+    final IconData statusIcon = isSuccess
+        ? Icons.check_circle
+        : isConnectionError
+        ? Icons.wifi_off
+        : Icons.cancel;
+    final String statusTitle = isSuccess
+        ? 'VENTA EXITOSA'
+        : isConnectionError
+        ? 'ERROR DE CONEXIÓN'
+        : 'VENTA RECHAZADA';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Center(
           child: Column(
             children: [
-              Icon(
-                operation.isSuccess ? Icons.check_circle : Icons.cancel,
-                color: operation.isSuccess ? Colors.green : Colors.red,
-                size: 64,
-              ),
+              Icon(statusIcon, color: statusColor, size: 64),
               const SizedBox(height: 12),
               Text(
-                operation.isSuccess ? 'VENTA EXITOSA' : 'VENTA RECHAZADA',
+                statusTitle,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: operation.isSuccess ? Colors.green : Colors.red,
+                  color: statusColor,
                 ),
               ),
               const SizedBox(height: 8),

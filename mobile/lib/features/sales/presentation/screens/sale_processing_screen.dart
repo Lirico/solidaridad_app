@@ -35,7 +35,7 @@ class SaleProcessingScreen extends StatelessWidget {
       });
     }
 
-    final String currency = salesState.currency;
+    final String productLabel = salesState.productLabel;
     final double amount = salesState.amount;
     final String cardNumber = salesState.cardNumber;
     final String cardHolder = salesState.cardHolder;
@@ -97,7 +97,7 @@ class SaleProcessingScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          currency,
+                          productLabel,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,

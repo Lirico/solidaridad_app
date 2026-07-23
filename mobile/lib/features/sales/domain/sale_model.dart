@@ -2,7 +2,8 @@ enum PaymentResult { approved, declined, connectionError }
 
 class OperationModel {
   final String id;
-  final String currency;
+  final String productCode;
+  final String productLabel;
   final double amount;
   final String cardNumber;
   final PaymentResult result;
@@ -10,7 +11,8 @@ class OperationModel {
 
   const OperationModel({
     required this.id,
-    required this.currency,
+    required this.productCode,
+    required this.productLabel,
     required this.amount,
     required this.cardNumber,
     required this.result,
@@ -32,4 +34,18 @@ class SaleResponse {
     required this.errorCode,
     this.connectionError = false,
   });
+}
+
+class ProductInfo {
+  final String code;
+  final String label;
+
+  const ProductInfo({required this.code, required this.label});
+
+  factory ProductInfo.fromJson(Map<String, dynamic> json) {
+    return ProductInfo(
+      code: json['code'] as String,
+      label: json['label'] as String,
+    );
+  }
 }

@@ -4,9 +4,9 @@ import '../../data/sales_repository.dart';
 import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
-  final SalesRepository _salesRepository;
+  final SalesRepository salesRepository;
 
-  SalesCubit({required this._salesRepository})
+  SalesCubit({required this.salesRepository})
     : super(SalesInitialWithHistory(history: _mockHistory()));
 
   static List<OperationModel> _mockHistory() {
@@ -14,7 +14,8 @@ class SalesCubit extends Cubit<SalesState> {
     return [
       OperationModel(
         id: 'OP-20260714-001',
-        currency: 'ARS',
+        productCode: 'GARRAFA_10',
+        productLabel: 'Garrafa 10 kg',
         amount: 15250.00,
         cardNumber: '•••• 4582',
         result: PaymentResult.approved,
@@ -22,7 +23,8 @@ class SalesCubit extends Cubit<SalesState> {
       ),
       OperationModel(
         id: 'OP-20260714-002',
-        currency: 'USD',
+        productCode: 'GARRAFA_15',
+        productLabel: 'Garrafa 15 kg',
         amount: 120.50,
         cardNumber: '•••• 9237',
         result: PaymentResult.approved,
@@ -30,7 +32,8 @@ class SalesCubit extends Cubit<SalesState> {
       ),
       OperationModel(
         id: 'OP-20260714-003',
-        currency: 'ARS',
+        productCode: 'TUBO_45',
+        productLabel: 'Tubo 45 kg',
         amount: 8900.75,
         cardNumber: '•••• 6712',
         result: PaymentResult.declined,
@@ -38,7 +41,8 @@ class SalesCubit extends Cubit<SalesState> {
       ),
       OperationModel(
         id: 'OP-20260713-004',
-        currency: 'ARS',
+        productCode: 'GARRAFA_10',
+        productLabel: 'Garrafa 10 kg',
         amount: 31200.00,
         cardNumber: '•••• 3348',
         result: PaymentResult.approved,
@@ -46,7 +50,8 @@ class SalesCubit extends Cubit<SalesState> {
       ),
       OperationModel(
         id: 'OP-20260713-005',
-        currency: 'USD',
+        productCode: 'GRANEL',
+        productLabel: 'Granel',
         amount: 85.00,
         cardNumber: '•••• 1056',
         result: PaymentResult.approved,
@@ -54,7 +59,8 @@ class SalesCubit extends Cubit<SalesState> {
       ),
       OperationModel(
         id: 'OP-20260713-006',
-        currency: 'ARS',
+        productCode: 'GARRAFA_15',
+        productLabel: 'Garrafa 15 kg',
         amount: 6700.00,
         cardNumber: '•••• 7823',
         result: PaymentResult.declined,
@@ -64,14 +70,16 @@ class SalesCubit extends Cubit<SalesState> {
   }
 
   void showReview({
-    required String currency,
+    required String productCode,
+    required String productLabel,
     required double amount,
     required String cardNumber,
     required String cardHolder,
   }) {
     emit(
       SalesReviewing(
-        currency: currency,
+        productCode: productCode,
+        productLabel: productLabel,
         amount: amount,
         cardNumber: cardNumber,
         cardHolder: cardHolder,
@@ -81,7 +89,8 @@ class SalesCubit extends Cubit<SalesState> {
   }
 
   Future<void> sendIsoMessage() async {
-    final currentCurrency = state.currency;
+    final currentProductCode = state.productCode;
+    final currentProductLabel = state.productLabel;
     final currentAmount = state.amount;
     final currentCardNumber = state.cardNumber;
     final currentCardHolder = state.cardHolder;
@@ -90,7 +99,8 @@ class SalesCubit extends Cubit<SalesState> {
 
     emit(
       SalesProcessing(
-        currency: currentCurrency,
+        productCode: currentProductCode,
+        productLabel: currentProductLabel,
         amount: currentAmount,
         cardNumber: currentCardNumber,
         cardHolder: currentCardHolder,
@@ -98,8 +108,8 @@ class SalesCubit extends Cubit<SalesState> {
       ),
     );
 
-    final response = await _salesRepository.registerGasSale(
-      currency: currentCurrency,
+    final response = await salesRepository.registerGasSale(
+      product: currentProductCode,
       amount: currentAmount,
       cardNumber: currentCardNumber,
       cardHolder: currentCardHolder,
@@ -121,7 +131,8 @@ class SalesCubit extends Cubit<SalesState> {
       id: response.operationNumber.isNotEmpty
           ? response.operationNumber
           : 'OP-ERR',
-      currency: currentCurrency,
+      productCode: currentProductCode,
+      productLabel: currentProductLabel,
       amount: currentAmount,
       cardNumber: hiddenCard,
       result: paymentResult,
@@ -132,7 +143,8 @@ class SalesCubit extends Cubit<SalesState> {
 
     emit(
       SalesCompleted(
-        currency: currentCurrency,
+        productCode: currentProductCode,
+        productLabel: currentProductLabel,
         amount: currentAmount,
         cardNumber: currentCardNumber,
         cardHolder: currentCardHolder,

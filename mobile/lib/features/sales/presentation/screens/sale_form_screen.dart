@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/amount_input_formatter.dart';
-import '../widgets/currency_selector.dart';
+import '../widgets/product_selector.dart';
 import '../widgets/card_fields_container.dart';
 import '../widgets/sale_form_header.dart';
 
@@ -18,13 +19,45 @@ class SaleFormScreen extends StatefulWidget {
 class _SaleFormScreenState extends State<SaleFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  String _selectedCurrency = 'ARS';
+  String _selectedProductCode = 'GARRAFA_10';
+  String _selectedProductLabel = 'Garrafa 10 kg';
+  List<ProductInfo> _products = [];
+  bool _loadingProducts = true;
 
   final _cardNumberController = TextEditingController();
   final _expiryController = TextEditingController();
   final _unitsController = TextEditingController();
   final _cvvController = TextEditingController();
   final _cardHolderController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    final repo = context.read<SalesCubit>().salesRepository;
+    try {
+      final products = await repo.fetchProducts(
+        token: 'TOKEN_MOCK_SESION_FASE_0',
+      );
+      if (!mounted) return;
+      setState(() {
+        _products = products;
+        _loadingProducts = false;
+        if (products.isNotEmpty) {
+          _selectedProductCode = products.first.code;
+          _selectedProductLabel = products.first.label;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingProducts = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -88,14 +121,27 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                             ),
                             const Divider(height: 32),
 
-                            CurrencySelector(
-                              selectedCurrency: _selectedCurrency,
-                              onCurrencyChanged: (currency) {
-                                setState(() {
-                                  _selectedCurrency = currency;
-                                });
-                              },
-                            ),
+                            if (_loadingProducts)
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            else
+                              ProductSelector(
+                                products: _products,
+                                selectedCode: _selectedProductCode,
+                                onProductChanged: (code) {
+                                  final product = _products.firstWhere(
+                                    (p) => p.code == code,
+                                  );
+                                  setState(() {
+                                    _selectedProductCode = code;
+                                    _selectedProductLabel = product.label;
+                                  });
+                                },
+                              ),
                             const SizedBox(height: 20),
                             const Text(
                               'Cantidad de Unidades',
@@ -153,7 +199,8 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                       0;
 
                                   cubit.showReview(
-                                    currency: _selectedCurrency,
+                                    productCode: _selectedProductCode,
+                                    productLabel: _selectedProductLabel,
                                     amount: units,
                                     cardNumber: _cardNumberController.text,
                                     cardHolder: _cardHolderController.text,

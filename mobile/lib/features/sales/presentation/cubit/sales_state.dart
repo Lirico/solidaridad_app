@@ -3,14 +3,16 @@ import '../../domain/sale_model.dart';
 
 @immutable
 sealed class SalesState {
-  final String currency;
+  final String productCode;
+  final String productLabel;
   final double amount;
   final String cardNumber;
   final String cardHolder;
   final List<OperationModel> history;
 
   const SalesState({
-    required this.currency,
+    required this.productCode,
+    required this.productLabel,
     required this.amount,
     required this.cardNumber,
     required this.cardHolder,
@@ -21,7 +23,8 @@ sealed class SalesState {
 class SalesInitial extends SalesState {
   const SalesInitial()
     : super(
-        currency: 'ARS',
+        productCode: 'GARRAFA_10',
+        productLabel: 'Garrafa 10 kg',
         amount: 0.0,
         cardNumber: '',
         cardHolder: '',
@@ -31,7 +34,8 @@ class SalesInitial extends SalesState {
 
 class SalesReviewing extends SalesState {
   const SalesReviewing({
-    required super.currency,
+    required super.productCode,
+    required super.productLabel,
     required super.amount,
     required super.cardNumber,
     required super.cardHolder,
@@ -41,7 +45,8 @@ class SalesReviewing extends SalesState {
 
 class SalesProcessing extends SalesState {
   const SalesProcessing({
-    required super.currency,
+    required super.productCode,
+    required super.productLabel,
     required super.amount,
     required super.cardNumber,
     required super.cardHolder,
@@ -56,7 +61,8 @@ class SalesCompleted extends SalesState {
   final String? errorCode;
 
   const SalesCompleted({
-    required super.currency,
+    required super.productCode,
+    required super.productLabel,
     required super.amount,
     required super.cardNumber,
     required super.cardHolder,
@@ -72,5 +78,11 @@ class SalesCompleted extends SalesState {
 
 class SalesInitialWithHistory extends SalesState {
   const SalesInitialWithHistory({required super.history})
-    : super(currency: 'ARS', amount: 0.0, cardNumber: '', cardHolder: '');
+    : super(
+        productCode: 'GARRAFA_10',
+        productLabel: 'Garrafa 10 kg',
+        amount: 0.0,
+        cardNumber: '',
+        cardHolder: '',
+      );
 }

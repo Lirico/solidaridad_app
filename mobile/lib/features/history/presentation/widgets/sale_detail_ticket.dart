@@ -46,7 +46,7 @@ class SaleDetailTicket extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '${operation.currency} ${operation.amount.toStringAsFixed(2)}',
+                '${operation.productLabel} — ${operation.amount.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,

@@ -84,7 +84,7 @@ class SalesHistoryScreen extends StatelessWidget {
                   size: 32,
                 ),
                 title: Text(
-                  '${operation.currency} ${operation.amount.toStringAsFixed(2)}',
+                  '${operation.productLabel} — ${operation.amount.toStringAsFixed(2)}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text('${operation.cardNumber} \n${operation.id}'),

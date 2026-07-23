@@ -4,7 +4,9 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-07-22
+Última revisión: 2026-07-23
+
+> ✅ **Último cambio:** se reemplazó `CurrencySelector` (ARS/USD hardcodeados) por `ProductSelector` que consume `GET /v1/products` del backend. Se renombró `currency` → `productCode`/`productLabel` en modelos, estado, cubit y repository. El payload de venta ahora envía `product` en vez de `species_currency`.
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -27,12 +29,12 @@ Verifone (banda + térmica).
 | G-P0-02 | Auth mobile incompleto vs API | partial | Login/register ya envían `installation_id` y manejan `must_change_password`. Pendiente: change-password sin Bearer. |
 | G-P0-03 | Token de venta no enlazado a sesión real | open | `SalesCubit` usa token mock; no consume el JWT de auth. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | open | Solo `POST /v1/transactions`. PDF/alcance piden listado y detalle. Historial mobile = mock. |
-| G-P0-05 | Producto/especie y campos de tarjeta desalineados | open | Mobile: ARS/USD y no envía CVV/expiry. API: enum productos gas + `cvv`/`expiration_date` requeridos. |
+| G-P0-05 | Producto/especie y campos de tarjeta desalineados | partial | Mobile: ahora usa `ProductSelector` con catálogo de `GET /v1/products` (GARRAFA_10, GARRAFA_15, etc.) en vez de ARS/USD. Payload envía `product` en vez de `species_currency`. Pendiente: CVV/expiry no se envían aún. |
 | G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. Pendiente: lectura runtime desde config del device. |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
-| G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | Se mejoró `api_config.dart` para detectar plataforma automáticamente: web usa `localhost`, Android emulador usa `10.0.2.2`, otros usan `localhost`. Sigue siendo sobreescribible con `--dart-define=API_BASE_URL`. |
+| G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | partial | Se mejoró `api_config.dart` para detectar plataforma automáticamente. **Parcial:** `AuthRepository` consume `ApiConfig.baseUrl`, pero `SalesRepository` ignora `ApiConfig` y tiene su propia URL hardcodeada (`https://api.solidaridad-prod.aws.com/v1`). |
 
 ---
 
@@ -77,6 +79,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |
 | Status screen con 3 estados (aprobado/rechazado/error conexión POSNET) | `PaymentResult` enum + `connectionError` flag en `SaleResponse`; naranja para pérdida de conectividad POSNET |
+| ProductSelector con catálogo del backend | `ProductSelector` widget consume `GET /v1/products` y muestra productos de gas (GARRAFA_10, etc.) en vez de ARS/USD. Payload de venta envía `product`. |
 
 ---
 

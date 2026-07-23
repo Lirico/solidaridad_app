@@ -27,8 +27,8 @@ class SaleReviewContent extends StatelessWidget {
 
         ReviewDataRow(
           icon: Icons.monetization_on_outlined,
-          label: 'Moneda de Cobro',
-          value: state.currency,
+          label: 'Producto',
+          value: state.productLabel,
         ),
         const Divider(height: 32),
 

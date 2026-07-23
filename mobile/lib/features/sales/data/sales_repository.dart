@@ -12,8 +12,43 @@ class SalesRepository {
   SalesRepository({http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
 
+  Future<List<ProductInfo>> fetchProducts({required String token}) async {
+    final url = Uri.parse('$_baseUrl/products');
+    try {
+      final response = await _httpClient
+          .get(
+            url,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+        return data
+            .map((item) => ProductInfo.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+      return _defaultProducts();
+    } catch (_) {
+      return _defaultProducts();
+    }
+  }
+
+  List<ProductInfo> _defaultProducts() {
+    return const [
+      ProductInfo(code: 'GARRAFA_10', label: 'Garrafa 10 kg'),
+      ProductInfo(code: 'GARRAFA_15', label: 'Garrafa 15 kg'),
+      ProductInfo(code: 'GARRAFA_30', label: 'Garrafa 30 kg'),
+      ProductInfo(code: 'TUBO_45', label: 'Tubo 45 kg'),
+      ProductInfo(code: 'GRANEL', label: 'Granel'),
+    ];
+  }
+
   Future<SaleResponse> registerGasSale({
-    required String currency,
+    required String product,
     required double amount,
     required String cardNumber,
     required String cardHolder,
@@ -22,7 +57,7 @@ class SalesRepository {
     final url = Uri.parse('$_baseUrl/sales/gas');
 
     final Map<String, dynamic> bodyPayload = {
-      'species_currency': currency,
+      'product': product,
       'amount': amount,
       'card_number': cardNumber.replaceAll(
         ' ',

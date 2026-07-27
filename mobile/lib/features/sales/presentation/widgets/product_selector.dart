@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../domain/sale_model.dart';
 
-class ProductSelector extends StatelessWidget {
+class ProductSelector extends StatefulWidget {
   final List<ProductInfo> products;
   final String selectedCode;
   final ValueChanged<String> onProductChanged;
@@ -15,55 +14,60 @@ class ProductSelector extends StatelessWidget {
   });
 
   @override
+  State<ProductSelector> createState() => _ProductSelectorState();
+}
+
+class _ProductSelectorState extends State<ProductSelector> {
+  late String _selectedCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCode = widget.selectedCode;
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedCode != oldWidget.selectedCode) {
+      _selectedCode = widget.selectedCode;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'Producto / Especie',
-          style: TextStyle(fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        ...products.map((product) {
-          final isSelected = selectedCode == product.code;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: OutlinedButton(
-              onPressed: () => onProductChanged(product.code),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(
-                  color: isSelected
-                      ? AppColors.primaryOrange
-                      : const Color(0xFFCED4DA),
-                  width: isSelected ? 2 : 1,
-                ),
-                backgroundColor: isSelected
-                    ? AppColors.primaryOrange.withValues(alpha: 0.05)
-                    : Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Align(
-                alignment: Alignment.center,
-                child: Text(
-                  product.label,
-                  style: TextStyle(
-                    color: isSelected
-                        ? AppColors.primaryOrange
-                        : Colors.black87,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedCode,
+      isExpanded: true,
+      items: widget.products.map((product) {
+        return DropdownMenuItem<String>(
+          value: product.code,
+          child: Text(product.label),
+        );
+      }).toList(),
+      onChanged: (code) {
+        if (code != null) {
+          setState(() {
+            _selectedCode = code;
+          });
+          widget.onProductChanged(code);
+        }
+      },
+      decoration: const InputDecoration(
+        labelText: 'Producto / Especie',
+        prefixIcon: Icon(Icons.propane_tank_outlined),
+      ),
+      selectedItemBuilder: (context) {
+        return widget.products.map<Widget>((product) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              product.label,
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
             ),
           );
-        }),
-      ],
+        }).toList();
+      },
     );
   }
 }

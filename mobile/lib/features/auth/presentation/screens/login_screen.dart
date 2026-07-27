@@ -120,19 +120,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       )
                                     : const Text('INGRESAR'),
                               ),
-                              SizedBox(height: AppSpacing.md),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pushReplacementNamed(
-                                    context,
-                                    AppRoutes.register,
-                                  );
-                                },
-                                child: const Text(
-                                  '¿No tiene una cuenta? Registrarse',
-                                  style: AppTextStyles.linkButton,
-                                ),
-                              ),
                             ],
                           ),
                         );

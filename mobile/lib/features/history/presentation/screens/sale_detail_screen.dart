@@ -7,8 +7,18 @@ class SaleDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final operation =
-        ModalRoute.of(context)!.settings.arguments as OperationModel;
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is! OperationModel) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pop(context);
+      });
+      return const Scaffold(
+        body: Center(child: Text('Error: datos de operación no disponibles')),
+      );
+    }
+
+    final operation = args;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

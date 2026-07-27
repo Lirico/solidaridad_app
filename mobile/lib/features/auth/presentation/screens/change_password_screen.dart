@@ -22,8 +22,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isFirstLogin = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map<String, dynamic>) {
       _isFirstLogin = args['isFirstLogin'] == true;

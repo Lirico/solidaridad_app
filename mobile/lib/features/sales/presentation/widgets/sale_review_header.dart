@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/header_menu_button.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class SaleReviewHeader extends StatelessWidget {
@@ -32,6 +33,8 @@ class SaleReviewHeader extends StatelessWidget {
               ),
             ),
           ),
+          const HeaderMenuButton(),
+          const SizedBox(width: 8),
           const UserMenuButton(),
         ],
       ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/header_menu_button.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class SaleFormHeader extends StatelessWidget {
@@ -27,25 +27,7 @@ class SaleFormHeader extends StatelessWidget {
           ),
           Row(
             children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.lock_reset,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                tooltip: 'Cambiar Contraseña',
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRoutes.changePassword);
-                },
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.history, color: Colors.white, size: 28),
-                tooltip: 'Ver historial de ventas',
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRoutes.salesHistory);
-                },
-              ),
+              const HeaderMenuButton(),
               const SizedBox(width: 8),
               const UserMenuButton(),
             ],

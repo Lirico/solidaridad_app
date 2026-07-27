@@ -48,6 +48,8 @@ class UserMenuButton extends StatelessWidget {
       tooltip: 'Menú de usuario',
       offset: const Offset(0, 40),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      surfaceTintColor: Colors.white,
       onSelected: (value) {
         if (value == 'logout') {
           _confirmLogout(context);

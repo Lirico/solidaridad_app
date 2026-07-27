@@ -75,6 +75,8 @@ class SalesCubit extends Cubit<SalesState> {
     required double amount,
     required String cardNumber,
     required String cardHolder,
+    required String cvv,
+    required String expirationDate,
   }) {
     emit(
       SalesReviewing(
@@ -83,6 +85,8 @@ class SalesCubit extends Cubit<SalesState> {
         amount: amount,
         cardNumber: cardNumber,
         cardHolder: cardHolder,
+        cvv: cvv,
+        expirationDate: expirationDate,
         history: state.history,
       ),
     );
@@ -94,6 +98,8 @@ class SalesCubit extends Cubit<SalesState> {
     final currentAmount = state.amount;
     final currentCardNumber = state.cardNumber;
     final currentCardHolder = state.cardHolder;
+    final currentCvv = state.cvv;
+    final currentExpirationDate = state.expirationDate;
 
     final currentHistory = List<OperationModel>.from(state.history);
 
@@ -104,15 +110,18 @@ class SalesCubit extends Cubit<SalesState> {
         amount: currentAmount,
         cardNumber: currentCardNumber,
         cardHolder: currentCardHolder,
+        cvv: currentCvv,
+        expirationDate: currentExpirationDate,
         history: currentHistory,
       ),
     );
 
-    final response = await salesRepository.registerGasSale(
+    final response = await salesRepository.registerSale(
       product: currentProductCode,
-      amount: currentAmount,
+      amount: currentAmount.toString(),
       cardNumber: currentCardNumber,
-      cardHolder: currentCardHolder,
+      cvv: currentCvv,
+      expirationDate: currentExpirationDate,
       token:
           'TOKEN_MOCK_SESION_FASE_0', // TODO: Enlazar con tu AuthCubit global en producción
     );
@@ -148,6 +157,8 @@ class SalesCubit extends Cubit<SalesState> {
         amount: currentAmount,
         cardNumber: currentCardNumber,
         cardHolder: currentCardHolder,
+        cvv: currentCvv,
+        expirationDate: currentExpirationDate,
         history: currentHistory,
         result: paymentResult,
         operationNumber: paymentResult == PaymentResult.approved

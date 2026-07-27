@@ -8,6 +8,8 @@ sealed class SalesState {
   final double amount;
   final String cardNumber;
   final String cardHolder;
+  final String cvv;
+  final String expirationDate;
   final List<OperationModel> history;
 
   const SalesState({
@@ -16,6 +18,8 @@ sealed class SalesState {
     required this.amount,
     required this.cardNumber,
     required this.cardHolder,
+    required this.cvv,
+    required this.expirationDate,
     required this.history,
   });
 }
@@ -28,6 +32,8 @@ class SalesInitial extends SalesState {
         amount: 0.0,
         cardNumber: '',
         cardHolder: '',
+        cvv: '',
+        expirationDate: '',
         history: const [],
       );
 }
@@ -39,6 +45,8 @@ class SalesReviewing extends SalesState {
     required super.amount,
     required super.cardNumber,
     required super.cardHolder,
+    required super.cvv,
+    required super.expirationDate,
     required super.history,
   });
 }
@@ -50,6 +58,8 @@ class SalesProcessing extends SalesState {
     required super.amount,
     required super.cardNumber,
     required super.cardHolder,
+    required super.cvv,
+    required super.expirationDate,
     required super.history,
   });
 }
@@ -66,6 +76,8 @@ class SalesCompleted extends SalesState {
     required super.amount,
     required super.cardNumber,
     required super.cardHolder,
+    required super.cvv,
+    required super.expirationDate,
     required super.history,
     required this.result,
     this.operationNumber,
@@ -84,5 +96,7 @@ class SalesInitialWithHistory extends SalesState {
         amount: 0.0,
         cardNumber: '',
         cardHolder: '',
+        cvv: '',
+        expirationDate: '',
       );
 }

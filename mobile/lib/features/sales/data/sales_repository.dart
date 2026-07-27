@@ -1,16 +1,28 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:http/http.dart' as http;
+import '../../../core/config/api_config.dart';
 import '../domain/sale_model.dart';
+
+/// Generates a pseudo-unique idempotency key.
+///
+/// In production, consider using the `uuid` package for guaranteed uniqueness.
+/// This implementation combines a timestamp with random digits.
+String _generateIdempotencyKey() {
+  final timestamp = DateTime.now().microsecondsSinceEpoch;
+  final random = Random().nextInt(99999);
+  return '$timestamp-$random';
+}
 
 class SalesRepository {
   final http.Client _httpClient;
-  // TODO: Mover a un archivo de configuración de ambientes (.env) cuando configuren AWS
-  final String _baseUrl = 'https://api.solidaridad-prod.aws.com/v1';
+  final String _baseUrl;
 
-  SalesRepository({http.Client? httpClient})
-    : _httpClient = httpClient ?? http.Client();
+  SalesRepository({http.Client? httpClient, String? baseUrl})
+    : _httpClient = httpClient ?? http.Client(),
+      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   Future<List<ProductInfo>> fetchProducts({required String token}) async {
     final url = Uri.parse('$_baseUrl/products');
@@ -47,25 +59,27 @@ class SalesRepository {
     ];
   }
 
-  Future<SaleResponse> registerGasSale({
+  Future<SaleResponse> registerSale({
     required String product,
-    required double amount,
+    required String amount,
     required String cardNumber,
-    required String cardHolder,
-    required String token, // Token de sesión de la Fase 0
+    required String cvv,
+    required String expirationDate,
+    required String token,
   }) async {
-    final url = Uri.parse('$_baseUrl/sales/gas');
+    final url = Uri.parse('$_baseUrl/transactions');
 
     final Map<String, dynamic> bodyPayload = {
       'product': product,
       'amount': amount,
-      'card_number': cardNumber.replaceAll(
-        ' ',
-        '',
-      ), // Quitamos la máscara visual
-      'card_holder': cardHolder,
-      'terminal_origin': 'VIRTUAL_POS_01', // ID de terminal asociada
+      'card_number': cardNumber.replaceAll(' ', ''),
+      'cvv': cvv,
     };
+    if (expirationDate.isNotEmpty) {
+      bodyPayload['expiration_date'] = expirationDate;
+    }
+
+    final idempotencyKey = _generateIdempotencyKey();
 
     try {
       final response = await _httpClient
@@ -74,38 +88,36 @@ class SalesRepository {
             headers: {
               HttpHeaders.contentTypeHeader: 'application/json',
               HttpHeaders.authorizationHeader: 'Bearer $token',
+              'Idempotency-Key': idempotencyKey,
             },
             body: jsonEncode(bodyPayload),
           )
-          .timeout(
-            const Duration(seconds: 15),
-          ); // Control de Timeout que pide el instructivo
+          .timeout(const Duration(seconds: 15));
 
       final Map<String, dynamic> responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Operación procesada de forma exitosa por el Gateway ISO
+      if (response.statusCode == 200 ||
+          response.statusCode == 201 ||
+          response.statusCode == 202) {
         final bool approved = responseData['status'] == 'APPROVED';
 
         return SaleResponse(
           isApproved: approved,
-          operationNumber: responseData['operation_number'] ?? 'OP-UNKNOWN',
+          operationNumber: responseData['transaction_number'] ?? 'OP-UNKNOWN',
           message: responseData['user_message'] ?? 'Operación procesada',
-          errorCode: responseData['error_code'] ?? '00',
+          errorCode: '00',
         );
       } else {
-        // Errores de negocio reportados por el Backend/Procesador (ej: Fondos insuficientes)
         return SaleResponse(
           isApproved: false,
-          operationNumber: responseData['operation_number'] ?? '',
+          operationNumber: responseData['transaction_number'] ?? '',
           message:
               responseData['user_message'] ??
               'Venta rechazada por la entidad emisora.',
-          errorCode: responseData['error_code'] ?? '${response.statusCode}',
+          errorCode: '${response.statusCode}',
         );
       }
     } on TimeoutException {
-      // Tiempo de espera agotado = error de conectividad
       return const SaleResponse(
         isApproved: false,
         operationNumber: '',
@@ -115,7 +127,6 @@ class SalesRepository {
         connectionError: true,
       );
     } on SocketException {
-      // Error de conectividad física o DNS
       return const SaleResponse(
         isApproved: false,
         operationNumber: '',
@@ -133,7 +144,6 @@ class SalesRepository {
         connectionError: true,
       );
     } catch (e) {
-      // Catch genérico final
       return SaleResponse(
         isApproved: false,
         operationNumber: '',

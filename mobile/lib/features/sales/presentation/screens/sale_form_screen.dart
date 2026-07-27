@@ -204,6 +204,9 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                     amount: units,
                                     cardNumber: _cardNumberController.text,
                                     cardHolder: _cardHolderController.text,
+                                    cvv: _cvvController.text,
+                                    expirationDate: _expiryController.text
+                                        .replaceAll('/', ''),
                                   );
 
                                   Navigator.pushNamed(

@@ -14,6 +14,7 @@ from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.create_transaction import CreateTransaction
+from application.payments.list_transactions import ListTransactions
 from config import Settings, get_settings
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
@@ -84,6 +85,14 @@ def get_payment_gateway(
     return HttpPaymentGateway(
         base_url=settings.payment_gateway_url,
         timeout_seconds=settings.payment_gateway_timeout_seconds,
+    )
+
+
+def get_list_transactions(
+    db: Annotated[Session, Depends(get_db)],
+) -> ListTransactions:
+    return ListTransactions(
+        transactions=TransactionRepository(db),
     )
 
 

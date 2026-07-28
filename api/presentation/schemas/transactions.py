@@ -19,3 +19,22 @@ class TransactionResponse(BaseModel):
     status: str
     user_message: str
     created_at: datetime
+
+
+class TransactionItemResponse(BaseModel):
+    """Single item in a transaction list response."""
+
+    transaction_number: str
+    product: str
+    amount: str
+    card_last4: str
+    status: str
+    user_message: str
+    created_at: datetime
+
+
+class TransactionListResponse(BaseModel):
+    """Paginated list of transactions."""
+
+    items: list[TransactionItemResponse]
+    total: int

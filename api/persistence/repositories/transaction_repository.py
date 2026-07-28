@@ -2,7 +2,7 @@
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from domain.exceptions import TransactionNumberExhausted
@@ -118,6 +118,30 @@ class TransactionRepository:
         self._session.add(row)
         self._session.flush()
         return _to_domain(row)
+
+    def list_by_user(
+        self,
+        *,
+        user_id: int,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[Transaction], int]:
+        """Return transactions for a user, newest first, plus total count."""
+        stmt = (
+            select(TransactionModel)
+            .where(TransactionModel.user_id == user_id)
+            .order_by(TransactionModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        rows = list(self._session.scalars(stmt).all())
+
+        count_stmt = select(func.count()).select_from(TransactionModel).where(
+            TransactionModel.user_id == user_id,
+        )
+        total = self._session.scalar(count_stmt) or 0
+
+        return [_to_domain(r) for r in rows], total
 
     def update_result(
         self,

@@ -1,14 +1,16 @@
 """Transactions HTTP controller."""
 
+from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from fastapi.responses import JSONResponse
 
 from application.payments.create_transaction import (
     CreateTransaction,
     CreateTransactionHttpStatus,
 )
+from application.payments.list_transactions import ListTransactions
 from domain.exceptions import (
     IdempotencyConflict,
     InvalidAmount,
@@ -19,17 +21,56 @@ from domain.exceptions import (
     TransactionNumberExhausted,
     UnsupportedProduct,
 )
+from domain.money import AMOUNT_EXPONENT
 from presentation.dependencies import (
     CurrentUser,
     get_create_transaction,
     get_current_user,
+    get_list_transactions,
 )
 from presentation.schemas.transactions import (
     CreateTransactionRequest,
+    TransactionItemResponse,
+    TransactionListResponse,
     TransactionResponse,
 )
 
 router = APIRouter()
+
+
+@router.get(
+    "",
+    response_model=TransactionListResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing/invalid token",
+        },
+    },
+)
+def list_transactions(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[ListTransactions, Depends(get_list_transactions)],
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> TransactionListResponse:
+    result = use_case.execute(
+        user_id=current_user.user_id,
+        limit=limit,
+        offset=offset,
+    )
+    items = [
+        TransactionItemResponse(
+            transaction_number=t.transaction_number,
+            product=t.product.value,
+            amount=str(Decimal(t.amount_minor) / (10**AMOUNT_EXPONENT)),
+            card_last4=t.card_last4,
+            status=t.status.value,
+            user_message=t.user_message or "",
+            created_at=t.created_at,
+        )
+        for t in result.transactions
+    ]
+    return TransactionListResponse(items=items, total=result.total)
 
 
 @router.post(

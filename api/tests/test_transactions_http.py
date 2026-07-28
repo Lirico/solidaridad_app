@@ -8,6 +8,10 @@ from application.payments.create_transaction import (
     CreateTransactionHttpStatus,
     CreateTransactionResult,
 )
+from application.payments.list_transactions import (
+    ListTransactions,
+    ListTransactionsResult,
+)
 from domain.exceptions import IdempotencyConflict, InvalidCardNumber
 from domain.product import Product
 from domain.transaction import Transaction
@@ -17,6 +21,7 @@ from presentation.dependencies import (
     CurrentUser,
     get_create_transaction,
     get_current_user,
+    get_list_transactions,
 )
 
 client = TestClient(app)
@@ -50,6 +55,15 @@ def _tx(**overrides: object) -> Transaction:
 
 def _override(use_case: MagicMock) -> None:
     app.dependency_overrides[get_create_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+
+
+def _override_list(use_case: MagicMock) -> None:
+    app.dependency_overrides[get_list_transactions] = lambda: use_case
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
         user_id=1,
         email="demo@solidaridad.local",
@@ -152,6 +166,74 @@ def test_create_transaction_domain_400() -> None:
         _clear()
     assert response.status_code == 400
     assert response.json()["message"] == "Número de tarjeta inválido"
+
+
+def test_list_transactions_200() -> None:
+    use_case = MagicMock(spec=ListTransactions)
+    use_case.execute.return_value = ListTransactionsResult(
+        transactions=[_tx()],
+        total=1,
+    )
+    _override_list(use_case)
+    try:
+        response = client.get("/v1/transactions")
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["transaction_number"] == "OP-260716-0001"
+    assert item["product"] == "GARRAFA_10"
+    assert item["amount"] == "1.5"
+    assert item["card_last4"] == "1111"
+    assert item["status"] == "APPROVED"
+    assert item["user_message"] == "Pago aprobado"
+
+
+def test_list_transactions_empty() -> None:
+    use_case = MagicMock(spec=ListTransactions)
+    use_case.execute.return_value = ListTransactionsResult(
+        transactions=[],
+        total=0,
+    )
+    _override_list(use_case)
+    try:
+        response = client.get("/v1/transactions")
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 0
+    assert data["items"] == []
+
+
+def test_list_transactions_requires_auth() -> None:
+    response = client.get("/v1/transactions")
+    assert response.status_code == 401
+
+
+def test_list_transactions_pagination_params() -> None:
+    use_case = MagicMock(spec=ListTransactions)
+    use_case.execute.return_value = ListTransactionsResult(
+        transactions=[_tx()],
+        total=1,
+    )
+    _override_list(use_case)
+    try:
+        response = client.get("/v1/transactions?limit=10&offset=5")
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+    use_case.execute.assert_called_once_with(
+        user_id=1,
+        limit=10,
+        offset=5,
+    )
 
 
 def test_create_transaction_idempotency_conflict() -> None:

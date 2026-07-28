@@ -54,7 +54,7 @@ def list_transactions(
     offset: int = Query(default=0, ge=0),
 ) -> TransactionListResponse:
     result = use_case.execute(
-        user_id=current_user.user_id,
+        terminal_id=current_user.installation_id,
         limit=limit,
         offset=offset,
     )

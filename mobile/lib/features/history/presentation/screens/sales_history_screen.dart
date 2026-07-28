@@ -1,13 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../auth/domain/auth_model.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../../../sales/presentation/cubit/sales_cubit.dart';
 import '../../../sales/presentation/cubit/sales_state.dart';
 import '../widgets/sales_history_header.dart';
 
-class SalesHistoryScreen extends StatelessWidget {
+class SalesHistoryScreen extends StatefulWidget {
   const SalesHistoryScreen({super.key});
+
+  @override
+  State<SalesHistoryScreen> createState() => _SalesHistoryScreenState();
+}
+
+class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
+  final ScrollController _scrollController = ScrollController();
+  int _offset = 0;
+  static const int _limit = 20;
+  bool _loadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialHistory();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _loadInitialHistory() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess && authState.user != null) {
+      context.read<SalesCubit>().loadHistory(
+        token: authState.user!.token,
+        limit: _limit,
+        offset: 0,
+      );
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_loadingMore) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) return;
+
+    setState(() => _loadingMore = true);
+    final newOffset = _offset + _limit;
+    final items = await context.read<SalesCubit>().salesRepository.fetchHistory(
+      token: authState.user!.token,
+      limit: _limit,
+      offset: newOffset,
+    );
+
+    if (items.isNotEmpty && mounted) {
+      setState(() => _offset = newOffset);
+      final currentState = context.read<SalesCubit>().state;
+      final updatedHistory = [...currentState.history, ...items];
+      context.read<SalesCubit>().emit(
+        SalesInitialWithHistory(history: updatedHistory),
+      );
+    }
+    if (mounted) setState(() => _loadingMore = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,20 +121,32 @@ class SalesHistoryScreen extends StatelessWidget {
   Widget _buildBody(BuildContext context) {
     return BlocBuilder<SalesCubit, SalesState>(
       builder: (context, state) {
+        if (state is SalesLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         final history = state.history;
 
         if (history.isEmpty) {
           return const Center(
             child: Text(
-              'No hay transacciones registradas hoy.',
+              'No hay transacciones registradas.',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           );
         }
 
         return ListView.builder(
-          itemCount: history.length,
+          controller: _scrollController,
+          itemCount: history.length + (_loadingMore ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index == history.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
             final operation = history[index];
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

@@ -24,6 +24,20 @@ sealed class SalesState {
   });
 }
 
+class SalesLoading extends SalesState {
+  const SalesLoading()
+    : super(
+        productCode: '',
+        productLabel: '',
+        amount: 0.0,
+        cardNumber: '',
+        cardHolder: '',
+        cvv: '',
+        expirationDate: '',
+        history: const [],
+      );
+}
+
 class SalesInitial extends SalesState {
   const SalesInitial()
     : super(

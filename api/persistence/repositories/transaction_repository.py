@@ -119,17 +119,17 @@ class TransactionRepository:
         self._session.flush()
         return _to_domain(row)
 
-    def list_by_user(
+    def list_by_terminal_id(
         self,
         *,
-        user_id: int,
+        terminal_id: str,
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[Transaction], int]:
-        """Return transactions for a user, newest first, plus total count."""
+        """Return transactions for a terminal, newest first, plus total count."""
         stmt = (
             select(TransactionModel)
-            .where(TransactionModel.user_id == user_id)
+            .where(TransactionModel.terminal_id == terminal_id)
             .order_by(TransactionModel.created_at.desc())
             .limit(limit)
             .offset(offset)
@@ -137,7 +137,7 @@ class TransactionRepository:
         rows = list(self._session.scalars(stmt).all())
 
         count_stmt = select(func.count()).select_from(TransactionModel).where(
-            TransactionModel.user_id == user_id,
+            TransactionModel.terminal_id == terminal_id,
         )
         total = self._session.scalar(count_stmt) or 0
 

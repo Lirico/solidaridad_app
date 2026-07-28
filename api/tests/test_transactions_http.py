@@ -230,7 +230,7 @@ def test_list_transactions_pagination_params() -> None:
 
     assert response.status_code == 200
     use_case.execute.assert_called_once_with(
-        user_id=1,
+        terminal_id="inst-1",
         limit=10,
         offset=5,
     )

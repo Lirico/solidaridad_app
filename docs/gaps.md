@@ -4,9 +4,9 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-07-23
+Última revisión: 2026-07-28
 
-> ✅ **Último cambio:** se reemplazó `CurrencySelector` (ARS/USD hardcodeados) por `ProductSelector` que consume `GET /v1/products` del backend. Se renombró `currency` → `productCode`/`productLabel` en modelos, estado, cubit y repository. El payload de venta ahora envía `product` en vez de `species_currency`.
+> ✅ **Último cambio:** El listado `GET /v1/transactions` ahora filtra por terminal (`installation_id`) en vez de por usuario. Cualquier usuario logueado en una terminal ve todas las transacciones de esa terminal. Se mantiene el método `list_by_user()` en el repository para uso futuro.
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -25,16 +25,16 @@ Verifone (banda + térmica).
 
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
-| G-P0-01 | Mobile no usa el contrato vivo de ventas | open | Cliente: `POST /v1/sales/gas` (`mobile/.../sales_repository.dart`). API: `POST /v1/transactions`. |
+| G-P0-01 | Mobile no usa el contrato vivo de ventas | done | Cliente: `POST /v1/transactions` (migrado desde `/v1/sales/gas`). Payload alineado: `product`, `amount` (string), `card_number`, `cvv`, `expiration_date` (opcional). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-02 | Auth mobile incompleto vs API | partial | Login/register ya envían `installation_id` y manejan `must_change_password`. Pendiente: change-password sin Bearer. |
-| G-P0-03 | Token de venta no enlazado a sesión real | open | `SalesCubit` usa token mock; no consume el JWT de auth. |
-| G-P0-04 | Sin listado/detalle de transacciones en API | open | Solo `POST /v1/transactions`. PDF/alcance piden listado y detalle. Historial mobile = mock. |
-| G-P0-05 | Producto/especie y campos de tarjeta desalineados | partial | Mobile: ahora usa `ProductSelector` con catálogo de `GET /v1/products` (GARRAFA_10, GARRAFA_15, etc.) en vez de ARS/USD. Payload envía `product` en vez de `species_currency`. Pendiente: CVV/expiry no se envían aún. |
+| G-P0-03 | Token de venta no enlazado a sesión real | partial | `SalesCubit.loadHistory()` ya recibe el token desde `AuthCubit`. `sendIsoMessage()` aún usa token mock. |
+| G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
+| G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
 | G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. Pendiente: lectura runtime desde config del device. |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
-| G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | partial | Se mejoró `api_config.dart` para detectar plataforma automáticamente. **Parcial:** `AuthRepository` consume `ApiConfig.baseUrl`, pero `SalesRepository` ignora `ApiConfig` y tiene su propia URL hardcodeada (`https://api.solidaridad-prod.aws.com/v1`). |
+| G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 
 ---
 
@@ -43,7 +43,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | open | Register abierto; sin flag de habilitación ni política de provisión central en prod. |
-| G-P1-02 | Reintentos e idempotencia en mobile | open | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`; mobile no reintenta con la misma clave ni maneja 202. |
+| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. Mobile genera y envía `Idempotency-Key` (timestamp+random) en cada `POST /v1/transactions`. **Pendiente:** reintentar con la misma clave ante timeout/error idempotente, manejar status 202 (ACCEPTED). |
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
 | G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
@@ -71,6 +71,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 |------|-------|
 | Auth API (login / register / change-password + JWT) | Implementado en `api/` |
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
+| `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
 | Catálogo `GET /v1/products` | Implementado en `api/` |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |

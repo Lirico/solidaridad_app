@@ -59,6 +59,39 @@ class SalesRepository {
     ];
   }
 
+  Future<List<OperationModel>> fetchHistory({
+    required String token,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final url = Uri.parse('$_baseUrl/transactions?limit=$limit&offset=$offset');
+    try {
+      final response = await _httpClient
+          .get(
+            url,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> body =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        final List<dynamic> items = body['items'] as List<dynamic>? ?? [];
+        return items
+            .map(
+              (item) => OperationModel.fromJson(item as Map<String, dynamic>),
+            )
+            .toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<SaleResponse> registerSale({
     required String product,
     required String amount,

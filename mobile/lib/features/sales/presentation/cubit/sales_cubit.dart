@@ -6,67 +6,24 @@ import 'sales_state.dart';
 class SalesCubit extends Cubit<SalesState> {
   final SalesRepository salesRepository;
 
-  SalesCubit({required this.salesRepository})
-    : super(SalesInitialWithHistory(history: _mockHistory()));
+  SalesCubit({required this.salesRepository}) : super(const SalesLoading());
 
-  static List<OperationModel> _mockHistory() {
-    final now = DateTime.now();
-    return [
-      OperationModel(
-        id: 'OP-20260714-001',
-        productCode: 'GARRAFA_10',
-        productLabel: 'Garrafa 10 kg',
-        amount: 15250.00,
-        cardNumber: '•••• 4582',
-        result: PaymentResult.approved,
-        date: now.subtract(const Duration(minutes: 12)),
-      ),
-      OperationModel(
-        id: 'OP-20260714-002',
-        productCode: 'GARRAFA_15',
-        productLabel: 'Garrafa 15 kg',
-        amount: 120.50,
-        cardNumber: '•••• 9237',
-        result: PaymentResult.approved,
-        date: now.subtract(const Duration(hours: 1, minutes: 5)),
-      ),
-      OperationModel(
-        id: 'OP-20260714-003',
-        productCode: 'TUBO_45',
-        productLabel: 'Tubo 45 kg',
-        amount: 8900.75,
-        cardNumber: '•••• 6712',
-        result: PaymentResult.declined,
-        date: now.subtract(const Duration(hours: 2, minutes: 30)),
-      ),
-      OperationModel(
-        id: 'OP-20260713-004',
-        productCode: 'GARRAFA_10',
-        productLabel: 'Garrafa 10 kg',
-        amount: 31200.00,
-        cardNumber: '•••• 3348',
-        result: PaymentResult.approved,
-        date: now.subtract(const Duration(days: 1, hours: 4)),
-      ),
-      OperationModel(
-        id: 'OP-20260713-005',
-        productCode: 'GRANEL',
-        productLabel: 'Granel',
-        amount: 85.00,
-        cardNumber: '•••• 1056',
-        result: PaymentResult.approved,
-        date: now.subtract(const Duration(days: 1, hours: 8)),
-      ),
-      OperationModel(
-        id: 'OP-20260713-006',
-        productCode: 'GARRAFA_15',
-        productLabel: 'Garrafa 15 kg',
-        amount: 6700.00,
-        cardNumber: '•••• 7823',
-        result: PaymentResult.declined,
-        date: now.subtract(const Duration(days: 1, hours: 10)),
-      ),
-    ];
+  Future<void> loadHistory({
+    required String token,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    emit(const SalesLoading());
+    try {
+      final items = await salesRepository.fetchHistory(
+        token: token,
+        limit: limit,
+        offset: offset,
+      );
+      emit(SalesInitialWithHistory(history: items));
+    } catch (_) {
+      emit(SalesInitialWithHistory(history: const []));
+    }
   }
 
   void showReview({

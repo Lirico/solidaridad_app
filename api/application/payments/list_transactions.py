@@ -1,4 +1,4 @@
-"""List transactions for a user (paginated)."""
+"""List transactions for a terminal (paginated)."""
 
 from dataclasses import dataclass
 
@@ -19,12 +19,12 @@ class ListTransactions:
     def execute(
         self,
         *,
-        user_id: int,
+        terminal_id: str,
         limit: int = 20,
         offset: int = 0,
     ) -> ListTransactionsResult:
-        items, total = self._transactions.list_by_user(
-            user_id=user_id,
+        items, total = self._transactions.list_by_terminal_id(
+            terminal_id=terminal_id,
             limit=limit,
             offset=offset,
         )

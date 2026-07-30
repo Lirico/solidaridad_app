@@ -49,7 +49,7 @@ class SalesCubit extends Cubit<SalesState> {
     );
   }
 
-  Future<void> sendIsoMessage() async {
+  Future<void> sendIsoMessage({required String token}) async {
     final currentProductCode = state.productCode;
     final currentProductLabel = state.productLabel;
     final currentAmount = state.amount;
@@ -79,8 +79,7 @@ class SalesCubit extends Cubit<SalesState> {
       cardNumber: currentCardNumber,
       cvv: currentCvv,
       expirationDate: currentExpirationDate,
-      token:
-          'TOKEN_MOCK_SESION_FASE_0', // TODO: Enlazar con tu AuthCubit global en producción
+      token: token,
     );
 
     final String hiddenCard = currentCardNumber.replaceAll(' ', '').length >= 4

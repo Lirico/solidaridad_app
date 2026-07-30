@@ -4,9 +4,9 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-07-28
+Última revisión: 2026-07-30
 
-> ✅ **Último cambio:** El listado `GET /v1/transactions` ahora filtra por terminal (`installation_id`) en vez de por usuario. Cualquier usuario logueado en una terminal ve todas las transacciones de esa terminal. Se mantiene el método `list_by_user()` en el repository para uso futuro.
+> ✅ **Último cambio:** Token de venta enlazado a sesión real — `sendIsoMessage()` y `fetchProducts()` ahora usan el token JWT desde `AuthCubit` en lugar del mock `TOKEN_MOCK_SESION_FASE_0`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`.
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -27,7 +27,7 @@ Verifone (banda + térmica).
 |----|-----|--------|-------------------|
 | G-P0-01 | Mobile no usa el contrato vivo de ventas | done | Cliente: `POST /v1/transactions` (migrado desde `/v1/sales/gas`). Payload alineado: `product`, `amount` (string), `card_number`, `cvv`, `expiration_date` (opcional). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-02 | Auth mobile incompleto vs API | partial | Login/register ya envían `installation_id` y manejan `must_change_password`. Pendiente: change-password sin Bearer. |
-| G-P0-03 | Token de venta no enlazado a sesión real | partial | `SalesCubit.loadHistory()` ya recibe el token desde `AuthCubit`. `sendIsoMessage()` aún usa token mock. |
+| G-P0-03 | Token de venta no enlazado a sesión real | done | `SalesCubit.loadHistory()`, `sendIsoMessage()` y `fetchProducts()` reciben el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
 | G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
@@ -81,6 +81,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |
 | Status screen con 3 estados (aprobado/rechazado/error conexión POSNET) | `PaymentResult` enum + `connectionError` flag en `SaleResponse`; naranja para pérdida de conectividad POSNET |
 | ProductSelector con catálogo del backend | `ProductSelector` widget consume `GET /v1/products` y muestra productos de gas (GARRAFA_10, etc.) en vez de ARS/USD. Payload de venta envía `product`. |
+| Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 
 ---
 

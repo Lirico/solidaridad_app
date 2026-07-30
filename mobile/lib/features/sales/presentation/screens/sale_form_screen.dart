@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/amount_input_formatter.dart';
@@ -37,11 +39,11 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   }
 
   Future<void> _loadProducts() async {
+    final authState = context.read<AuthCubit>().state;
+    final token = authState is AuthSuccess ? authState.user!.token : '';
     final repo = context.read<SalesCubit>().salesRepository;
     try {
-      final products = await repo.fetchProducts(
-        token: 'TOKEN_MOCK_SESION_FASE_0',
-      );
+      final products = await repo.fetchProducts(token: token);
       if (!mounted) return;
       setState(() {
         _products = products;

@@ -6,7 +6,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-07-30
 
-> ✅ **Último cambio:** Token de venta enlazado a sesión real — `sendIsoMessage()` y `fetchProducts()` ahora usan el token JWT desde `AuthCubit` en lugar del mock `TOKEN_MOCK_SESION_FASE_0`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`.
+> ✅ **Último cambio:** Se agregó `luhn_check_enabled` (default `True`) a `Settings` para permitir desactivar el checksum de Luhn en entorno local (`LUHN_CHECK_ENABLED=false`). Esto permite usar tarjetas de prueba que no pasan el algoritmo de Luhn (ej: `6063 0070 1400 7403`). Ver `api/config/settings.py`, `api/application/payments/create_transaction.py`, `api/presentation/dependencies.py`.
 
 Leyenda de estado: `open` · `partial` · `done`
 

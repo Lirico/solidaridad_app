@@ -99,12 +99,14 @@ def get_list_transactions(
 def get_create_transaction(
     db: Annotated[Session, Depends(get_db)],
     gateway: Annotated[HttpPaymentGateway, Depends(get_payment_gateway)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> CreateTransaction:
     return CreateTransaction(
         session=db,
         transactions=TransactionRepository(db),
         installations=InstallationRepository(db),
         gateway=gateway,
+        luhn_check_enabled=settings.luhn_check_enabled,
     )
 
 

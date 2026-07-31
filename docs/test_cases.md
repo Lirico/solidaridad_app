@@ -73,14 +73,14 @@ Adaptador HTTP → ISO8583. Traduce las solicitudes de la API al formato del pro
 | Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
 |-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
 | 043 | Gateway | Ping / Health check | `GET /ping` | Código 200. `{"status": "ok"}` | `{"status":"ok"}` — 200 OK | Pass | Endpoint en `/ping` (no `/v1/ping`) |
-| 044 | Gateway | Autorizar venta exitosa (entry mode manual 012) | `POST /v1/authorize` — `product_code: "993"`, `amount_minor: 150000`, `card_number: "4111111111111111"`, `terminal_id: "TERM001"`, `stan: "000001"`, `expiration_date: "1228"` | Código 200. `status: "approved"`, `response_code`, `auth_id`, `retrieval_reference`, `user_message` | `{"status":"APPROVED","response_code":"00","user_message":"Aprobada","auth_id":"MOCK01","retrieval_reference":"000000000001"}` — 200 OK | Pass | El gateway usa `ProcessorCode` (993-997), no `Product`. Tarjeta de prueba Visa `4111...` pasa Luhn. Mock devuelve APPROVED. |
-| 045 | Gateway | Autorizar con tarjeta sin fondos | `POST /v1/authorize` — monto superior al límite de la tarjeta | Código 200. `status: "declined"`, `response_code` de rechazo, `user_message` explicativo | No probado | Pendiente | El mock no simula rechazo por fondos |
-| 046 | Gateway | Autorizar con terminal inválida | `POST /v1/authorize` — `terminal_id: "INVALIDO"` | Código 400. Mensaje: "Terminal inválida" | `{"status":"APPROVED","response_code":"00",...}` — 200 OK | Fail | **El mock no valida terminal.** Acepta cualquier terminal_id. Ver hallazgo #11. |
+| 044 | Gateway | Autorizar venta exitosa (entry mode manual 012) | `POST /v1/authorize` — `product_code: "993"`, `amount_minor: 150000`, `card_number: "4111111111111111"`, `terminal_id: "TERM001"`, `stan: "000002"`, `expiration_date: "1228"` | Código 200. `status: "approved"`, `response_code`, `auth_id`, `retrieval_reference`, `user_message` | **Mock:** `{"status":"APPROVED","response_code":"00","user_message":"Aprobada","auth_id":"MOCK01","retrieval_reference":"000000000001"}` — 200 OK. **Procesador real:** `{"status":"DECLINED","response_code":"89","user_message":"Rechazada","auth_id":"636915","retrieval_reference":"000000692777"}` — 200 OK | Pass | Mock: APPROVED. Procesador real: DECLINED con código 89 (terminal desconocida). TERM001 no está dada de alta en la base del procesador. |
+| 045 | Gateway | Autorizar con tarjeta sin fondos | `POST /v1/authorize` — monto superior al límite de la tarjeta | Código 200. `status: "declined"`, `response_code` de rechazo, `user_message` explicativo | No probado | Pendiente | Requiere tarjeta con límite configurado en el procesador |
+| 046 | Gateway | Autorizar con terminal inválida | `POST /v1/authorize` — `terminal_id: "INVALIDO"` | Código 400. Mensaje: "Terminal inválida" | **Mock:** `{"status":"APPROVED",...}` — 200 OK (Fail). **Procesador real:** `{"status":"DECLINED","response_code":"89","user_message":"Rechazada","auth_id":"238335","retrieval_reference":"000000747793"}` — 200 OK | Pass | El procesador real rechaza correctamente con código 89 (terminal desconocida). El mock no valida (ver hallazgo #11). |
 | 047 | Gateway | Autorizar con STAN inválido | `POST /v1/authorize` — `stan: ""` (vacío) | Código 400. Mensaje: "STAN inválido" | `{"message":"stan: String should have at least 1 character"}` — 400 Bad Request | Pass | |
 | 048 | Gateway | Autorizar con número de tarjeta inválido | `POST /v1/authorize` — `card_number: "1234"` | Código 400. Mensaje: "Número de tarjeta inválido" | `{"message":"card_number: String should have at least 13 characters"}` — 400 Bad Request | Pass | |
 | 049 | Gateway | Autorizar con monto inválido | `POST /v1/authorize` — `amount_minor: 0` | Código 400. Mensaje: "Monto inválido" | `{"message":"amount_minor: Input should be greater than 0"}` — 400 Bad Request | Pass | |
 | 050 | Gateway | Autorizar con producto no soportado | `POST /v1/authorize` — `product_code: "INVALIDO"` | Código 400. Mensaje: "Producto no soportado" | `{"message":"product_code: Input should be '993', '994', '995', '996' or '997'"}` — 400 Bad Request | Pass | El gateway usa códigos de procesador (993-997), no nombres de producto |
-| 051 | Gateway | Timeout de conexión al procesador | Procesador no disponible / no responde | Código 502. Mensaje: "Procesador de pagos no disponible" | No probado | Pendiente | Requiere apagar el procesador |
+| 051 | Gateway | Timeout de conexión al procesador | Procesador detenido con `docker compose stop auth` | Código 502. Mensaje: "Procesador de pagos no disponible" | `{"message":"Procesador de pagos no disponible"}` — 502 Bad Gateway | Pass | El gateway detecta correctamente la caída del procesador y devuelve 502. |
 | 052 | Gateway | Autorizar con entry mode de banda (020) | `POST /v1/authorize` — `entry_mode: "020"` con datos de track | Código 200. `status: "approved"` | | | Pendiente de implementación de captura por banda (G-P0-06) |
 
 ---
@@ -141,10 +141,10 @@ Sistema on-premises en C que autoriza las transacciones vía mensajería ISO8583
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
 | API | 42 | 33 | 1 | 0 | 3 | 5 |
-| Payment Gateway | 10 | 6 | 1 | 0 | 0 | 3 |
+| Payment Gateway | 10 | 8 | 0 | 0 | 0 | 2 |
 | Mobile | 26 | 0 | 0 | 0 | 0 | 26 |
 | Procesador | 7 | 0 | 0 | 0 | 0 | 7 |
-| **Total** | **85** | **39** | **2** | **0** | **3** | **41** |
+| **Total** | **85** | **41** | **1** | **0** | **3** | **40** |
 
 ---
 
@@ -167,6 +167,9 @@ Sistema on-premises en C que autoriza las transacciones vía mensajería ISO8583
 | 11 | 2026-07-30 | Gateway | **El mock del gateway no valida terminal_id.** Acepta cualquier terminal (incluso "INVALIDO") y devuelve APPROVED (TC-046 Falló). | El mock es solo para desarrollo. En producción, el procesador real valida la terminal. No es un bug del gateway, sino una limitación del mock. |
 | 12 | 2026-07-30 | Gateway | El gateway usa `ProcessorCode` (códigos 993-997) en vez de `Product` (GARRAFA_10, etc.). La API traduce de Product a ProcessorCode antes de llamar al gateway. | Los tests del gateway deben usar códigos 993-997. La app mobile no necesita conocer estos códigos porque habla con la API. |
 | 13 | 2026-07-30 | Gateway | El gateway valida Luhn de la tarjeta, a diferencia de la API que lo tiene desactivable con `LUHN_CHECK_ENABLED=false`. | Para probar el gateway hay que usar tarjetas que pasen Luhn (ej: `4111111111111111`). La tarjeta `6063007014007403` no sirve para tests del gateway. |
+| 14 | 2026-07-31 | Procesador | **El build Docker del procesador falla con `./compile.sh: not found`.** El `payment_processor/Dockerfile` intenta ejecutar `compile.sh` pero el contenedor no lo encuentra. Causa: finales de línea CRLF (Windows) que hacen que el script no sea ejecutable en Linux. **Se resolvió convirtiendo `compile.sh` y `entrypoint.sh` a LF.** | Resuelto localmente convirtiendo los scripts a LF. **Recomendación:** agregar `.gitattributes` con `*.sh text eol=lf` para prevenir este problema en otros clones. |
+| 15 | 2026-07-31 | Procesador | **El `authkig.conf` tenía finales de línea CRLF** que hacían que el host MySQL se leyera como `mysql\r\n` en vez de `mysql`. El procesador no podía conectar a la base de datos y respondía con una trama ISO inválida (response_code 96). **Se resolvió convirtiendo `authkig.conf` a LF.** | Resuelto localmente. **Recomendación:** incluir `*.conf text eol=lf` en `.gitattributes`. Tras el fix, el flujo completo API → Gateway → Procesador funciona: el procesador responde `DECLINED` con código 89 (terminal desconocida) porque TERM001 no está dada de alta en su base. |
+| 16 | 2026-07-31 | Procesador | **El procesador real rechaza todas las terminales de prueba con código 89 (TERMINAL_UNK).** TERM001, TERM002, etc. no están dadas de alta en la base MySQL del procesador local. | Para probar una autorización aprobada (TC-079, TC-081) hay que dar de alta la terminal en la base del procesador (tabla de terminales en MySQL). Requiere seed data o INSERT manual. |
 
 ---
 

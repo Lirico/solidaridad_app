@@ -20,6 +20,7 @@ terminal, contratos), actualizar también `docs/alcance.md`.
 | Path | Rol |
 |------|-----|
 | `mobile/` | App Flutter (comercio / terminal) |
+| `poc_verifone/` | POC Flutter semilla para PSDK Verifone (V660P) |
 | `api/` | API pública (FastAPI + Postgres) |
 | `payment-gateway/` | Adaptador HTTP → ISO8583 |
 | `payment_processor/` | Autorizador legacy (C + MySQL) |

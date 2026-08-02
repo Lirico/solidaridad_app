@@ -4,9 +4,11 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-07-30
+Última revisión: 2026-08-02
 
-> ✅ **Último cambio:** Token de venta enlazado a sesión real — `sendIsoMessage()` y `fetchProducts()` ahora usan el token JWT desde `AuthCubit` en lugar del mock `TOKEN_MOCK_SESION_FASE_0`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`.
+> ✅ **Último cambio:** `poc_verifone/` mock acotado a `readMsr` (whitelist);
+> Init/print nativos. Ticket: `ReceiptFormatter` + `printHtml`. G-P0-07
+> `partial` en POC; sigue pendiente en `mobile/`.
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -30,8 +32,8 @@ Verifone (banda + térmica).
 | G-P0-03 | Token de venta no enlazado a sesión real | done | `SalesCubit.loadHistory()`, `sendIsoMessage()` y `fetchProducts()` reciben el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
-| G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
-| G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
+| G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado en `mobile/`. POC: `readMsr` nativo + fixture `PsdkMsrMock` (switch Mock MSR). Claro en device aún requiere whitelist SDI. Falta integrar en `mobile/` + DE22/track al autorizador. |
+| G-P0-07 | Impresión de ticket en térmica (Verifone) | partial | Solo comprobante en UI en `mobile/`. POC: `printHtml` + formatter + venta mock en `poc_verifone/` (`SdiPrinter.printHTML`). Falta integrar en `mobile/` post-venta real. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. Pendiente: lectura runtime desde config del device. |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |

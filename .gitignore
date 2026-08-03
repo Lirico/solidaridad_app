@@ -34,6 +34,21 @@ mobile/android/app/debug
 mobile/android/app/profile
 mobile/android/app/release
 
+# POC Verifone (Flutter) — also covered by poc_verifone/.gitignore
+poc_verifone/.dart_tool/
+poc_verifone/.flutter-plugins-dependencies
+poc_verifone/.pub-cache/
+poc_verifone/.pub/
+poc_verifone/build/
+poc_verifone/coverage/
+poc_verifone/**/doc/api/
+poc_verifone/**/ios/Flutter/.last_build_id
+poc_verifone/app.*.symbols
+poc_verifone/app.*.map.json
+poc_verifone/android/app/debug
+poc_verifone/android/app/profile
+poc_verifone/android/app/release
+
 # Shared packages
 packages/**/.venv/
 packages/**/__pycache__/

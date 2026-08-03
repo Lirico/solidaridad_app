@@ -17,7 +17,7 @@ def _user(*, email: str = "new@example.com") -> User:
         name="Ada",
         email=email,
         password_hash="hashed",
-        must_change_password=False,
+        must_change_password=True,
         created_at=now,
         updated_at=now,
     )
@@ -63,7 +63,7 @@ def test_register_user_success() -> None:
     assert result.name == "Ada"
     assert result.email == "ada@example.com"
     assert result.token == "jwt-token"
-    assert result.must_change_password is False
+    assert result.must_change_password is True
 
     users.get_by_email.assert_called_once_with("ada@example.com")
     users.create.assert_called_once()
@@ -71,7 +71,7 @@ def test_register_user_success() -> None:
     assert create_kwargs["name"] == "Ada"
     assert create_kwargs["email"] == "ada@example.com"
     assert create_kwargs["password_hash"] == "argon2-hash"
-    assert create_kwargs["must_change_password"] is False
+    assert create_kwargs["must_change_password"] is True
 
     installations.upsert.assert_called_once_with("inst-1")
     tokens.create_access_token.assert_called_once_with(

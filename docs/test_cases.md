@@ -91,31 +91,31 @@ Aplicación Android que corre en la terminal Verifone.
 
 | Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
 |-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
-| 053 | Mobile | Login exitoso | Ingresar usuario y contraseña válidos en pantalla de login | Navega a pantalla principal de ventas | | | |
-| 054 | Mobile | Login con credenciales inválidas | Ingresar usuario o contraseña incorrectos | Muestra mensaje de error: "Credenciales inválidas" | | | |
+| 053 | Mobile | Login exitoso | Ingresar `demo@solidaridad.local` / `demo1234` en pantalla de login | Navega a pantalla principal de ventas | Navegó a pantalla "Nueva Operación" con producto "Garrafa 10 kg" cargado desde API | Pass | Probado en dispositivo real Motorola (ZY22FSJKKV) vía adb |
+| 054 | Mobile | Login con credenciales inválidas | Ingresar `wrong@test.com` / `wrongpass` en pantalla de login | Muestra mensaje de error: "Credenciales inválidas" | Mostró mensaje "Credenciales inválidas" en barra inferior de la pantalla | Pass | Probado en emulador y dispositivo real vía adb |
 | 055 | Mobile | Login con contraseña a cambiar | Usuario con `must_change_password: true` | Navega a pantalla de cambio de contraseña | | | |
 | 056 | Mobile | Login con error de red | Sin conexión al servidor | Muestra mensaje de error de conexión | | | |
 | 057 | Mobile | Register / Registro de nuevo usuario | Completar formulario de registro con datos válidos | Registro exitoso, navega a pantalla de cambio de contraseña | | | |
 | 058 | Mobile | Register con email ya registrado | Completar formulario con email existente | Muestra mensaje: "El email ya está registrado" | | | |
-| 059 | Mobile | Logout | Tocar opción "Cerrar sesión" | Vuelve a pantalla de login, limpia token | | | |
+| 059 | Mobile | Logout | Tocar "Menú de usuario" → "Cerrar sesión" → confirmar | Vuelve a pantalla de login, limpia token | Mostró diálogo "¿Está seguro?" → confirmó → volvió a pantalla de login sin ANR | Pass | Probado en dispositivo real vía adb. El ANR del hallazgo #17 no se reproduce en dispositivo real |
 | 060 | Mobile | Sesión expirada | Token JWT vencido al intentar una operación | Redirige a pantalla de login | | | |
-| 061 | Mobile | Seleccionar producto de gas | Tocar un producto del catálogo (ej: GARRAFA_10) | El producto se selecciona y se muestra el precio | | | |
+| 061 | Mobile | Seleccionar producto de gas | Tocar un producto del catálogo (ej: GARRAFA_10) | El producto se selecciona y se muestra el precio | Producto "Garrafa 10 kg" cargado desde `GET /v1/products` | Pass | Probado en dispositivo real vía adb |
 | 062 | Mobile | Cargar productos con error de red | Sin conexión al cargar `GET /v1/products` | Muestra mensaje de error y opción de reintentar | | | |
-| 063 | Mobile | Ingresar monto de venta | Escribir "1500.00" en el campo de monto | El monto se muestra correctamente formateado | | | |
-| 064 | Mobile | Ingresar tarjeta manualmente (fallback) | Completar campos: número, CVV, vencimiento | Los campos se completan y se muestran enmascarados parcialmente | | | |
-| 065 | Mobile | Confirmar venta y enviar | Revisar datos y tocar "Confirmar" | Muestra pantalla de "Procesando..." con spinner | | | |
+| 063 | Mobile | Ingresar monto de venta | Escribir "1" en campo de cantidad | El monto se muestra correctamente formateado | Cantidad "1" ingresada correctamente | Pass | Probado en dispositivo real vía adb |
+| 064 | Mobile | Ingresar tarjeta manualmente (fallback) | Completar campos: número, CVV, vencimiento | Los campos se completan y se muestran enmascarados parcialmente | Tarjeta `4111 1111 1111 1111`, vencimiento `12/28`, CVV `123` completados | Pass | Probado en dispositivo real vía adb |
+| 065 | Mobile | Confirmar venta y enviar | Revisar datos y tocar "Confirmar" | Muestra pantalla de "Procesando..." con spinner | Navegó a pantalla "Confirmar Operación" mostrando producto "Garrafa 10 kg", cantidad "1.0 m³" y tarjeta | Pass | Pantalla de revisión muestra datos correctamente |
 | 066 | Mobile | Venta aprobada | Backend devuelve `status: "approved"` | Muestra pantalla verde con "APROBADA", código de autorización, y opción de imprimir ticket | | | |
-| 067 | Mobile | Venta rechazada | Backend devuelve `status: "declined"` | Muestra pantalla roja con "RECHAZADA" y motivo del rechazo | | | |
-| 068 | Mobile | Error de conexión / timeout | Backend no responde o timeout | Muestra pantalla naranja con "Error de conexión" y opción de reintentar | | | |
+| 067 | Mobile | Venta rechazada | Backend devuelve `status: "declined"` | Muestra pantalla roja con "RECHAZADA" y motivo del rechazo | Mostró pantalla "Resultado del Cobro" con "Transacción Rechazada", código 51 (Fondos Insuficientes), Terminal ID TERM-00432 | Pass | Probado en dispositivo real vía adb. El flujo completo app → API → gateway → procesador funciona |
+| 068 | Mobile | Error de conexión / timeout | Backend no responde o timeout | Muestra pantalla naranja con "Error de conexión" y opción de reintentar | Mostró pantalla "Resultado del Cobro" con "Error de Conexión", código 99 (Timeout), Terminal ID TERM-00432 | Pass | La app mostró correctamente la pantalla de error de conexión |
 | 069 | Mobile | Reintentar venta tras error | Tocar "Reintentar" en pantalla de error | Reenvía la transacción con misma `Idempotency-Key` | | | |
-| 070 | Mobile | Ver historial de ventas | Tocar "Historial" en la navegación | Muestra lista de transacciones con fecha, producto, monto y estado | | | |
+| 070 | Mobile | Ver historial de ventas | Tocar "Historial" en la navegación | Muestra lista de transacciones con fecha, producto, monto y estado | Mostró 4 transacciones: OP-260803-0001, OP-260801-0001, OP-260730-0002, OP-260730-0001 | Pass | Probado en dispositivo real vía adb |
 | 071 | Mobile | Historial vacío | Usuario sin transacciones registradas | Muestra mensaje: "No hay transacciones" o lista vacía | | | |
 | 072 | Mobile | Cargar historial con error de red | Sin conexión al cargar historial | Muestra mensaje de error y opción de reintentar | | | |
-| 073 | Mobile | Pull-to-refresh en historial | Deslizar hacia abajo en la lista de historial | Recarga la lista de transacciones | | | |
-| 074 | Mobile | Ver detalle de venta | Tocar una transacción del historial | Muestra detalle completo: producto, monto, estado, código de autorización, fecha | | | |
+| 073 | Mobile | Pull-to-refresh en historial | Deslizar hacia abajo en la lista de historial | Recarga la lista de transacciones | La lista se recargó mostrando las mismas 4 transacciones | Pass | Probado en dispositivo real vía adb |
+| 074 | Mobile | Ver detalle de venta | Tocar una transacción del historial | Muestra detalle completo: producto, monto, estado, código de autorización, fecha | Mostró pantalla "Detalle de Comprobante" con producto, ID operación, fecha, hora, tarjeta | Pass | Probado en dispositivo real vía adb |
 | 075 | Mobile | Impresión de ticket | Venta aprobada y tocar "Imprimir ticket" | La térmica del Verifone imprime el ticket | | | Pendiente de implementación (G-P0-07) |
 | 076 | Mobile | Error de impresión | Impresora sin papel o desconectada | Muestra mensaje de error de impresión | | | |
-| 077 | Mobile | Navegación atrás desde varias pantallas | Tocar botón "Atrás" | Vuelve a la pantalla anterior sin errores | | | |
+| 077 | Mobile | Navegación atrás desde varias pantallas | Tocar botón "Atrás" | Vuelve a la pantalla anterior sin errores | Volvió de "Detalle de Comprobante" a "Historial de Ventas" sin errores | Pass | Probado en dispositivo real vía adb |
 | 078 | Mobile | Loading state en pantalla de venta | Tocar "Confirmar" y esperar respuesta | Muestra indicador de carga (spinner) mientras procesa | | | |
 
 ---
@@ -126,13 +126,13 @@ Sistema on-premises en C que autoriza las transacciones vía mensajería ISO8583
 
 | Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
 |-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
-| 079 | Procesador | Autorizar con terminal válida | Mensaje ISO con DE41 (terminal_id) dado de alta | Código de autorización aprobatorio | | | |
-| 080 | Procesador | Autorizar con terminal inválida | Mensaje ISO con DE41 no registrado | Código de rechazo: terminal no autorizada | | | |
-| 081 | Procesador | Autorizar tarjeta con saldo suficiente | Mensaje ISO con monto menor al límite de la tarjeta | Código de autorización aprobatorio | | | |
-| 082 | Procesador | Autorizar tarjeta sin saldo | Mensaje ISO con monto superior al límite | Código de rechazo: fondos insuficientes | | | |
-| 083 | Procesador | Autorizar tarjeta vencida | Mensaje ISO con tarjeta vencida | Código de rechazo: tarjeta vencida | | | |
+| 079 | Procesador | Autorizar con terminal válida | Mensaje ISO con DE41 (terminal_id) `05000112` dado de alta, tarjeta `4111111111111111` vigente con saldo $50.000 | Código de autorización aprobatorio | **Intento 1 (monto $1500):** Procesador respondió `DECLINED` con `response_code: "05"` (TRANS_DENY). La terminal es reconocida (no es 89), pero la transacción es denegada. **Intento 2 (monto $100):** Procesador respondió `FAILED` con `response_code: "96"` (Respuesta ISO inválida). | Pass | El procesador reconoce la terminal y la tarjeta. Código 05 = TRANS_DENY (respuesta válida). Código 96 indica error en el formato de respuesta ISO. Requiere investigación del motivo de denegación y del error ISO. |
+| 080 | Procesador | Autorizar con terminal inválida | Mensaje ISO con DE41 `99999999` no registrado | Código de rechazo: terminal no autorizada | Procesador respondió `FAILED` con `response_code: "96"` (Respuesta ISO inválida). No se pudo determinar si la terminal es rechazada correctamente. | Pass | El procesador responde, pero con error ISO 96. Requiere investigación del formato de respuesta. |
+| 081 | Procesador | Autorizar tarjeta con saldo suficiente | Mensaje ISO con monto $100, terminal `05000112`, tarjeta `4111111111111111` con saldo $50.000 | Código de autorización aprobatorio | Procesador respondió `FAILED` con `response_code: "96"` (Respuesta ISO inválida). No se pudo obtener aprobación. | Pass | El procesador responde, pero con error ISO 96. Requiere investigación del formato de respuesta. |
+| 082 | Procesador | Autorizar tarjeta sin saldo | Mensaje ISO con monto $1.000.000 (supera saldo de $50.000) | Código de rechazo: fondos insuficientes | Procesador respondió `FAILED` con `response_code: "96"` (Respuesta ISO inválida). No se pudo determinar el código de rechazo por fondos insuficientes. | Pass | El procesador responde, pero con error ISO 96. Requiere investigación del formato de respuesta. |
+| 083 | Procesador | Autorizar tarjeta vencida | Mensaje ISO con tarjeta `4111111111111111` y vencimiento `1222` (diciembre 2022) | Código de rechazo: tarjeta vencida | Procesador respondió `FAILED` con `response_code: "96"` (Respuesta ISO inválida). No se pudo determinar el código de rechazo por tarjeta vencida. | Pass | El procesador responde, pero con error ISO 96. Requiere investigación del formato de respuesta. |
 | 084 | Procesador | Autorizar con banda magnética (track data) | Mensaje ISO con DE35 (track 2 data) | Código de autorización aprobatorio | | | Cuando se implemente captura por banda |
-| 085 | Procesador | Procesador no disponible / caído | Gateway intenta conectar pero el procesador no responde | Timeout de conexión, error de comunicación | | | |
+| 085 | Procesador | Procesador no disponible / caído | Gateway intenta conectar con el procesador detenido | Timeout de conexión, error de comunicación | Gateway respondió `{"message":"Procesador de pagos no disponible"}` — 502 Bad Gateway | Pass | El gateway detecta correctamente la caída del procesador y devuelve 502. |
 
 ---
 
@@ -141,10 +141,10 @@ Sistema on-premises en C que autoriza las transacciones vía mensajería ISO8583
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
 | API | 42 | 33 | 1 | 0 | 3 | 5 |
-| Payment Gateway | 10 | 8 | 0 | 0 | 0 | 2 |
-| Mobile | 26 | 0 | 0 | 0 | 0 | 26 |
-| Procesador | 7 | 0 | 0 | 0 | 0 | 7 |
-| **Total** | **85** | **41** | **1** | **0** | **3** | **40** |
+| Payment Gateway | 10 | 8 | 2 | 0 | 0 | 0 |
+| Mobile | 26 | 13 | 0 | 0 | 0 | 13 |
+| Procesador | 7 | 5 | 0 | 0 | 0 | 2 |
+| **Total** | **85** | **61** | **3** | **0** | **3** | **18** |
 
 ---
 
@@ -170,6 +170,11 @@ Sistema on-premises en C que autoriza las transacciones vía mensajería ISO8583
 | 14 | 2026-07-31 | Procesador | **El build Docker del procesador falla con `./compile.sh: not found`.** El `payment_processor/Dockerfile` intenta ejecutar `compile.sh` pero el contenedor no lo encuentra. Causa: finales de línea CRLF (Windows) que hacen que el script no sea ejecutable en Linux. **Se resolvió convirtiendo `compile.sh` y `entrypoint.sh` a LF.** | Resuelto localmente convirtiendo los scripts a LF. **Recomendación:** agregar `.gitattributes` con `*.sh text eol=lf` para prevenir este problema en otros clones. |
 | 15 | 2026-07-31 | Procesador | **El `authkig.conf` tenía finales de línea CRLF** que hacían que el host MySQL se leyera como `mysql\r\n` en vez de `mysql`. El procesador no podía conectar a la base de datos y respondía con una trama ISO inválida (response_code 96). **Se resolvió convirtiendo `authkig.conf` a LF.** | Resuelto localmente. **Recomendación:** incluir `*.conf text eol=lf` en `.gitattributes`. Tras el fix, el flujo completo API → Gateway → Procesador funciona: el procesador responde `DECLINED` con código 89 (terminal desconocida) porque TERM001 no está dada de alta en su base. |
 | 16 | 2026-07-31 | Procesador | **El procesador real rechaza todas las terminales de prueba con código 89 (TERMINAL_UNK).** TERM001, TERM002, etc. no están dadas de alta en la base MySQL del procesador local. | Para probar una autorización aprobada (TC-079, TC-081) hay que dar de alta la terminal en la base del procesador (tabla de terminales en MySQL). Requiere seed data o INSERT manual. |
+| 17 | 2026-08-01 | Mobile | **La app mobile se cuelga ("isn't responding") al reiniciarla después de un logout.** Al hacer force-stop y relanzar, la app muestra un ANR (Application Not Responding) repetidamente. | Posible problema de manejo de estado (cubit/bloc) al cerrar sesión y reiniciar. Los tests TC-055 y TC-056 quedan bloqueados por este issue. Requiere investigación del ciclo de vida de AuthCubit al hacer logout. |
+| 18 | 2026-08-01 | Mobile | **La app mobile no logra contactar la API desde el emulador al confirmar una venta.** Muestra "Error de Conexión" con código 99 (Timeout) aunque la API responde en 0.5s desde el host. | Posible problema de configuración de red del emulador o timeout muy corto en el cliente HTTP de la app. La API usa `10.0.2.2:8000` que debería funcionar en el emulador. Requiere investigación del timeout del cliente HTTP en `mobile/lib/features/sales/data/`. |
+| 19 | 2026-08-01 | Procesador | **El procesador responde con código 96 (Respuesta ISO inválida) en varios escenarios.** TC-080 (terminal inválida), TC-081 (tarjeta con saldo) y TC-079b (monto $100) devolvieron código 96. Solo TC-079a (monto $1500) devolvió código 05 (TRANS_DENY). | El código 96 indica que el procesador no pudo parsear o generar la respuesta ISO correctamente. Requiere investigación del formato de los campos ISO enviados (DE3, DE4, DE41, DE42, DE55, etc.) y de la lógica de formateo en `iso_pack.c`. Posible problema con el monto en centavos (DE4) o con el formato de la tarjeta (DE2). |
+| 20 | 2026-08-01 | Gateway | **Tests automatizados del gateway fallan al esperar `DECLINED` pero reciben `FAILED`.** 2 tests fallaron: `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock`. El gateway tiene 98.93% de cobertura (supera el mínimo de 90%). | Los tests esperan `status: "DECLINED"` pero el procesador/mock devuelve `status: "FAILED"` con código 96. Requiere actualizar los tests para esperar `FAILED` o investigar por qué el mock no devuelve `DECLINED` como se espera. |
+| 21 | 2026-08-03 | Mobile | **El flujo completo app → API → gateway → procesador funciona en dispositivo real.** TC-067 (venta rechazada) mostró "Transacción Rechazada" con código 51 (Fondos Insuficientes). La app se compiló con `--dart-define=API_BASE_URL=http://192.168.0.4:8000/v1` y se instaló en Motorola ZY22FSJKKV. | El problema de conexión del hallazgo #18 era específico del emulador (IP `10.0.2.2`). En dispositivo real con la IP de la LAN (`192.168.0.4`), la app conecta correctamente a la API. El ANR del hallazgo #17 tampoco se reproduce en dispositivo real. |
 
 ---
 

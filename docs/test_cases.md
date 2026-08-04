@@ -1,6 +1,6 @@
 # Test Cases — Solidaridad App
 
-> **Última actualización:** 2026-08-03
+> **Última actualización:** 2026-08-04
 >
 > Archivo vivo de casos de prueba. Se actualiza a medida que se documentan y ejecutan tests.
 
@@ -85,6 +85,20 @@ Adaptador HTTP → ISO8583. Traduce las solicitudes de la API al formato del pro
 
 ---
 
+## Módulo: POC Verifone (V660P)
+
+App semilla para probar integración de hardware Verifone (PaymentSDK 4.1.0-sdi).
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+| 086 | POC Verifone | Inicializar PaymentSDK | Presionar "Init PSDK" en pantalla principal | Evento `success: true` y `sdiReady: true` en log | `PaymentSDK init OK; SDI ready=true`. Conexión TCP a 127.0.0.1:12000 exitosa. | Pass | PSDK se inicializa correctamente en ~2 segundos. Detecta dispositivo V660P en modo NEXO. |
+| 087 | POC Verifone | Leer banda magnética (modo mock) | Switch "Mock solo lectura de banda" ON + presionar "Leer banda (mock)" | Devuelve datos de prueba predefinidos: PAN `6063001014007403`, nombre `LILLO ESPINOZA SILVIA DEL`, expiry `12/30` | Mock activado: devolvió PAN, nombre, tracks en texto plano. `mocked: true`, `hasClearData: true` | Pass | Modo mock funciona correctamente para desarrollo sin hardware. |
+| 088 | POC Verifone | Leer banda magnética (modo real, VCL activo) | Switch Mock OFF + presionar "Leer banda" + pasar tarjeta por MSR | Devuelve datos de tarjeta en claro (PAN, tracks) | `swipeSeen: true`, `result: ERR_EXECUTION`, `hasClearData: false`. PAN y tracks enmascarados con `FF`. Tags devueltos pero enmascarados. | Pass | **Comportamiento esperado:** VCL (Verifone Common Library) enmascara datos sensibles. Requiere whitelist de BINs o perfil de laboratorio para obtener datos claros. |
+| 089 | POC Verifone | Imprimir ticket térmico | PSDK inicializado + presionar "Imprimir ticket" | Impresora térmica imprime ticket con datos de venta mock | `printHTML: OK`. Ticket impreso correctamente con formato HTML (1269 chars). | Pass | Impresión funciona correctamente. Requiere PSDK en estado `sdiReady`. |
+| 090 | POC Verifone | Venta mock (sin backend) | Presionar "Venta mock" | Devuelve respuesta simulada de API: `status: APPROVED`, `transaction_number`, `amount`, `card_last4` | `ok: true`, `mocked: true`, `status: APPROVED`, `transaction_number: TXN-MOCK-1785857117336` | Pass | Simula respuesta de backend para testing del flujo completo. |
+
+---
+
 ## Módulo: Mobile (App Flutter)
 
 Aplicación Android que corre en la terminal Verifone.
@@ -142,9 +156,10 @@ Sistema on-premises en C que autoriza las transacciones vía mensajería ISO8583
 |--------|-------|------|------|---------|-----|-----------|
 | API | 42 | 36 | 1 | 0 | 3 | 2 |
 | Payment Gateway | 10 | 8 | 0 | 0 | 0 | 2 |
+| POC Verifone | 5 | 5 | 0 | 0 | 0 | 0 |
 | Mobile | 26 | 22 | 0 | 0 | 2 | 2 |
 | Procesador | 7 | 6 | 0 | 0 | 0 | 1 |
-| **Total** | **85** | **72** | **1** | **0** | **5** | **7** |
+| **Total** | **90** | **77** | **1** | **0** | **5** | **7** |
 
 ---
 
@@ -178,7 +193,8 @@ Sistema on-premises en C que autoriza las transacciones vía mensajería ISO8583
 | 22 | 2026-08-03 | Mobile | **La app mobile no tiene manejo explícito de tokens expirados (401).** La API devuelve 401 con `{"message":"Token inválido o expirado"}` al usar un token expirado, pero los repositorios de la app (`SalesRepository`, `AuthRepository`) no interceptan el código 401 para redirigir al login. `fetchProducts()` y `fetchHistory()` devuelven silenciosamente resultados vacíos/default, y `registerSale()` devuelve un error genérico. | **Gap de seguridad/UX:** si el token expira mientras el usuario usa la app, las operaciones fallarán silenciosamente o con errores confusos, en lugar de redirigir al login. Recomendación: agregar un interceptor HTTP (o wrapper en los repositorios) que detecte 401 y dispare el logout/redirección al login. |
 | 23 | 2026-08-03 | Mobile | **Los repositorios de la app manejan errores de red con fallback silencioso en lugar de mostrar errores al usuario.** `SalesRepository.fetchProducts()` devuelve productos default hardcodeados ante cualquier excepción. `SalesRepository.fetchHistory()` devuelve lista vacía ante cualquier excepción. Ninguno muestra un mensaje de error ni opción de reintentar. | **Comportamiento esperado vs real:** los TC-062 y TC-072 esperaban "mensaje de error y opción de reintentar", pero la app usa fallback silencioso. Esto es útil para resiliencia offline, pero no informa al usuario del problema. Considerar agregar un indicador visual (banner o snackbar) cuando se usan datos fallback, y opción de reintentar en el historial. |
 | 24 | 2026-08-03 | Mobile | **No existe botón "Reintentar" en la pantalla de resultado de venta.** La `SaleStatusScreen` solo tiene un botón "FINALIZAR" que vuelve a la pantalla de venta. TC-069 esperaba un botón "Reintentar" que reenvíe la transacción con la misma `Idempotency-Key`. | **Funcionalidad faltante:** agregar botón "Reintentar" en la pantalla de resultado cuando el resultado es `declined` o `connectionError`. El reintento debería reenviar la misma transacción (con la misma `Idempotency-Key` para evitar duplicados). Requiere guardar el estado de la transacción en el `SalesCubit` para poder reenviarla. |
+| 25 | 2026-08-04 | POC Verifone | **VCL (Verifone Common Library) enmascara datos de tarjetas en el MSR.** Al leer banda magnética real (mock OFF), el SDK devuelve `ERR_EXECUTION` con PAN y tracks llenos de `FF` (0xFF). `hasClearData: false`. Los tags de transacción (`fetchTxnTags`) también vienen enmascarados. | **Comportamiento esperado en producción:** VCL enmascara PAN/tracks por seguridad. Para obtener datos claros se requiere: (1) Whitelist de BINs configurada en la terminal, (2) Perfil de laboratorio que desactive VCL, o (3) Usar camino de datos encriptados (`getEncData`). El modo mock (`PsdkMsrMock`) permite desarrollo sin whitelist. | La app funciona correctamente. VCL está activo (`keyStatusValue: 1`). Para desarrollo, usar modo mock. Para producción, gestionar whitelist con Verifone. | Ver TC-088. |
 
 ---
 
-*Este archivo es un documento vivo. Se actualiza a medida que se documentan y ejecutan nuevos test cases.*
+*Este archivo es un documento vivo. Se actualiza a medida que se documentan y ejecutan nuevos test cases.

@@ -12,6 +12,23 @@ class SaleReviewContent extends StatelessWidget {
     required this.onConfirm,
   });
 
+  /// Formatea la cantidad de gas según el tipo de producto.
+  ///
+  /// - Garrafas y tubos se expresan en kilogramos (kg).
+  /// - El granel se expresa en metros cúbicos (m³) y litros (L), ya que según
+  ///   el proveedor puede requerirse una u otra medida (1 m³ = 1000 L).
+  String _formatQuantity(SalesState state) {
+    final amount = state.amount;
+    if (state.productCode == 'GRANEL') {
+      return '$amount m³ / ${amount * 1000} L';
+    }
+    if (state.productCode.startsWith('GARRAFA') ||
+        state.productCode.startsWith('TUBO')) {
+      return '$amount kg';
+    }
+    return '$amount m³';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -35,7 +52,7 @@ class SaleReviewContent extends StatelessWidget {
         ReviewDataRow(
           icon: Icons.local_gas_station_outlined,
           label: 'Cantidad de Gas',
-          value: '${state.amount} m³',
+          value: _formatQuantity(state),
         ),
         const Divider(height: 32),
 

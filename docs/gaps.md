@@ -4,9 +4,10 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-05
+Última revisión: 2026-05-08
 
-> ✅ **Último cambio:** Resuelto G-P0-17 (mobile no maneja tokens expirados / 401). Los repositorios `SalesRepository` y `AuthRepository` ahora detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila de navegación. Ver hallazgo #22 en `docs/test_cases.md`.
+> ✅ **Último cambio:** Corregida la unidad de medida de la cantidad de gas en la pantalla "Confirmar Operación" (`sale_review_content.dart`). Antes se mostraba siempre "m³"; ahora las garrafas y tubos se muestran en "kg" y el granel en "m³ / L" (ambas medidas separadas por barra inclinada, ya que según el proveedor puede requerirse una u otra; 1 m³ = 1000 L).
+
 
 
 Leyenda de estado: `open` · `partial` · `done`

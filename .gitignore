@@ -4,6 +4,8 @@
 *.ipr
 *.iws
 .vscode/
+.kilo/
+
 
 # OS
 .DS_Store
@@ -20,7 +22,17 @@
 migrate_working_dir/
 
 # Mobile (Flutter/Dart)
+/.dart_tool/
 mobile/.dart_tool/
+
+# Root Flutter generated files (iOS/macOS)
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/ios/Flutter/ephemeral/
+/macos/Flutter/GeneratedPluginRegistrant.swift
+/macos/Flutter/ephemeral/
+
+
 mobile/.flutter-plugins-dependencies
 mobile/.pub-cache/
 mobile/.pub/
@@ -28,11 +40,13 @@ mobile/build/
 mobile/coverage/
 mobile/**/doc/api/
 mobile/**/ios/Flutter/.last_build_id
+mobile/**/macos/Flutter/GeneratedPluginRegistrant.swift
 mobile/app.*.symbols
 mobile/app.*.map.json
 mobile/android/app/debug
 mobile/android/app/profile
 mobile/android/app/release
+
 
 # POC Verifone (Flutter) — also covered by poc_verifone/.gitignore
 poc_verifone/.dart_tool/

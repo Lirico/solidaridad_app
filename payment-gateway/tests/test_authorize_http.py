@@ -9,6 +9,7 @@ from domain.authorization import (
     AuthorizeCommand,
 )
 from domain.exceptions import ProcessorUnavailable
+from infrastructure.iso.mock_processor import MockIsoProcessor
 from main import app
 from presentation.dependencies import get_authorize_payment, get_iso_processor
 
@@ -28,20 +29,32 @@ def _payload(**overrides: Any) -> dict[str, Any]:
 
 
 def test_authorize_http_approved_mock() -> None:
-    response = client.post("/v1/authorize", json=_payload())
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "APPROVED"
-    assert data["response_code"] == "00"
+    # Force the mock processor so the test is deterministic regardless of
+    # local .env (ISO_TRANSPORT may point to a real TCP processor).
+    app.dependency_overrides[get_iso_processor] = lambda: MockIsoProcessor()
+    try:
+        response = client.post("/v1/authorize", json=_payload())
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "APPROVED"
+        assert data["response_code"] == "00"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_authorize_http_declined_mock() -> None:
-    response = client.post(
-        "/v1/authorize",
-        json=_payload(card_number="4000000000000002"),
-    )
-    assert response.status_code == 200
-    assert response.json()["status"] == "DECLINED"
+    # Force the mock processor so the test is deterministic regardless of
+    # local .env (ISO_TRANSPORT may point to a real TCP processor).
+    app.dependency_overrides[get_iso_processor] = lambda: MockIsoProcessor()
+    try:
+        response = client.post(
+            "/v1/authorize",
+            json=_payload(card_number="4000000000000002"),
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "DECLINED"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_authorize_http_invalid_pan() -> None:
@@ -96,6 +109,7 @@ def test_authorize_http_with_processor_override() -> None:
                 auth_id="FIX001",
                 retrieval_reference="RRN",
             )
+
 
     app.dependency_overrides[get_iso_processor] = lambda: FixedProcessor()
     try:

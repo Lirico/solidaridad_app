@@ -11,7 +11,7 @@
 | Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
 |-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
 
-**Leyenda Test Result:** `Pass` · `Fail` · `Blocked` · `N/A`
+**Leyenda Test Result:** `Pass` · `Fail` · `Blocked` · `N/A` · `Pendiente`
 
 ---
 

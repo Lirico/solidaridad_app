@@ -68,7 +68,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ),
       body: BlocConsumer<AuthCubit, AuthState>(
         listener: (context, state) {
-          if (state is AuthSuccess) {
+          if (state is AuthSessionExpired) {
+            context.read<AuthCubit>().logout();
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.login,
+              (route) => false,
+            );
+          } else if (state is AuthSuccess) {
             if (_isFirstLogin) {
               // El backend ya marcó must_change_password=false,
               // navegar directamente al formulario de ventas
@@ -94,6 +101,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             context.read<AuthCubit>().resetState();
           }
         },
+
         builder: (context, state) {
           return SingleChildScrollView(
             child: Column(

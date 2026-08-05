@@ -114,3 +114,18 @@ class SalesInitialWithHistory extends SalesState {
         expirationDate: '',
       );
 }
+
+/// Emitted when the API returns 401 (token expired/invalid).
+class SalesSessionExpired extends SalesState {
+  const SalesSessionExpired()
+    : super(
+        productCode: '',
+        productLabel: '',
+        amount: 0.0,
+        cardNumber: '',
+        cardHolder: '',
+        cvv: '',
+        expirationDate: '',
+        history: const [],
+      );
+}

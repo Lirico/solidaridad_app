@@ -21,6 +21,8 @@ class SalesCubit extends Cubit<SalesState> {
         offset: offset,
       );
       emit(SalesInitialWithHistory(history: items));
+    } on SessionExpiredException {
+      emit(const SalesSessionExpired());
     } catch (_) {
       emit(SalesInitialWithHistory(history: const []));
     }
@@ -82,6 +84,11 @@ class SalesCubit extends Cubit<SalesState> {
       token: token,
     );
 
+    if (response.sessionExpired) {
+      emit(const SalesSessionExpired());
+      return;
+    }
+
     final String hiddenCard = currentCardNumber.replaceAll(' ', '').length >= 4
         ? '•••• ${currentCardNumber.replaceAll(' ', '').substring(currentCardNumber.replaceAll(' ', '').length - 4)}'
         : '•••• 4321';
@@ -132,5 +139,10 @@ class SalesCubit extends Cubit<SalesState> {
 
   void resetSale() {
     emit(SalesInitial());
+  }
+
+  /// Appends more history items (used for pagination / load-more).
+  void appendHistory(List<OperationModel> items) {
+    emit(SalesInitialWithHistory(history: [...state.history, ...items]));
   }
 }

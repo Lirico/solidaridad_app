@@ -162,6 +162,14 @@ class AuthRepository {
           )
           .timeout(const Duration(seconds: 15));
 
+      if (response.statusCode == 401) {
+        return const AuthResponse(
+          isSuccess: false,
+          message: 'Su sesión ha expirado. Vuelva a iniciar sesión.',
+          sessionExpired: true,
+        );
+      }
+
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {

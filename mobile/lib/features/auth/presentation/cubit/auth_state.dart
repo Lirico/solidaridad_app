@@ -30,3 +30,8 @@ class AuthSuccess extends AuthState {
 class AuthError extends AuthState {
   const AuthError({required super.message});
 }
+
+/// Emitted when the API returns 401 (token expired/invalid).
+class AuthSessionExpired extends AuthState {
+  const AuthSessionExpired({super.message});
+}

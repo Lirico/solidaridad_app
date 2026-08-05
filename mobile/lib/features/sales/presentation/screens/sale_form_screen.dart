@@ -4,8 +4,10 @@ import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
+import '../../data/sales_repository.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
+
 import '../widgets/amount_input_formatter.dart';
 import '../widgets/product_selector.dart';
 import '../widgets/card_fields_container.dart';
@@ -53,6 +55,14 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
           _selectedProductLabel = products.first.label;
         }
       });
+    } on SessionExpiredException {
+      if (!mounted) return;
+      context.read<AuthCubit>().logout();
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false,
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() {

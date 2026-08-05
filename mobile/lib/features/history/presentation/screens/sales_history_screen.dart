@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
-import '../../../auth/domain/auth_model.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
+
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../../../sales/presentation/cubit/sales_cubit.dart';
@@ -69,11 +69,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
     if (items.isNotEmpty && mounted) {
       setState(() => _offset = newOffset);
-      final currentState = context.read<SalesCubit>().state;
-      final updatedHistory = [...currentState.history, ...items];
-      context.read<SalesCubit>().emit(
-        SalesInitialWithHistory(history: updatedHistory),
-      );
+      context.read<SalesCubit>().appendHistory(items);
     }
     if (mounted) setState(() => _loadingMore = false);
   }
@@ -106,7 +102,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: _buildBody(context),
+                      child: BlocListener<SalesCubit, SalesState>(
+                        listener: (context, state) {
+                          if (state is SalesSessionExpired) {
+                            context.read<AuthCubit>().logout();
+                            Navigator.pushNamedAndRemoveUntil(
+                              context,
+                              AppRoutes.login,
+                              (route) => false,
+                            );
+                          }
+                        },
+                        child: _buildBody(context),
+                      ),
                     ),
                   ),
                 ),

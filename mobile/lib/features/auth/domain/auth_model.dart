@@ -11,11 +11,13 @@ class AuthResponse {
   final User? user;
   final String message;
   final bool mustChangePassword;
+  final bool sessionExpired;
 
   const AuthResponse({
     required this.isSuccess,
     this.user,
     required this.message,
     this.mustChangePassword = false,
+    this.sessionExpired = false,
   });
 }

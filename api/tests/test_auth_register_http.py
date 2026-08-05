@@ -26,7 +26,7 @@ def test_register_returns_201_and_token_shape() -> None:
         name="Ada",
         email="ada@example.com",
         token="jwt-token",
-        must_change_password=False,
+        must_change_password=True,
     )
     _override_register_user(use_case)
 
@@ -48,7 +48,7 @@ def test_register_returns_201_and_token_shape() -> None:
         "name": "Ada",
         "email": "ada@example.com",
         "token": "jwt-token",
-        "must_change_password": False,
+        "must_change_password": True,
     }
     use_case.execute.assert_called_once_with(
         name="Ada",

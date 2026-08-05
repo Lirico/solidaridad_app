@@ -65,6 +65,11 @@ class AuthCubit extends Cubit<AuthState> {
       newPassword: newPassword,
     );
 
+    if (response.sessionExpired) {
+      emit(AuthSessionExpired(message: response.message));
+      return;
+    }
+
     if (response.isSuccess) {
       emit(AuthSuccess(user: previousUser, message: response.message));
     } else {

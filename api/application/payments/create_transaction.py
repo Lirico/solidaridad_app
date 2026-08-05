@@ -85,9 +85,11 @@ def _validate_cvv(cvv: str) -> str:
     return cleaned
 
 
-def _validate_pan(card_number: str) -> str:
+def _validate_pan(card_number: str, *, skip_luhn: bool = False) -> str:
     pan = card_number.replace(" ", "").strip()
-    if not pan.isdigit() or not (13 <= len(pan) <= 19) or not _luhn_ok(pan):
+    if not pan.isdigit() or not (13 <= len(pan) <= 19):
+        raise InvalidCardNumber()
+    if not skip_luhn and not _luhn_ok(pan):
         raise InvalidCardNumber()
     return pan
 
@@ -99,11 +101,14 @@ class CreateTransaction:
         transactions: TransactionRepository,
         installations: InstallationRepository,
         gateway: PaymentGateway,
+        *,
+        luhn_check_enabled: bool = True,
     ) -> None:
         self._session = session
         self._transactions = transactions
         self._installations = installations
         self._gateway = gateway
+        self._skip_luhn = not luhn_check_enabled
 
     def execute(
         self,
@@ -123,7 +128,7 @@ class CreateTransaction:
 
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
-        pan = _validate_pan(card_number)
+        pan = _validate_pan(card_number, skip_luhn=self._skip_luhn)
         _validate_cvv(cvv)
         card_last4 = pan[-4:]
         exp = expiration_date.strip() if expiration_date else None

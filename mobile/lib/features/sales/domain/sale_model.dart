@@ -72,6 +72,7 @@ class SaleResponse {
   final String message;
   final String errorCode;
   final bool connectionError;
+  final bool sessionExpired;
 
   const SaleResponse({
     required this.isApproved,
@@ -79,6 +80,7 @@ class SaleResponse {
     required this.message,
     required this.errorCode,
     this.connectionError = false,
+    this.sessionExpired = false,
   });
 }
 

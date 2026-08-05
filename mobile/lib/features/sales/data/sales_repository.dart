@@ -6,6 +6,11 @@ import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
 import '../domain/sale_model.dart';
 
+/// Thrown when the API returns 401 (token expired/invalid).
+class SessionExpiredException implements Exception {
+  const SessionExpiredException();
+}
+
 /// Generates a pseudo-unique idempotency key.
 ///
 /// In production, consider using the `uuid` package for guaranteed uniqueness.
@@ -37,6 +42,9 @@ class SalesRepository {
           )
           .timeout(const Duration(seconds: 10));
 
+      if (response.statusCode == 401) {
+        throw const SessionExpiredException();
+      }
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
         return data
@@ -44,6 +52,8 @@ class SalesRepository {
             .toList();
       }
       return _defaultProducts();
+    } on SessionExpiredException {
+      rethrow;
     } catch (_) {
       return _defaultProducts();
     }
@@ -76,6 +86,9 @@ class SalesRepository {
           )
           .timeout(const Duration(seconds: 10));
 
+      if (response.statusCode == 401) {
+        throw const SessionExpiredException();
+      }
       if (response.statusCode == 200) {
         final Map<String, dynamic> body =
             jsonDecode(response.body) as Map<String, dynamic>;
@@ -87,6 +100,8 @@ class SalesRepository {
             .toList();
       }
       return [];
+    } on SessionExpiredException {
+      rethrow;
     } catch (_) {
       return [];
     }
@@ -126,6 +141,16 @@ class SalesRepository {
             body: jsonEncode(bodyPayload),
           )
           .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 401) {
+        return const SaleResponse(
+          isApproved: false,
+          operationNumber: '',
+          message: 'Su sesión ha expirado. Vuelva a iniciar sesión.',
+          errorCode: '401',
+          sessionExpired: true,
+        );
+      }
 
       final Map<String, dynamic> responseData = jsonDecode(response.body);
 

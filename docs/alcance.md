@@ -78,6 +78,10 @@ claridad operativa.
 - API pública segura para la app.
 - Autenticación, sesión por token, cambio de contraseña.
 - Validación de usuario habilitado (según política de altas).
+- **Provisión de usuarios centralizada**: los usuarios (empleados) son dados
+  de alta únicamente por la empresa; no se usa el registro desde la app. El
+  endpoint `POST /v1/auth/register` se mantiene como utilidad para que la
+  empresa registre usuarios vía Postman/central.
 - Terminal origen: el `installation_id` del login es el terminal id que se
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).

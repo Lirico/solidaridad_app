@@ -59,7 +59,7 @@ class RegisterUser:
             name=normalized_name,
             email=normalized_email,
             password_hash=self._hasher.hash(password),
-            must_change_password=False,
+            must_change_password=True,
         )
         self._installations.upsert(normalized_installation_id)
         self._session.commit()

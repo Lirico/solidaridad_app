@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../cubit/sales_cubit.dart';
 import '../cubit/sales_state.dart';
 import '../widgets/sale_review_header.dart';
@@ -31,6 +32,19 @@ class SaleProcessingScreen extends StatelessWidget {
           context,
           AppRoutes.saleStatus,
           arguments: salesState.result,
+        );
+      });
+    }
+
+    // Session expired (401): log out and return to login
+    if (salesState is SalesSessionExpired) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        context.read<AuthCubit>().logout();
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.login,
+          (route) => false,
         );
       });
     }

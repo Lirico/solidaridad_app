@@ -51,6 +51,7 @@ def _build(
     existing: Transaction | None = None,
     gateway_result: AuthorizeResult | None = None,
     installation_code: str | None = "05000001",
+    luhn_check_enabled: bool = True,
 ) -> tuple[CreateTransaction, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
@@ -87,8 +88,10 @@ def _build(
         transactions=transactions,
         installations=installations,
         gateway=gateway,
+        luhn_check_enabled=luhn_check_enabled,
     )
     return use_case, transactions, installations, gateway
+
 
 
 def test_create_approves() -> None:
@@ -136,6 +139,25 @@ def test_invalid_pan() -> None:
         )
 
 
+def test_invalid_pan_accepted_when_luhn_disabled() -> None:
+    # PAN 4111111111111112 no pasa el checksum de Luhn, pero con
+    # luhn_check_enabled=False la validación se omite y la transacción continúa.
+    use_case, transactions, _, gateway = _build(luhn_check_enabled=False)
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="1.50",
+        card_number="4111111111111112",
+        cvv="123",
+    )
+    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    assert result.transaction.status == TransactionStatus.APPROVED
+    gateway.authorize.assert_called_once()
+    transactions.update_result.assert_called_once()
+
+
 def test_missing_terminal() -> None:
     use_case, *_ = _build(installation_code=None)
     with pytest.raises(MissingTerminalId):
@@ -161,6 +183,7 @@ def test_replay_pending_returns_202() -> None:
         expiration_date=None,
     )
     existing = _tx(status=TransactionStatus.PENDING, request_fingerprint=fp)
+
     use_case, transactions, _, gateway = _build(existing=existing)
     result = use_case.execute(
         user_id=existing.user_id,

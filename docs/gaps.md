@@ -4,9 +4,10 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-03
+Última revisión: 2026-08-05
 
-> ✅ **Último cambio:** Ejecución de tests manuales de mobile (TC-055 a TC-078) en dispositivo real Motorola ZY22FSJKKV. Se actualizaron 13 test cases pendientes de mobile: 9 Pass, 2 Pendiente (TC-066, TC-069), 2 N/A (TC-075, TC-076). Se detectaron 3 nuevos gaps: G-P0-17 (sin manejo de 401/token expirado), G-P1-07 (fallback silencioso en errores de red), G-P1-02 actualizado (sin botón Reintentar). Ver hallazgos #22, #23, #24 en `docs/test_cases.md`.
+> ✅ **Último cambio:** Resuelto G-P0-17 (mobile no maneja tokens expirados / 401). Los repositorios `SalesRepository` y `AuthRepository` ahora detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila de navegación. Ver hallazgo #22 en `docs/test_cases.md`.
+
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -15,6 +16,7 @@ Leyenda de estado: `open` · `partial` · `done`
 ## Resumen
 
 El backend local (API → gateway → procesador) cubre buena parte del corazón de
+
 autorización ISO. La app Flutter sigue el contrato borrador de estimación
 (ingreso manual, `/v1/sales/gas`, historial mock) y **no** integra hardware
 Verifone (banda + térmica).
@@ -38,10 +40,12 @@ Verifone (banda + térmica).
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases.md`. |
 | G-P0-16 | `must_change_password` no se forzaba en registros nuevos | done | **Fix aplicado (2026-08-03):** `register_user.py` seteaba `must_change_password=False` siempre, impidiendo forzar el cambio de contraseña en el primer login. Se corrigió a `True` en `api/application/auth/register_user.py` línea 62. Tests actualizados en `test_register_user.py` y `test_auth_register_http.py`. Ver hallazgo #6 en `docs/test_cases.md`. |
 | G-P0-12 | Endpoint de detalle de transacción no implementado | open | `GET /v1/transactions/{id}` no existe. Solo hay listado (`GET /v1/transactions`) y creación (`POST /v1/transactions`). La app mobile podría necesitarlo para mostrar detalle desde el historial. Ver hallazgo #9 en `docs/test_cases.md`. |
-| G-P0-13 | Tests automatizados del gateway fallan por código 96 | open | 2 tests fallaron: `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock`. Esperan `status: "DECLINED"` pero reciben `status: "FAILED"` con `response_code: "96"` (Respuesta ISO inválida). El gateway tiene 98.93% de cobertura. Ver hallazgo #20 en `docs/test_cases.md`. |
+| G-P0-13 | Tests automatizados del gateway fallan por código 96 | done | **Fix aplicado (2026-08-04):** los tests `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock` ahora fuerzan el `MockIsoProcessor` vía `dependency_overrides` en `payment-gateway/tests/test_authorize_http.py`, haciéndolos deterministas independientemente del `.env` local (`ISO_TRANSPORT=tcp`). `make check` pasa: lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓. Ver hallazgo #20 en `docs/test_cases.md`. |
 | G-P0-14 | Procesador no setea DE39 (código de respuesta) en varios escenarios | open | El procesador C solo setea `respcode_39` en algunos casos (ej: código 05 para TRANS_DENY). En otros escenarios (monto $100, terminal inválida, tarjeta sin saldo, tarjeta vencida) el DE39 queda vacío. El gateway interpreta DE39 vacío como código 96 (`response_mapper.py` línea 22: `code = (iso.respcode_39 or "").strip() or "96"`). Esto causa que el gateway devuelva `FAILED` en lugar de `DECLINED` con el código correcto. Requiere fix en `auth_thread.c` para asegurar que DE39 siempre tenga un código de respuesta válido. |
 | G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | TC-067 (venta rechazada) mostró "Transacción Rechazada" con código 51 (Fondos Insuficientes) en Motorola ZY22FSJKKV. La app se compiló con `--dart-define=API_BASE_URL=http://192.168.0.4:8000/v1`. El problema de conexión del hallazgo #18 era específico del emulador (IP `10.0.2.2`). El ANR del hallazgo #17 tampoco se reproduce en dispositivo real. Ver hallazgo #21 en `docs/test_cases.md`. |
-| G-P0-17 | App mobile no maneja tokens expirados (401) | open | La API devuelve 401 con `{"message":"Token inválido o expirado"}` al usar un token expirado, pero los repositorios de la app (`SalesRepository`, `AuthRepository`) no interceptan 401 para redirigir al login. `fetchProducts()` y `fetchHistory()` devuelven silenciosamente resultados vacíos/default. Si el token expira mientras el usuario usa la app, las operaciones fallarán silenciosamente. Recomendación: agregar interceptor HTTP que detecte 401 y dispare logout. Ver hallazgo #22 y TC-060 en `docs/test_cases.md`. |
+
+| G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases.md`. |
+
 
 ---
 
@@ -90,6 +94,8 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Status screen con 3 estados (aprobado/rechazado/error conexión POSNET) | `PaymentResult` enum + `connectionError` flag en `SaleResponse`; naranja para pérdida de conectividad POSNET |
 | ProductSelector con catálogo del backend | `ProductSelector` widget consume `GET /v1/products` y muestra productos de gas (GARRAFA_10, etc.) en vez de ARS/USD. Payload de venta envía `product`. |
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
+| Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
+
 
 ---
 

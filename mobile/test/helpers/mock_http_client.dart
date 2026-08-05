@@ -30,6 +30,8 @@ http.Response jsonListResponse(List<dynamic> body, {int statusCode = 200}) {
 }
 
 /// Registers a fallback for [http.Client] so mocktail can use it in matchers.
+class FakeHttpClient extends Fake implements http.Client {}
+
 void registerHttpClientFallback() {
-  registerFallbackValue(http.Client());
+  registerFallbackValue(FakeHttpClient());
 }

@@ -353,7 +353,7 @@ class PsdkBridge(private val appContext: Context) :
             val panHex = bytesAsHex(panBytes)
             val track1Ascii = bytesAsAscii(track1Bytes)
             val track2Hex = bytesAsHex(track2Bytes)
-            val track2Ascii = bytesAsAscii(track2Bytes)
+            val track2Ascii = bytesAsBcdAscii(track2Bytes)
             val expiryHex = bytesAsHex(expiryBytes)
 
             out["panHex"] = panHex
@@ -365,6 +365,7 @@ class PsdkBridge(private val appContext: Context) :
             out["expiryHex"] = expiryHex
             out["expiry"] = expiryHex
             out
+
         } catch (e: Exception) {
             Log.e(TAG, "fetchTxnTags failed", e)
             mapOf(
@@ -413,7 +414,45 @@ class PsdkBridge(private val appContext: Context) :
         return bytes.toString(Charset.forName("US-ASCII"))
     }
 
+    /**
+     * Decodes a BCD-encoded track2 into its ASCII representation.
+     *
+     * Track2 in BCD packs two decimal digits per byte. Special nibbles:
+     * - 0xB → ';' (start sentinel)
+     * - 0xD → '=' (field separator)
+     * - 0xF → '?' (end sentinel) or filler (dropped)
+     * - 0xA → ':' (alternate separator)
+     * - 0xC → '<' , 0xE → '>' (rare)
+     *
+     * Example: `B6063007014007403D3012F8` → `;6063007014007403=3012F8?`
+     */
+    private fun bytesAsBcdAscii(bytes: ByteArray?): String {
+        if (bytes == null || bytes.isEmpty()) return ""
+        val sb = StringBuilder()
+        for (b in bytes) {
+            val hi = (b.toInt() shr 4) and 0x0F
+            val lo = b.toInt() and 0x0F
+            sb.append(bcdNibbleToChar(hi))
+            sb.append(bcdNibbleToChar(lo))
+        }
+        return sb.toString()
+    }
+
+    private fun bcdNibbleToChar(nibble: Int): Char {
+        return when (nibble) {
+            in 0..9 -> '0' + nibble
+            0xA -> ':'
+            0xB -> ';'
+            0xC -> '<'
+            0xD -> '='
+            0xE -> '>'
+            0xF -> '?'
+            else -> '?'
+        }
+    }
+
     /** True only if at least one field looks like real card data (not blank / not all FFs). */
+
     private fun hasUsefulCleartext(vararg values: String?): Boolean {
         return values.any { value ->
             val v = value?.trim().orEmpty()

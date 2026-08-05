@@ -52,6 +52,17 @@ class SalesInitial extends SalesState {
       );
 }
 
+/// Estado intermedio emitido cuando el usuario selecciona producto y cantidad
+/// en el formulario de venta, antes de ingresar los datos de la tarjeta.
+class SalesProductSelected extends SalesState {
+  const SalesProductSelected({
+    required super.productCode,
+    required super.productLabel,
+    required super.amount,
+    required super.history,
+  }) : super(cardNumber: '', cardHolder: '', cvv: '', expirationDate: '');
+}
+
 class SalesReviewing extends SalesState {
   const SalesReviewing({
     required super.productCode,

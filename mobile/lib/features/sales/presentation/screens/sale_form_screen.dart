@@ -10,7 +10,6 @@ import '../cubit/sales_cubit.dart';
 
 import '../widgets/amount_input_formatter.dart';
 import '../widgets/product_selector.dart';
-import '../widgets/card_fields_container.dart';
 import '../widgets/sale_form_header.dart';
 
 class SaleFormScreen extends StatefulWidget {
@@ -28,11 +27,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   List<ProductInfo> _products = [];
   bool _loadingProducts = true;
 
-  final _cardNumberController = TextEditingController();
-  final _expiryController = TextEditingController();
   final _unitsController = TextEditingController();
-  final _cvvController = TextEditingController();
-  final _cardHolderController = TextEditingController();
 
   @override
   void initState() {
@@ -73,12 +68,23 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
 
   @override
   void dispose() {
-    _cardNumberController.dispose();
-    _expiryController.dispose();
     _unitsController.dispose();
-    _cvvController.dispose();
-    _cardHolderController.dispose();
     super.dispose();
+  }
+
+  void _onNext() {
+    if (_formKey.currentState!.validate()) {
+      final units =
+          double.tryParse(_unitsController.text.replaceAll(',', '.')) ?? 0;
+
+      context.read<SalesCubit>().setProductAndAmount(
+        productCode: _selectedProductCode,
+        productLabel: _selectedProductLabel,
+        amount: units,
+      );
+
+      Navigator.pushNamed(context, AppRoutes.saleSelectNewOperation);
+    }
   }
 
   @override
@@ -188,45 +194,8 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                             ),
                             const SizedBox(height: 24),
 
-                            CardFieldsContainer(
-                              cardNumberController: _cardNumberController,
-                              expiryController: _expiryController,
-                              cvvController: _cvvController,
-                              cardHolderController: _cardHolderController,
-                            ),
-
-                            const SizedBox(height: 24),
-
                             ElevatedButton(
-                              onPressed: () {
-                                if (_formKey.currentState!.validate()) {
-                                  final cubit = context.read<SalesCubit>();
-                                  final units =
-                                      double.tryParse(
-                                        _unitsController.text.replaceAll(
-                                          ',',
-                                          '.',
-                                        ),
-                                      ) ??
-                                      0;
-
-                                  cubit.showReview(
-                                    productCode: _selectedProductCode,
-                                    productLabel: _selectedProductLabel,
-                                    amount: units,
-                                    cardNumber: _cardNumberController.text,
-                                    cardHolder: _cardHolderController.text,
-                                    cvv: _cvvController.text,
-                                    expirationDate: _expiryController.text
-                                        .replaceAll('/', ''),
-                                  );
-
-                                  Navigator.pushNamed(
-                                    context,
-                                    AppRoutes.saleReview,
-                                  );
-                                }
-                              },
+                              onPressed: _onNext,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primaryOrange,
                                 foregroundColor: Colors.white,
@@ -238,7 +207,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                 ),
                               ),
                               child: const Text(
-                                'CONTINUAR',
+                                'SIGUIENTE',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,

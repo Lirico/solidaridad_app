@@ -28,6 +28,24 @@ class SalesCubit extends Cubit<SalesState> {
     }
   }
 
+  /// Guarda el producto y la cantidad seleccionados en el formulario de venta,
+  /// para que la pantalla de ingreso manual de tarjeta pueda continuar el flujo
+  /// sin perder estos datos intermedios.
+  void setProductAndAmount({
+    required String productCode,
+    required String productLabel,
+    required double amount,
+  }) {
+    emit(
+      SalesProductSelected(
+        productCode: productCode,
+        productLabel: productLabel,
+        amount: amount,
+        history: state.history,
+      ),
+    );
+  }
+
   void showReview({
     required String productCode,
     required String productLabel,

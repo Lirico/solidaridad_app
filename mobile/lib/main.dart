@@ -17,6 +17,7 @@ import 'features/sales/presentation/screens/sale_review_screen.dart';
 import 'features/sales/presentation/screens/sale_status_screen.dart';
 import 'features/sales/presentation/screens/sale_select_new_operation_screen.dart';
 import 'features/sales/presentation/screens/sale_manual_card_screen.dart';
+import 'features/sales/presentation/screens/sale_waiting_for_card_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
 import 'features/history/presentation/screens/sale_detail_screen.dart';
 import 'core/widgets/loading_screen.dart';
@@ -62,6 +63,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.saleSelectNewOperation: (context) =>
             const SelectNewOperationScreen(),
         AppRoutes.saleManualCard: (context) => const SaleManualCardScreen(),
+        AppRoutes.saleWaitingForCard: (context) => const WaitingForCardScreen(),
         AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
         AppRoutes.saleDetail: (context) => const SaleDetailScreen(),
         AppRoutes.splash: (context) => const SplashScreen(),

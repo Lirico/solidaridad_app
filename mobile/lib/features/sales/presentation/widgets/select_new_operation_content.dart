@@ -3,9 +3,14 @@ import '../../../../core/theme/app_colors.dart';
 import 'payment_option_card.dart';
 
 class SelectNewOperationContent extends StatelessWidget {
+  final VoidCallback? onCardTap;
   final VoidCallback? onManualCardTap;
 
-  const SelectNewOperationContent({super.key, this.onManualCardTap});
+  const SelectNewOperationContent({
+    super.key,
+    this.onCardTap,
+    this.onManualCardTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +62,7 @@ class SelectNewOperationContent extends StatelessWidget {
             icon: Icons.credit_card,
             title: 'Tarjeta',
             subtitle: 'Acercar, insertar\no deslizar',
-            onTap: () {},
+            onTap: onCardTap ?? () {},
           ),
           const SizedBox(height: 12),
 

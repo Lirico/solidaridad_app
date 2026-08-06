@@ -6,7 +6,6 @@ class ManualCardContent extends StatelessWidget {
   final TextEditingController cardNumberController;
   final TextEditingController expiryController;
   final TextEditingController cvvController;
-  final TextEditingController cardHolderController;
   final VoidCallback onContinue;
 
   const ManualCardContent({
@@ -14,7 +13,6 @@ class ManualCardContent extends StatelessWidget {
     required this.cardNumberController,
     required this.expiryController,
     required this.cvvController,
-    required this.cardHolderController,
     required this.onContinue,
   });
 
@@ -35,7 +33,6 @@ class ManualCardContent extends StatelessWidget {
             cardNumberController: cardNumberController,
             expiryController: expiryController,
             cvvController: cvvController,
-            cardHolderController: cardHolderController,
           ),
 
           const SizedBox(height: 24),

@@ -6,7 +6,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** cierre de ajustes POS mobile (`mobile/lib/core/theme/app_theme.dart`, `mobile/lib/core/theme/app_colors.dart`, `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): se consolidaron tokens de tema para inputs, botones, appbar, estados y textos secundarios según medidas POS; además el resumen de confirmación muestra "Número de Tarjeta" y se ignora `/build/` raíz para no versionar reportes generados.
+> ✅ **Último cambio:** ajuste de consistencia operativa POS mobile (`mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_manual_card_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_processing_screen.dart`, `mobile/lib/features/sales/presentation/widgets/card_fields_container.dart`, `mobile/lib/features/sales/presentation/widgets/manual_card_content.dart`, `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): el input y el resumen de cantidad muestran unidades para garrafas/tubos y m³ solo cuando el producto seleccionado es granel. En ingreso manual se eliminó el campo "Nombre del Titular" de la vista y del flujo que prepara la venta, por lo que no se captura ni se propaga hacia la operación. Además, el botón "CONFIRMAR COBRO" usa `AppColors.primaryOrange`, igual que la acción "SIGUIENTE", manteniendo altura 60 px, radio 10 px, texto 20 px y padding horizontal 24 px.
 
 
 

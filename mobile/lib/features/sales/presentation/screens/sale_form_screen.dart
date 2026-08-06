@@ -30,6 +30,8 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
 
   final _unitsController = TextEditingController();
 
+  bool get _isBulkProduct => _selectedProductCode == 'GRANEL';
+
   @override
   void initState() {
     super.initState();
@@ -163,9 +165,11 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                 },
                               ),
                             const SizedBox(height: 20),
-                            const Text(
-                              'Cantidad de Unidades',
-                              style: TextStyle(
+                            Text(
+                              _isBulkProduct
+                                  ? 'Cantidad de Gas (m³)'
+                                  : 'Cantidad de Unidades',
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -179,9 +183,11 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                     decimal: true,
                                   ),
                               inputFormatters: [AmountInputFormatter()],
-                              decoration: const InputDecoration(
-                                hintText: 'Ingresar Unidades',
-                                prefixIcon: Icon(
+                              decoration: InputDecoration(
+                                hintText: _isBulkProduct
+                                    ? 'Ingresar m³'
+                                    : 'Ingresar unidades',
+                                prefixIcon: const Icon(
                                   Icons.propane_tank_outlined,
                                   size: 24,
                                 ),

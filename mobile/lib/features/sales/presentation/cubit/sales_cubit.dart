@@ -51,7 +51,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String productLabel,
     required double amount,
     required String cardNumber,
-    required String cardHolder,
     required String cvv,
     required String expirationDate,
   }) {
@@ -61,7 +60,6 @@ class SalesCubit extends Cubit<SalesState> {
         productLabel: productLabel,
         amount: amount,
         cardNumber: cardNumber,
-        cardHolder: cardHolder,
         cvv: cvv,
         expirationDate: expirationDate,
         history: state.history,
@@ -74,7 +72,6 @@ class SalesCubit extends Cubit<SalesState> {
     final currentProductLabel = state.productLabel;
     final currentAmount = state.amount;
     final currentCardNumber = state.cardNumber;
-    final currentCardHolder = state.cardHolder;
     final currentCvv = state.cvv;
     final currentExpirationDate = state.expirationDate;
 
@@ -86,7 +83,6 @@ class SalesCubit extends Cubit<SalesState> {
         productLabel: currentProductLabel,
         amount: currentAmount,
         cardNumber: currentCardNumber,
-        cardHolder: currentCardHolder,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
         history: currentHistory,
@@ -137,7 +133,6 @@ class SalesCubit extends Cubit<SalesState> {
         productLabel: currentProductLabel,
         amount: currentAmount,
         cardNumber: currentCardNumber,
-        cardHolder: currentCardHolder,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
         history: currentHistory,

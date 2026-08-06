@@ -7,7 +7,6 @@ sealed class SalesState {
   final String productLabel;
   final double amount;
   final String cardNumber;
-  final String cardHolder;
   final String cvv;
   final String expirationDate;
   final List<OperationModel> history;
@@ -17,7 +16,6 @@ sealed class SalesState {
     required this.productLabel,
     required this.amount,
     required this.cardNumber,
-    required this.cardHolder,
     required this.cvv,
     required this.expirationDate,
     required this.history,
@@ -31,7 +29,6 @@ class SalesLoading extends SalesState {
         productLabel: '',
         amount: 0.0,
         cardNumber: '',
-        cardHolder: '',
         cvv: '',
         expirationDate: '',
         history: const [],
@@ -45,7 +42,6 @@ class SalesInitial extends SalesState {
         productLabel: 'Garrafa 10 kg',
         amount: 0.0,
         cardNumber: '',
-        cardHolder: '',
         cvv: '',
         expirationDate: '',
         history: const [],
@@ -60,7 +56,7 @@ class SalesProductSelected extends SalesState {
     required super.productLabel,
     required super.amount,
     required super.history,
-  }) : super(cardNumber: '', cardHolder: '', cvv: '', expirationDate: '');
+  }) : super(cardNumber: '', cvv: '', expirationDate: '');
 }
 
 class SalesReviewing extends SalesState {
@@ -69,7 +65,6 @@ class SalesReviewing extends SalesState {
     required super.productLabel,
     required super.amount,
     required super.cardNumber,
-    required super.cardHolder,
     required super.cvv,
     required super.expirationDate,
     required super.history,
@@ -82,7 +77,6 @@ class SalesProcessing extends SalesState {
     required super.productLabel,
     required super.amount,
     required super.cardNumber,
-    required super.cardHolder,
     required super.cvv,
     required super.expirationDate,
     required super.history,
@@ -100,7 +94,6 @@ class SalesCompleted extends SalesState {
     required super.productLabel,
     required super.amount,
     required super.cardNumber,
-    required super.cardHolder,
     required super.cvv,
     required super.expirationDate,
     required super.history,
@@ -120,7 +113,6 @@ class SalesInitialWithHistory extends SalesState {
         productLabel: 'Garrafa 10 kg',
         amount: 0.0,
         cardNumber: '',
-        cardHolder: '',
         cvv: '',
         expirationDate: '',
       );
@@ -134,7 +126,6 @@ class SalesSessionExpired extends SalesState {
         productLabel: '',
         amount: 0.0,
         cardNumber: '',
-        cardHolder: '',
         cvv: '',
         expirationDate: '',
         history: const [],

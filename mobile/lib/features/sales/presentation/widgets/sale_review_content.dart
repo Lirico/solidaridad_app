@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../cubit/sales_state.dart';
 import 'sale_review_widgets.dart';
 
@@ -14,19 +15,14 @@ class SaleReviewContent extends StatelessWidget {
 
   /// Formatea la cantidad de gas según el tipo de producto.
   ///
-  /// - Garrafas y tubos se expresan en kilogramos (kg).
-  /// - El granel se expresa en metros cúbicos (m³) y litros (L), ya que según
-  ///   el proveedor puede requerirse una u otra medida (1 m³ = 1000 L).
+  /// - Garrafas y tubos se expresan como unidades.
+  /// - El granel se expresa en metros cúbicos (m³).
   String _formatQuantity(SalesState state) {
     final amount = state.amount;
     if (state.productCode == 'GRANEL') {
-      return '$amount m³ / ${amount * 1000} L';
+      return '$amount m³';
     }
-    if (state.productCode.startsWith('GARRAFA') ||
-        state.productCode.startsWith('TUBO')) {
-      return '$amount kg';
-    }
-    return '$amount m³';
+    return '$amount unidades';
   }
 
   @override
@@ -71,7 +67,7 @@ class SaleReviewContent extends StatelessWidget {
           child: ElevatedButton(
             onPressed: onConfirm,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE67E22),
+              backgroundColor: AppColors.primaryOrange,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24),
               shape: RoundedRectangleBorder(

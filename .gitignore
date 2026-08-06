@@ -23,17 +23,7 @@ build/
 migrate_working_dir/
 
 # Mobile (Flutter/Dart)
-/.dart_tool/
 mobile/.dart_tool/
-
-# Root Flutter generated files (iOS/macOS)
-/ios/Flutter/Generated.xcconfig
-/ios/Flutter/flutter_export_environment.sh
-/ios/Flutter/ephemeral/
-/macos/Flutter/GeneratedPluginRegistrant.swift
-/macos/Flutter/ephemeral/
-
-
 mobile/.flutter-plugins-dependencies
 mobile/.pub-cache/
 mobile/.pub/

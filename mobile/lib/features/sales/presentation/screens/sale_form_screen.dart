@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../data/sales_repository.dart';
@@ -28,6 +29,8 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   bool _loadingProducts = true;
 
   final _unitsController = TextEditingController();
+
+  bool get _isBulkProduct => _selectedProductCode == 'GRANEL';
 
   @override
   void initState() {
@@ -138,6 +141,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                               ],
                             ),
                             const Divider(height: 32),
+                            const SizedBox(height: 8),
 
                             if (_loadingProducts)
                               const Center(
@@ -161,21 +165,32 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                 },
                               ),
                             const SizedBox(height: 20),
-                            const Text(
-                              'Cantidad de Unidades',
-                              style: TextStyle(fontWeight: FontWeight.w500),
+                            Text(
+                              _isBulkProduct
+                                  ? 'Cantidad de Gas (m³)'
+                                  : 'Cantidad de Unidades',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _unitsController,
+                              style: const TextStyle(fontSize: 22),
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
                               inputFormatters: [AmountInputFormatter()],
-                              decoration: const InputDecoration(
-                                hintText: 'Ingresar Unidades',
-                                prefixIcon: Icon(Icons.propane_tank_outlined),
+                              decoration: InputDecoration(
+                                hintText: _isBulkProduct
+                                    ? 'Ingresar m³'
+                                    : 'Ingresar unidades',
+                                prefixIcon: const Icon(
+                                  Icons.propane_tank_outlined,
+                                  size: 24,
+                                ),
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
@@ -192,25 +207,29 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: AppSpacing.xxl),
 
-                            ElevatedButton(
-                              onPressed: _onNext,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryOrange,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+                            SizedBox(
+                              width: double.infinity,
+                              height: 60,
+                              child: ElevatedButton(
+                                onPressed: _onNext,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryOrange,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                'SIGUIENTE',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                child: const Text(
+                                  'SIGUIENTE',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),

@@ -4,9 +4,9 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-05-08
+Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** Corregida la unidad de medida de la cantidad de gas en la pantalla "Confirmar Operación" (`sale_review_content.dart`). Antes se mostraba siempre "m³"; ahora las garrafas y tubos se muestran en "kg" y el granel en "m³ / L" (ambas medidas separadas por barra inclinada, ya que según el proveedor puede requerirse una u otra; 1 m³ = 1000 L).
+> ✅ **Último cambio:** ajuste de consistencia operativa POS mobile (`mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): el resumen de cantidad ya no muestra `.0` cuando la cantidad es entera; por ejemplo, `2 unidades` en lugar de `2.0 unidades`, preservando decimales reales cuando existan.
 
 
 
@@ -88,7 +88,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Catálogo `GET /v1/products` | Implementado en `api/` |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
-| UI mobile de login, venta, review, status, historial (mock) | `mobile/` — UI presente; contrato/backend incompletos (ver P0) |
+| UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
 | `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |

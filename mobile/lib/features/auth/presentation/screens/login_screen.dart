@@ -105,20 +105,24 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               SizedBox(height: AppSpacing.xxl),
 
-                              ElevatedButton(
-                                onPressed: state is AuthLoading
-                                    ? null
-                                    : _handleLogin,
-                                child: state is AuthLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Text('INGRESAR'),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 60,
+                                child: ElevatedButton(
+                                  onPressed: state is AuthLoading
+                                      ? null
+                                      : _handleLogin,
+                                  child: state is AuthLoading
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text('INGRESAR'),
+                                ),
                               ),
                             ],
                           ),

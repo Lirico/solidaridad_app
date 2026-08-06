@@ -7,14 +7,12 @@ class CardFieldsContainer extends StatelessWidget {
   final TextEditingController cardNumberController;
   final TextEditingController expiryController;
   final TextEditingController cvvController;
-  final TextEditingController cardHolderController;
 
   const CardFieldsContainer({
     super.key,
     required this.cardNumberController,
     required this.expiryController,
     required this.cvvController,
-    required this.cardHolderController,
   });
 
   @override
@@ -126,27 +124,6 @@ class CardFieldsContainer extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-
-          // --- TITULAR DE LA TARJETA ---
-          TextFormField(
-            controller: cardHolderController,
-            textCapitalization: TextCapitalization
-                .characters, // Fuerza mayúsculas para estética bancaria
-            decoration: const InputDecoration(
-              hintText: 'Nombre del Titular',
-              prefixIcon: Icon(Icons.person_outline),
-            ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'El nombre del titular es obligatorio';
-              }
-              if (value.trim().split(' ').length < 2) {
-                return 'Ingrese nombre y apellido completo';
-              }
-              return null;
-            },
           ),
         ],
       ),

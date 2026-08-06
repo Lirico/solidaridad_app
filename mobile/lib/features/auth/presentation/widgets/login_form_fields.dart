@@ -17,41 +17,48 @@ class LoginFormFields extends StatefulWidget {
 }
 
 class _LoginFormFieldsState extends State<LoginFormFields> {
-  bool _obscurePassword = true; // Estado local para ocultar/mostrar contraseña
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Input de Usuario
-        const Text('Usuario o Correo', style: AppTextStyles.formLabel),
+        Text(
+          'Usuario o Correo',
+          style: AppTextStyles.formLabel.copyWith(fontSize: 16),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: widget.userInputController,
+          style: const TextStyle(fontSize: 22),
           keyboardType: TextInputType.emailAddress,
           validator: validateUsernameOrEmail,
           decoration: const InputDecoration(
             hintText: 'ejemplo@gas.com',
-            prefixIcon: Icon(Icons.person_outline),
+            prefixIcon: Icon(Icons.person_outline, size: 24),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // Input de Contraseña
-        const Text('Contraseña', style: AppTextStyles.formLabel),
+        Text(
+          'Contraseña',
+          style: AppTextStyles.formLabel.copyWith(fontSize: 16),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: widget.passwordInputController,
-          obscureText: _obscurePassword, // Oculta el texto dinámicamente
+          style: const TextStyle(fontSize: 22),
+          obscureText: _obscurePassword,
           decoration: InputDecoration(
             hintText: 'Ingrese su contraseña',
-            prefixIcon: const Icon(Icons.lock_outline),
+            prefixIcon: const Icon(Icons.lock_outline, size: 24),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscurePassword
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
+                size: 24,
               ),
               onPressed: () {
                 setState(() {

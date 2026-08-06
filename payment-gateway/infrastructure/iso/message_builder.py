@@ -30,13 +30,15 @@ def build_purchase_request(
         poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
         termid_41=command.terminal_id[:8].ljust(8),
         currcode_49=product_code_de49(command.product_code),
+        field_62=command.stan,
     )
-    bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 41, 49]
+    bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 41, 49, 62]
     if command.expiration_date:
         iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
         bits.append(14)
     set_present(iso, *bits)
     return iso
+
 
 
 def _pad_digits(value: str, width: int) -> str:

@@ -168,7 +168,10 @@ def test_build_purchase_request_sets_fields() -> None:
     assert iso.dateexpire_14 == "2912"
     assert iso.currcode_49 == "993"
     assert iso.termid_41 == "TERM0001"
+    assert iso.field_62 == "000001"
+    assert bitmap_get(iso.bitmap, 62)
     assert not bitmap_get(iso.bitmap, 42)
+
 
 
 def test_map_iso_response_approved() -> None:

@@ -4,9 +4,26 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-05-08
+Última revisión: 2026-06-08
 
-> ✅ **Último cambio:** Corregida la unidad de medida de la cantidad de gas en la pantalla "Confirmar Operación" (`sale_review_content.dart`). Antes se mostraba siempre "m³"; ahora las garrafas y tubos se muestran en "kg" y el granel en "m³ / L" (ambas medidas separadas por barra inclinada, ya que según el proveedor puede requerirse una u otra; 1 m³ = 1000 L).
+> ✅ **Último cambio (2026-06-08):** Lograda una **transacción aprobada (código 00)** de punta a punta (gateway → authkig → MySQL). El bloqueo era que el gateway **no enviaba el DE62 (`numero_comprobante`)**, y el autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como `numero_comprobante = %s` (sin comillas), generando un error de sintaxis SQL (`near 'AND tipo_mensaje = '0200'...'`). Se agregó `field_62` (con el STAN como valor) al `build_purchase_request()` en `payment-gateway/infrastructure/iso/message_builder.py` y el bit 62 al bitmap. Verificado en `sgas_cup` (id 4709112, `numero_comprobante=123456`, `procode=000000`, `nro_tarjeta=6063007014007401`, `tipo_mensaje=0200`). Ver G-P0-19.
+>
+> **Segundo bloqueo (código 17) resuelto:** al re-probar una segunda venta de la misma tarjeta/producto, el autorizador devolvía **17** porque `validaTiempoUltimaVenta()` rechaza ventas de la misma tarjeta/producto dentro de `venta_min_horas_ultima_venta` horas (default **72**). Se seteó `venta_min_horas_ultima_venta = 0` en `soli_config` (aplicado en vivo y agregado al `fix_demo.sql`). Verificado: segunda venta aprobada (id 4709113, `numero_comprobante=654321`).
+>
+> **Tercer bloqueo (saldo agotado) resuelto:** el autorizador calcula saldo disponible = `saldo_anterior - consumo_vivo` (suma de ventas en `sgas_cup`). Con saldo 2000 y 2 ventas de $100 (2000 unidades internas), `saldo_actual = 0` y la venta se rechaza. Se recargó la tarjeta `6063007014007401` a **20000** en `sgas_usuario_cta` (aplicado en vivo y agregado al `fix_demo.sql`). Verificado: flujo completo vía API (`POST /v1/transactions`) devuelve `APPROVED`/`Pago aprobado` (OP-260806-0002).
+>
+> **Nota de tarjeta:** la tarjeta de demo que aprueba en vivo es `6063007014007401` (Luhn-válida, con saldo 2000 en producto 993). El `fix_demo.sql` y G-P0-18 referencian `6063007014007403` (la original de Lillo, que **no** pasa Luhn); mantener `6063007014007401` como la tarjeta de referencia para el demo.
+>
+> **Cuarto bloqueo (rechazo desde el frontend, código 89) resuelto:** al probar la venta desde la app Flutter, el autorizador devolvía **89** (`valida_terminal() NUM_ROWS: 0` → `valida_operacion(): valida terminal = 89`). Causa raíz: el frontend usaba `installation_id: 'dev-term'` por defecto (`mobile/lib/features/auth/data/auth_repository.dart`), y ese terminal **no existe** en la tabla `terminales` del autorizador (solo existe `05000001`). Se cambió el default a `05000001`. Ver G-P0-08.
+>
+> **Recarga demo (2026-06-08):** se recargaron ambas tarjetas de prueba a **100000** en producto `993` y se extendió la vigencia de `6063007014007401` a **2028-12-30** (DE14 `1228`) vía `payment_processor/docker/mysql/recarga_demo.sql`. Verificado: `POST /v1/authorize` con `expiration_date=1228` devuelve `APPROVED`/`00` (auth_id 930886, `vencimiento=1228` en `sgas_cup`). Guía de reproducción: `docs/demo-transaccion-aprobada.md`.
+>
+> **Bug conocido (2026-06-08):** la tarjeta `4111111111111111` (VISA de prueba, saldo 100000) **cuelga el autorizador** en `calcula_saldo_vivo()` (bug del código C) y Docker reinicia el contenedor. **No usar para el demo.** Usar siempre `6063007014007401`.
+
+
+
+
+
 
 
 
@@ -35,7 +52,7 @@ Verifone (banda + térmica).
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
 | G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
-| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. Pendiente: lectura runtime desde config del device. |
+| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-06-08:** el default pasó de `dev-term` a `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (el terminal `dev-term` no existe en `terminales` del autorizador → código 89). Pendiente: lectura runtime desde config del device. |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases.md`. |
@@ -46,9 +63,13 @@ Verifone (banda + térmica).
 | G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | TC-067 (venta rechazada) mostró "Transacción Rechazada" con código 51 (Fondos Insuficientes) en Motorola ZY22FSJKKV. La app se compiló con `--dart-define=API_BASE_URL=http://192.168.0.4:8000/v1`. El problema de conexión del hallazgo #18 era específico del emulador (IP `10.0.2.2`). El ANR del hallazgo #17 tampoco se reproduce en dispositivo real. Ver hallazgo #21 en `docs/test_cases.md`. |
 
 | G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases.md`. |
+| G-P0-18 | Transacción de demo siempre rechazada por comercio inválido en autorizador | done | **Fix aplicado (2026-06-08):** el terminal `05000001` (installation_id de la app) tenía `cod_comercio='000000'` en `terminales`, que no existe en `sgas_comercio`, por lo que `valida_comercio()` rechazaba siempre (`COMER_DES_SUP`). Se corrigió a `012502` (GOBIERNO, `situacion='V'`). Además se dio saldo (2000) y recarga (4000) a la tarjeta `6063007014007403` (Lillo) en producto `993` para que `venta_cupon()` apruebe ventas de hasta $200. Cambios en seed `payment_processor/docker/mysql/02_seed.sql.gz` y script `payment_processor/docker/mysql/fix_demo.sql`. Requiere reconstruir la base (`make reset`) o aplicar `fix_demo.sql` en vivo. |
+| G-P0-19 | Gateway no enviaba DE62 (`numero_comprobante`) → error SQL en autorizador | done | **Fix aplicado (2026-06-08):** el gateway no empaquetaba el DE62, y el autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como `numero_comprobante = %s` (sin comillas), generando error de sintaxis SQL (`near 'AND tipo_mensaje = '0200'...'`) y respuesta 96. Se agregó `field_62` (valor = STAN) y el bit 62 al bitmap en `payment-gateway/infrastructure/iso/message_builder.py` (`build_purchase_request`). `make check` pasa (lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓). Verificado: `POST /v1/authorize` devuelve `APPROVED`/`00` y se registra en `sgas_cup` (id 4709112, `numero_comprobante=123456`, `procode=000000`, `nro_tarjeta=6063007014007401`, `tipo_mensaje=0200`). |
+
 
 
 ---
+
 
 ## P1 — Fase 0 / robustez incompleta
 

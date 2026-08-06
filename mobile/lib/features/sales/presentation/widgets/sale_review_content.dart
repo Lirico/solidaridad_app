@@ -58,7 +58,7 @@ class SaleReviewContent extends StatelessWidget {
 
         ReviewDataRow(
           icon: Icons.credit_card_outlined,
-          label: 'Tarjeta Destino',
+          label: 'Número de Tarjeta',
           value: state.cardNumber.isEmpty
               ? '•••• •••• •••• 4321'
               : state.cardNumber,

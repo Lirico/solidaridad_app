@@ -6,7 +6,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** ajuste acotado de tamaños y espaciado en login, nueva venta y confirmación de cobro POS mobile (`mobile/lib/features/auth/presentation/screens/login_screen.dart`, `mobile/lib/features/auth/presentation/widgets/login_form_fields.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`, `mobile/lib/features/sales/presentation/widgets/product_selector.dart`, `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): se mantuvo la composición visual existente y solo se ajustaron medidas operativas de inputs, selector y botones: labels 16 px, texto de input/selector 22 px, iconos 24 px, separación entre campos 16 px, botón principal full width de 60 px, loader de 24 px, separación previa de 40 px en la acción de nueva venta igual que en login, 8 px entre la línea divisoria y el primer control de venta, y separación fija intermedia de 56 px antes de confirmar cobro.
+> ✅ **Último cambio:** cierre de ajustes POS mobile (`mobile/lib/core/theme/app_theme.dart`, `mobile/lib/core/theme/app_colors.dart`, `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): se consolidaron tokens de tema para inputs, botones, appbar, estados y textos secundarios según medidas POS; además el resumen de confirmación muestra "Número de Tarjeta" y se ignora `/build/` raíz para no versionar reportes generados.
 
 
 

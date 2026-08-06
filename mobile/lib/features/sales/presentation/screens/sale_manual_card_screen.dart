@@ -18,14 +18,12 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
   final _cardNumberController = TextEditingController();
   final _expiryController = TextEditingController();
   final _cvvController = TextEditingController();
-  final _cardHolderController = TextEditingController();
 
   @override
   void dispose() {
     _cardNumberController.dispose();
     _expiryController.dispose();
     _cvvController.dispose();
-    _cardHolderController.dispose();
     super.dispose();
   }
 
@@ -39,7 +37,6 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
         productLabel: state.productLabel,
         amount: state.amount,
         cardNumber: _cardNumberController.text,
-        cardHolder: _cardHolderController.text,
         cvv: _cvvController.text,
         expirationDate: _expiryController.text.replaceAll('/', ''),
       );
@@ -72,7 +69,6 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
               cardNumberController: _cardNumberController,
               expiryController: _expiryController,
               cvvController: _cvvController,
-              cardHolderController: _cardHolderController,
               onContinue: _onContinue,
             ),
           ),

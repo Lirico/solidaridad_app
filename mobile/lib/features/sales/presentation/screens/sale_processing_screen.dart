@@ -52,7 +52,6 @@ class SaleProcessingScreen extends StatelessWidget {
     final String productLabel = salesState.productLabel;
     final double amount = salesState.amount;
     final String cardNumber = salesState.cardNumber;
-    final String cardHolder = salesState.cardHolder;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
@@ -141,15 +140,6 @@ class SaleProcessingScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
-                          if (cardHolder.isNotEmpty)
-                            Text(
-                              cardHolder.toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey,
-                              ),
-                            ),
                           const SizedBox(height: 32),
                         ],
 

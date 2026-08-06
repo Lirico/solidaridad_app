@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../cubit/sales_state.dart';
 import 'sale_review_widgets.dart';
 
@@ -14,19 +15,21 @@ class SaleReviewContent extends StatelessWidget {
 
   /// Formatea la cantidad de gas según el tipo de producto.
   ///
-  /// - Garrafas y tubos se expresan en kilogramos (kg).
-  /// - El granel se expresa en metros cúbicos (m³) y litros (L), ya que según
-  ///   el proveedor puede requerirse una u otra medida (1 m³ = 1000 L).
+  /// - Garrafas y tubos se expresan como unidades.
+  /// - El granel se expresa en metros cúbicos (m³).
   String _formatQuantity(SalesState state) {
-    final amount = state.amount;
+    final amount = _formatNumber(state.amount);
     if (state.productCode == 'GRANEL') {
-      return '$amount m³ / ${amount * 1000} L';
+      return '$amount m³';
     }
-    if (state.productCode.startsWith('GARRAFA') ||
-        state.productCode.startsWith('TUBO')) {
-      return '$amount kg';
+    return '$amount unidades';
+  }
+
+  String _formatNumber(double value) {
+    if (value == value.truncateToDouble()) {
+      return value.toInt().toString();
     }
-    return '$amount m³';
+    return value.toString();
   }
 
   @override
@@ -58,30 +61,34 @@ class SaleReviewContent extends StatelessWidget {
 
         ReviewDataRow(
           icon: Icons.credit_card_outlined,
-          label: 'Tarjeta Destino',
+          label: 'Número de Tarjeta',
           value: state.cardNumber.isEmpty
               ? '•••• •••• •••• 4321'
               : state.cardNumber,
         ),
-        const Spacer(),
+        const SizedBox(height: 56),
 
-        ElevatedButton(
-          onPressed: onConfirm,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFE67E22),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: ElevatedButton(
+            onPressed: onConfirm,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryOrange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 0,
             ),
-            elevation: 2,
-          ),
-          child: const Text(
-            'CONFIRMAR COBRO',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
+            child: const Text(
+              'CONFIRMAR COBRO',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
             ),
           ),
         ),

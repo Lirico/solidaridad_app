@@ -39,10 +39,14 @@ class _ProductSelectorState extends State<ProductSelector> {
     return DropdownButtonFormField<String>(
       initialValue: _selectedCode,
       isExpanded: true,
+      style: const TextStyle(color: Colors.black87, fontSize: 22),
       items: widget.products.map((product) {
         return DropdownMenuItem<String>(
           value: product.code,
-          child: Text(product.label),
+          child: Text(
+            product.label,
+            style: const TextStyle(fontSize: 22),
+          ),
         );
       }).toList(),
       onChanged: (code) {
@@ -55,7 +59,7 @@ class _ProductSelectorState extends State<ProductSelector> {
       },
       decoration: const InputDecoration(
         labelText: 'Producto / Especie',
-        prefixIcon: Icon(Icons.propane_tank_outlined),
+        prefixIcon: Icon(Icons.propane_tank_outlined, size: 24),
       ),
       selectedItemBuilder: (context) {
         return widget.products.map<Widget>((product) {
@@ -63,7 +67,7 @@ class _ProductSelectorState extends State<ProductSelector> {
             alignment: Alignment.centerLeft,
             child: Text(
               product.label,
-              style: const TextStyle(color: Colors.black87, fontSize: 14),
+              style: const TextStyle(color: Colors.black87, fontSize: 22),
             ),
           );
         }).toList();

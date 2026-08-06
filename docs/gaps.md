@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-06-08
+Última revisión: 2026-08-06
 
 > ✅ **Último cambio (2026-06-08):** Lograda una **transacción aprobada (código 00)** de punta a punta (gateway → authkig → MySQL). El bloqueo era que el gateway **no enviaba el DE62 (`numero_comprobante`)**, y el autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como `numero_comprobante = %s` (sin comillas), generando un error de sintaxis SQL (`near 'AND tipo_mensaje = '0200'...'`). Se agregó `field_62` (con el STAN como valor) al `build_purchase_request()` en `payment-gateway/infrastructure/iso/message_builder.py` y el bit 62 al bitmap. Verificado en `sgas_cup` (id 4709112, `numero_comprobante=123456`, `procode=000000`, `nro_tarjeta=6063007014007401`, `tipo_mensaje=0200`). Ver G-P0-19.
 >
@@ -19,13 +19,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > **Recarga demo (2026-06-08):** se recargaron ambas tarjetas de prueba a **100000** en producto `993` y se extendió la vigencia de `6063007014007401` a **2028-12-30** (DE14 `1228`) vía `payment_processor/docker/mysql/recarga_demo.sql`. Verificado: `POST /v1/authorize` con `expiration_date=1228` devuelve `APPROVED`/`00` (auth_id 930886, `vencimiento=1228` en `sgas_cup`). Guía de reproducción: `docs/demo-transaccion-aprobada.md`.
 >
 > **Bug conocido (2026-06-08):** la tarjeta `4111111111111111` (VISA de prueba, saldo 100000) **cuelga el autorizador** en `calcula_saldo_vivo()` (bug del código C) y Docker reinicia el contenedor. **No usar para el demo.** Usar siempre `6063007014007401`.
-
-
-
-
-
-
-
+>
+> **Ajuste de consistencia operativa POS mobile (2026-08-06):** `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart` — el resumen de cantidad ya no muestra `.0` cuando la cantidad es entera; por ejemplo, `2 unidades` en lugar de `2.0 unidades`, preservando decimales reales cuando existan.
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -109,7 +104,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Catálogo `GET /v1/products` | Implementado en `api/` |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
-| UI mobile de login, venta, review, status, historial (mock) | `mobile/` — UI presente; contrato/backend incompletos (ver P0) |
+| UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
 | `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |

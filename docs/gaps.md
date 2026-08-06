@@ -6,7 +6,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** UX de inputs en mobile (`mobile/lib/core/theme/app_theme.dart`): se definieron `focusedBorder` y `focusedErrorBorder` en naranja (`AppColors.primaryOrange`, ancho 2) y `errorBorder` en rojo (`#D32F2F`). Antes, los campos con error pendiente se ponían rojos apenas se los enfocaba (Flutter usaba el `focusedErrorBorder` por defecto sin definir). Ahora el borde es naranja mientras el campo está enfocado y rojo solo cuando pierde el foco con error.
+> ✅ **Último cambio:** ajuste acotado de tamaños y espaciado en login, nueva venta y confirmación de cobro POS mobile (`mobile/lib/features/auth/presentation/screens/login_screen.dart`, `mobile/lib/features/auth/presentation/widgets/login_form_fields.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`, `mobile/lib/features/sales/presentation/widgets/product_selector.dart`, `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): se mantuvo la composición visual existente y solo se ajustaron medidas operativas de inputs, selector y botones: labels 16 px, texto de input/selector 22 px, iconos 24 px, separación entre campos 16 px, botón principal full width de 60 px, loader de 24 px, separación previa de 40 px en la acción de nueva venta igual que en login, 8 px entre la línea divisoria y el primer control de venta, y separación fija intermedia de 56 px antes de confirmar cobro.
 
 
 
@@ -88,7 +88,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Catálogo `GET /v1/products` | Implementado en `api/` |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
-| UI mobile de login, venta, review, status, historial (mock) | `mobile/` — UI presente; contrato/backend incompletos (ver P0) |
+| UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
 | `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |

@@ -18,11 +18,18 @@ class SaleReviewContent extends StatelessWidget {
   /// - Garrafas y tubos se expresan como unidades.
   /// - El granel se expresa en metros cúbicos (m³).
   String _formatQuantity(SalesState state) {
-    final amount = state.amount;
+    final amount = _formatNumber(state.amount);
     if (state.productCode == 'GRANEL') {
       return '$amount m³';
     }
     return '$amount unidades';
+  }
+
+  String _formatNumber(double value) {
+    if (value == value.truncateToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toString();
   }
 
   @override

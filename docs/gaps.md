@@ -6,7 +6,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** ajuste de consistencia operativa POS mobile (`mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_manual_card_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_processing_screen.dart`, `mobile/lib/features/sales/presentation/widgets/card_fields_container.dart`, `mobile/lib/features/sales/presentation/widgets/manual_card_content.dart`, `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): el input y el resumen de cantidad muestran unidades para garrafas/tubos y m³ solo cuando el producto seleccionado es granel. En ingreso manual se eliminó el campo "Nombre del Titular" de la vista y del flujo que prepara la venta, por lo que no se captura ni se propaga hacia la operación. Además, el botón "CONFIRMAR COBRO" usa `AppColors.primaryOrange`, igual que la acción "SIGUIENTE", manteniendo altura 60 px, radio 10 px, texto 20 px y padding horizontal 24 px.
+> ✅ **Último cambio:** ajuste de consistencia operativa POS mobile (`mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): el resumen de cantidad ya no muestra `.0` cuando la cantidad es entera; por ejemplo, `2 unidades` en lugar de `2.0 unidades`, preservando decimales reales cuando existan.
 
 
 

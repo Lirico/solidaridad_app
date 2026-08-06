@@ -4,9 +4,9 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-05-08
+Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** Corregida la unidad de medida de la cantidad de gas en la pantalla "Confirmar Operación" (`sale_review_content.dart`). Antes se mostraba siempre "m³"; ahora las garrafas y tubos se muestran en "kg" y el granel en "m³ / L" (ambas medidas separadas por barra inclinada, ya que según el proveedor puede requerirse una u otra; 1 m³ = 1000 L).
+> ✅ **Último cambio:** UX de inputs en mobile (`mobile/lib/core/theme/app_theme.dart`): se definieron `focusedBorder` y `focusedErrorBorder` en naranja (`AppColors.primaryOrange`, ancho 2) y `errorBorder` en rojo (`#D32F2F`). Antes, los campos con error pendiente se ponían rojos apenas se los enfocaba (Flutter usaba el `focusedErrorBorder` por defecto sin definir). Ahora el borde es naranja mientras el campo está enfocado y rojo solo cuando pierde el foco con error.
 
 
 

@@ -20,6 +20,18 @@ final ThemeData appTheme = ThemeData(
       borderRadius: BorderRadius.circular(8.0),
       borderSide: const BorderSide(color: AppColors.inputBorderEnabled),
     ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8.0),
+      borderSide: const BorderSide(color: AppColors.primaryOrange, width: 2),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8.0),
+      borderSide: const BorderSide(color: AppColors.primaryOrange, width: 2),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8.0),
+      borderSide: const BorderSide(color: Color(0xFFD32F2F)),
+    ),
     filled: true,
     fillColor: AppColors.cardBackground,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

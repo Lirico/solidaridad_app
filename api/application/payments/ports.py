@@ -19,7 +19,9 @@ class AuthorizeRequest:
     card_number: str
     terminal_id: str
     stan: str
+    transaction_number: str
     expiration_date: str | None = None
+
 
 
 @dataclass(frozen=True, slots=True)

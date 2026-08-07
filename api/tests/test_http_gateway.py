@@ -11,8 +11,10 @@ def _request() -> AuthorizeRequest:
         card_number="4111111111111111",
         terminal_id="05000001",
         stan="000001",
+        transaction_number="OP-260716-0001",
         expiration_date="2912",
     )
+
 
 
 def _gateway(handler: object) -> HttpPaymentGateway:

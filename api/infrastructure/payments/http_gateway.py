@@ -35,7 +35,9 @@ class HttpPaymentGateway:
             "card_number": request.card_number,
             "terminal_id": request.terminal_id,
             "stan": request.stan,
+            "transaction_number": request.transaction_number,
         }
+
         if request.expiration_date is not None:
             payload["expiration_date"] = request.expiration_date
 

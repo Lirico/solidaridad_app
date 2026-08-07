@@ -193,9 +193,11 @@ class CreateTransaction:
                 card_number=pan,
                 terminal_id=terminal_id[:8].ljust(8),
                 stan=stan,
+                transaction_number=transaction_number,
                 expiration_date=exp,
             )
         )
+
         final = self._apply_gateway_result(pending.id, gateway_result)
         self._session.commit()
         return CreateTransactionResult(

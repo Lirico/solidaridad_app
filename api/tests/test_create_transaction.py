@@ -109,9 +109,12 @@ def test_create_approves() -> None:
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
     transactions.update_result.assert_called_once()
+    sent = gateway.authorize.call_args.args[0]
+    assert sent.transaction_number == "OP-260716-0001"
 
 
 def test_missing_idempotency_key() -> None:
+
     use_case, *_ = _build()
     with pytest.raises(MissingIdempotencyKey):
         use_case.execute(

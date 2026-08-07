@@ -15,6 +15,7 @@ from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.create_transaction import CreateTransaction
 from application.payments.list_transactions import ListTransactions
+from application.payments.void_transaction import VoidTransaction
 from config import Settings, get_settings
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
@@ -104,6 +105,17 @@ def get_create_transaction(
         session=db,
         transactions=TransactionRepository(db),
         installations=InstallationRepository(db),
+        gateway=gateway,
+    )
+
+
+def get_void_transaction(
+    db: Annotated[Session, Depends(get_db)],
+    gateway: Annotated[HttpPaymentGateway, Depends(get_payment_gateway)],
+) -> VoidTransaction:
+    return VoidTransaction(
+        session=db,
+        transactions=TransactionRepository(db),
         gateway=gateway,
     )
 

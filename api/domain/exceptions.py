@@ -100,3 +100,30 @@ class MissingTerminalId(DomainError):
         message: str = "La instalación no tiene terminal configurada",
     ) -> None:
         super().__init__(message)
+
+
+class TransactionNotFound(DomainError):
+    """Raised when a transaction_number does not exist for the terminal."""
+
+    def __init__(self, message: str = "Transacción no encontrada") -> None:
+        super().__init__(message)
+
+
+class TransactionNotVoidable(DomainError):
+    """Raised when the transaction cannot be voided in its current status."""
+
+    def __init__(
+        self,
+        message: str = "Solo se pueden anular transacciones aprobadas",
+    ) -> None:
+        super().__init__(message)
+
+
+class CardMismatch(DomainError):
+    """Raised when the re-entered card does not match the original sale."""
+
+    def __init__(
+        self,
+        message: str = "La tarjeta no coincide con la de la venta original",
+    ) -> None:
+        super().__init__(message)

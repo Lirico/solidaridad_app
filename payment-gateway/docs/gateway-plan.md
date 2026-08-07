@@ -62,7 +62,11 @@ Response 200:
 ```
 
 - Errores de validación → 400 `{ "message": "..." }`
-- Procesador caído → 502
+- No se pudo conectar con el procesador (el ISO nunca salió) → 503
+- Falla después de enviar el ISO (timeout de lectura, conexión cortada) → 502
+
+La distinción 503 / 502 es parte del contrato: la API traduce 503 a `FAILED`
+(sin impacto posible) y 502 a `UNKNOWN` (resultado ambiguo).
 
 ## Transportes
 

@@ -8,7 +8,7 @@ from domain.authorization import (
     AuthorizationStatus,
     AuthorizeCommand,
 )
-from domain.exceptions import ProcessorUnavailable
+from domain.exceptions import ProcessorUnavailable, ProcessorUnreachable
 from infrastructure.iso.mock_processor import MockIsoProcessor
 from main import app
 from presentation.dependencies import (
@@ -103,6 +103,21 @@ def test_authorize_http_processor_unavailable() -> None:
         app.dependency_overrides.clear()
 
 
+def test_authorize_http_processor_unreachable() -> None:
+    use_case = MagicMock()
+    use_case.execute.side_effect = ProcessorUnreachable()
+    app.dependency_overrides[get_authorize_payment] = lambda: use_case
+    try:
+        response = client.post("/v1/authorize", json=_payload())
+        assert response.status_code == 503
+        assert (
+            response.json()["message"]
+            == "No se pudo conectar con el procesador de pagos"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_authorize_http_generic_domain_error() -> None:
     from domain.exceptions import IsoPackError
 
@@ -175,6 +190,17 @@ def test_void_http_processor_unavailable() -> None:
     try:
         response = client.post("/v1/void", json=_void_payload())
         assert response.status_code == 502
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_void_http_processor_unreachable() -> None:
+    use_case = MagicMock()
+    use_case.execute.side_effect = ProcessorUnreachable()
+    app.dependency_overrides[get_void_payment] = lambda: use_case
+    try:
+        response = client.post("/v1/void", json=_void_payload())
+        assert response.status_code == 503
     finally:
         app.dependency_overrides.clear()
 

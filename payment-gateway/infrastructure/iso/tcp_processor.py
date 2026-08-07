@@ -9,7 +9,11 @@ from domain.authorization import (
     AuthorizeCommand,
     VoidCommand,
 )
-from domain.exceptions import IsoPackError, ProcessorUnavailable
+from domain.exceptions import (
+    IsoPackError,
+    ProcessorUnavailable,
+    ProcessorUnreachable,
+)
 from infrastructure.iso.message_builder import (
     build_purchase_request,
     build_void_request,
@@ -57,7 +61,15 @@ class TcpIsoProcessor:
         connect_timeout = self._settings.iso_connect_timeout_seconds
         read_timeout = self._settings.iso_read_timeout_seconds
 
-        with socket.create_connection((host, port), timeout=connect_timeout) as sock:
+        try:
+            connection = socket.create_connection(
+                (host, port),
+                timeout=connect_timeout,
+            )
+        except (TimeoutError, OSError, ConnectionError) as exc:
+            raise ProcessorUnreachable() from exc
+
+        with connection as sock:
             sock.settimeout(read_timeout)
             sock.sendall(frame)
             header = _recv_exact(sock, 2)

@@ -15,6 +15,7 @@ from domain.exceptions import (
     InvalidTerminalId,
     InvalidTicket,
     ProcessorUnavailable,
+    ProcessorUnreachable,
     UnsupportedProduct,
 )
 from presentation.dependencies import get_authorize_payment
@@ -37,10 +38,20 @@ router = APIRouter()
             },
         },
         status.HTTP_502_BAD_GATEWAY: {
-            "description": "Processor unavailable",
+            "description": "Ambiguous processor failure (message may have arrived)",
             "content": {
                 "application/json": {
                     "example": {"message": "Procesador de pagos no disponible"}
+                }
+            },
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "Processor unreachable (message never sent)",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "No se pudo conectar con el procesador de pagos"
+                    }
                 }
             },
         },
@@ -71,6 +82,11 @@ def authorize(
     ) as exc:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": str(exc)},
+        )
+    except ProcessorUnreachable as exc:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"message": str(exc)},
         )
     except ProcessorUnavailable as exc:

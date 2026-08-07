@@ -6,7 +6,9 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** `GET /v1/products` exige `Authorization: Bearer` (mismo `get_current_user` que transacciones) y además informa `unit` con textos `singular`/`plural` (`unidad`/`unidades` o `m3`/`m3`).
+> ✅ **Último cambio:** se eliminó la validación Luhn de API y gateway porque
+> las tarjetas del programa usan el dígito verificador MOD-TDF del procesador.
+> Ambas capas mantienen validación de PAN numérico y longitud de 13–19 dígitos.
 
 
 
@@ -87,6 +89,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
 | Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
+| Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
 | `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |

@@ -60,7 +60,7 @@ def test_authorize_http_declined_mock() -> None:
 def test_authorize_http_invalid_pan() -> None:
     response = client.post(
         "/v1/authorize",
-        json=_payload(card_number="4111111111111112"),
+        json=_payload(card_number="606300101400740X"),
     )
     assert response.status_code == 400
     assert "message" in response.json()

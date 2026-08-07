@@ -59,7 +59,7 @@ class InvalidAmount(DomainError):
 
 
 class InvalidCardNumber(DomainError):
-    """Raised when the PAN fails basic format/Luhn checks."""
+    """Raised when the PAN fails basic format checks."""
 
     def __init__(self, message: str = "Número de tarjeta inválido") -> None:
         super().__init__(message)

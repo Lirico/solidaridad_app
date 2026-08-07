@@ -51,7 +51,6 @@ def _build(
     existing: Transaction | None = None,
     gateway_result: AuthorizeResult | None = None,
     installation_code: str | None = "05000001",
-    luhn_check_enabled: bool = True,
 ) -> tuple[CreateTransaction, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
@@ -88,7 +87,6 @@ def _build(
         transactions=transactions,
         installations=installations,
         gateway=gateway,
-        luhn_check_enabled=luhn_check_enabled,
     )
     return use_case, transactions, installations, gateway
 
@@ -134,22 +132,20 @@ def test_invalid_pan() -> None:
             idempotency_key="k1",
             product="GARRAFA_10",
             amount="1.50",
-            card_number="4111111111111112",
+            card_number="606300101400740X",
             cvv="123",
         )
 
 
-def test_invalid_pan_accepted_when_luhn_disabled() -> None:
-    # PAN 4111111111111112 no pasa el checksum de Luhn, pero con
-    # luhn_check_enabled=False la validación se omite y la transacción continúa.
-    use_case, transactions, _, gateway = _build(luhn_check_enabled=False)
+def test_processor_pan_without_luhn_is_accepted() -> None:
+    use_case, transactions, _, gateway = _build()
     result = use_case.execute(
         user_id=1,
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
         amount="1.50",
-        card_number="4111111111111112",
+        card_number="6063001014007403",
         cvv="123",
     )
     assert result.http_status == CreateTransactionHttpStatus.CREATED

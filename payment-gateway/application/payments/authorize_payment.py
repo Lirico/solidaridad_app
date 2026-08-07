@@ -11,19 +11,6 @@ from domain.exceptions import (
 from domain.product import product_code_de49
 
 
-def _luhn_ok(pan: str) -> bool:
-    digits = [int(c) for c in pan]
-    checksum = 0
-    parity = len(digits) % 2
-    for i, d in enumerate(digits):
-        if i % 2 == parity:
-            d *= 2
-            if d > 9:
-                d -= 9
-        checksum += d
-    return checksum % 10 == 0
-
-
 class AuthorizePayment:
     def __init__(self, processor: IsoProcessor) -> None:
         self._processor = processor
@@ -32,7 +19,7 @@ class AuthorizePayment:
         if command.amount_minor <= 0:
             raise InvalidAmount()
         pan = command.card_number.strip()
-        if not pan.isdigit() or not (13 <= len(pan) <= 19) or not _luhn_ok(pan):
+        if not pan.isdigit() or not (13 <= len(pan) <= 19):
             raise InvalidCardNumber()
         product_code_de49(command.product_code)
         if not command.terminal_id.strip():

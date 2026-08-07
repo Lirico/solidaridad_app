@@ -109,6 +109,8 @@ claridad operativa.
 ### 2.4 Procesador existente (on-premises)
 
 - Sigue siendo responsable de validación de tarjeta, saldo y autorización.
+- El PAN del programa usa el dígito verificador MOD-TDF del procesador; la API
+  y el gateway validan formato (solo dígitos y longitud), pero no aplican Luhn.
 - Valida que la terminal esté dada de alta/vigente.
 - La app y la API no acceden a bases internas de usuarios/tarjetas en este MVP.
 - Altas de comercios, usuarios y terminales: provisión desde central sobre

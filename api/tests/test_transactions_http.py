@@ -12,7 +12,17 @@ from application.payments.list_transactions import (
     ListTransactions,
     ListTransactionsResult,
 )
-from domain.exceptions import IdempotencyConflict, InvalidCardNumber
+from application.payments.void_transaction import (
+    VoidTransaction,
+    VoidTransactionHttpStatus,
+    VoidTransactionResult,
+)
+from domain.exceptions import (
+    CardMismatch,
+    IdempotencyConflict,
+    InvalidCardNumber,
+    TransactionNotFound,
+)
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -22,6 +32,7 @@ from presentation.dependencies import (
     get_create_transaction,
     get_current_user,
     get_list_transactions,
+    get_void_transaction,
 )
 
 client = TestClient(app)
@@ -30,7 +41,7 @@ client = TestClient(app)
 def _tx(**overrides: object) -> Transaction:
     base = dict(
         id=1,
-        transaction_number="OP-260716-0001",
+        transaction_number="OP-260716-00000001",
         user_id=1,
         installation_id=1,
         terminal_id="05000001",
@@ -104,7 +115,7 @@ def test_create_transaction_201() -> None:
 
     assert response.status_code == 201
     data = response.json()
-    assert data["transaction_number"] == "OP-260716-0001"
+    assert data["transaction_number"] == "OP-260716-00000001"
     assert data["status"] == "APPROVED"
     assert data["user_message"] == "Pago aprobado"
     assert "card_number" not in data
@@ -185,7 +196,7 @@ def test_list_transactions_200() -> None:
     assert data["total"] == 1
     assert len(data["items"]) == 1
     item = data["items"][0]
-    assert item["transaction_number"] == "OP-260716-0001"
+    assert item["transaction_number"] == "OP-260716-00000001"
     assert item["product"] == "GARRAFA_10"
     assert item["amount"] == "1.5"
     assert item["card_last4"] == "1111"
@@ -249,3 +260,75 @@ def test_create_transaction_idempotency_conflict() -> None:
     finally:
         _clear()
     assert response.status_code == 409
+
+
+def test_void_transaction_200() -> None:
+    use_case = MagicMock(spec=VoidTransaction)
+    use_case.execute.return_value = VoidTransactionResult(
+        transaction=_tx(
+            status=TransactionStatus.VOIDED,
+            user_message="Anulación aprobada",
+        ),
+        http_status=VoidTransactionHttpStatus.OK,
+        user_message="Anulación aprobada",
+    )
+    app.dependency_overrides[get_void_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.post(
+            "/v1/transactions/OP-260716-00000001/void",
+            json={"card_number": "4111111111111111"},
+            headers={"Idempotency-Key": "void-1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "VOIDED"
+    assert data["user_message"] == "Anulación aprobada"
+    use_case.execute.assert_called_once()
+
+
+def test_void_transaction_404() -> None:
+    use_case = MagicMock(spec=VoidTransaction)
+    use_case.execute.side_effect = TransactionNotFound()
+    app.dependency_overrides[get_void_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.post(
+            "/v1/transactions/OP-260716-99999999/void",
+            json={"card_number": "4111111111111111"},
+            headers={"Idempotency-Key": "void-1"},
+        )
+    finally:
+        _clear()
+    assert response.status_code == 404
+
+
+def test_void_transaction_card_mismatch_400() -> None:
+    use_case = MagicMock(spec=VoidTransaction)
+    use_case.execute.side_effect = CardMismatch()
+    app.dependency_overrides[get_void_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.post(
+            "/v1/transactions/OP-260716-00000001/void",
+            json={"card_number": "4111111111119999"},
+            headers={"Idempotency-Key": "void-1"},
+        )
+    finally:
+        _clear()
+    assert response.status_code == 400

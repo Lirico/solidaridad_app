@@ -7,10 +7,18 @@ from domain.authorization import (
     AuthorizationResult,
     AuthorizationStatus,
     AuthorizeCommand,
+    VoidCommand,
 )
-from domain.exceptions import IsoPackError, ProcessorUnavailable
-from infrastructure.iso.message_builder import build_purchase_request
-from infrastructure.iso.packer import pack_iso, unpack_iso
+from domain.exceptions import (
+    IsoPackError,
+    ProcessorUnavailable,
+    ProcessorUnreachable,
+)
+from infrastructure.iso.message_builder import (
+    build_purchase_request,
+    build_void_request,
+)
+from infrastructure.iso.packer import IsoMessage, pack_iso, unpack_iso
 from infrastructure.iso.response_mapper import map_iso_response
 
 
@@ -20,6 +28,13 @@ class TcpIsoProcessor:
 
     def authorize(self, command: AuthorizeCommand) -> AuthorizationResult:
         request = build_purchase_request(command, self._settings)
+        return self._send(request)
+
+    def void(self, command: VoidCommand) -> AuthorizationResult:
+        request = build_void_request(command, self._settings)
+        return self._send(request)
+
+    def _send(self, request: IsoMessage) -> AuthorizationResult:
         try:
             frame = pack_iso(request)
         except (ValueError, UnicodeEncodeError) as exc:
@@ -46,7 +61,15 @@ class TcpIsoProcessor:
         connect_timeout = self._settings.iso_connect_timeout_seconds
         read_timeout = self._settings.iso_read_timeout_seconds
 
-        with socket.create_connection((host, port), timeout=connect_timeout) as sock:
+        try:
+            connection = socket.create_connection(
+                (host, port),
+                timeout=connect_timeout,
+            )
+        except (TimeoutError, OSError, ConnectionError) as exc:
+            raise ProcessorUnreachable() from exc
+
+        with connection as sock:
             sock.settimeout(read_timeout)
             sock.sendall(frame)
             header = _recv_exact(sock, 2)

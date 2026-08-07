@@ -23,7 +23,7 @@ from domain.transaction_status import TransactionStatus
 def _tx(**overrides: object) -> Transaction:
     base = dict(
         id=1,
-        transaction_number="OP-260716-0001",
+        transaction_number="OP-260716-00000001",
         user_id=1,
         installation_id=10,
         terminal_id="05000001",
@@ -51,7 +51,6 @@ def _build(
     existing: Transaction | None = None,
     gateway_result: AuthorizeResult | None = None,
     installation_code: str | None = "05000001",
-    luhn_check_enabled: bool = True,
 ) -> tuple[CreateTransaction, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
@@ -70,7 +69,7 @@ def _build(
         if installation_code is not None
         else None
     )
-    transactions.next_transaction_number.return_value = "OP-260716-0001"
+    transactions.next_transaction_number.return_value = "OP-260716-00000001"
     pending = _tx(status=TransactionStatus.PENDING, user_message="pending")
     # fingerprint filled by use case after create; for create path we stub update
     transactions.create_pending.return_value = pending
@@ -88,7 +87,6 @@ def _build(
         transactions=transactions,
         installations=installations,
         gateway=gateway,
-        luhn_check_enabled=luhn_check_enabled,
     )
     return use_case, transactions, installations, gateway
 
@@ -108,9 +106,12 @@ def test_create_approves() -> None:
     assert result.http_status == CreateTransactionHttpStatus.CREATED
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
+    auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.ticket_number == "00000001"
+    transactions.create_pending.assert_called_once()
+    create_kwargs = transactions.create_pending.call_args.kwargs
+    assert create_kwargs["processor_ticket"] == "00000001"
     transactions.update_result.assert_called_once()
-    sent = gateway.authorize.call_args.args[0]
-    assert sent.transaction_number == "OP-260716-0001"
 
 
 def test_missing_idempotency_key() -> None:
@@ -137,22 +138,20 @@ def test_invalid_pan() -> None:
             idempotency_key="k1",
             product="GARRAFA_10",
             amount="1.50",
-            card_number="4111111111111112",
+            card_number="606300101400740X",
             cvv="123",
         )
 
 
-def test_invalid_pan_accepted_when_luhn_disabled() -> None:
-    # PAN 4111111111111112 no pasa el checksum de Luhn, pero con
-    # luhn_check_enabled=False la validación se omite y la transacción continúa.
-    use_case, transactions, _, gateway = _build(luhn_check_enabled=False)
+def test_processor_pan_without_luhn_is_accepted() -> None:
+    use_case, transactions, _, gateway = _build()
     result = use_case.execute(
         user_id=1,
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
         amount="1.50",
-        card_number="4111111111111112",
+        card_number="6063001014007403",
         cvv="123",
     )
     assert result.http_status == CreateTransactionHttpStatus.CREATED
@@ -201,6 +200,9 @@ def test_replay_pending_returns_202() -> None:
     assert result.transaction.status == TransactionStatus.PENDING
     gateway.authorize.assert_not_called()
     transactions.create_pending.assert_not_called()
+    transactions.record_idempotent_hit.assert_called_once()
+    session = use_case._session
+    session.commit.assert_called()
 
 
 def test_replay_approved_returns_201_without_gateway() -> None:
@@ -213,7 +215,7 @@ def test_replay_approved_returns_201_without_gateway() -> None:
         expiration_date=None,
     )
     existing = _tx(status=TransactionStatus.APPROVED, request_fingerprint=fp)
-    use_case, _, _, gateway = _build(existing=existing)
+    use_case, transactions, _, gateway = _build(existing=existing)
     result = use_case.execute(
         user_id=existing.user_id,
         installation_id="inst-1",
@@ -226,6 +228,14 @@ def test_replay_approved_returns_201_without_gateway() -> None:
     assert result.http_status == CreateTransactionHttpStatus.CREATED
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_not_called()
+    transactions.record_idempotent_hit.assert_called_once_with(
+        transaction_id=existing.id,
+        status=TransactionStatus.APPROVED,
+        actor_user_id=existing.user_id,
+        idempotency_key="key-1",
+        user_message=existing.user_message,
+        processor_response_code=existing.processor_response_code,
+    )
 
 
 def test_replay_conflict_on_different_body() -> None:

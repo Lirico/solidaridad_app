@@ -19,9 +19,20 @@ class AuthorizeRequest:
     card_number: str
     terminal_id: str
     stan: str
-    transaction_number: str
+    ticket_number: str
     expiration_date: str | None = None
 
+
+@dataclass(frozen=True, slots=True)
+class VoidRequest:
+    product_code: str
+    amount_minor: int
+    card_number: str
+    terminal_id: str
+    stan: str
+    original_ticket: str
+    void_ticket: str
+    expiration_date: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,3 +46,5 @@ class AuthorizeResult:
 
 class PaymentGateway(Protocol):
     def authorize(self, request: AuthorizeRequest) -> AuthorizeResult: ...
+
+    def void(self, request: VoidRequest) -> AuthorizeResult: ...

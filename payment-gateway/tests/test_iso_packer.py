@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from config.settings import Settings
-from domain.authorization import AuthorizationStatus, AuthorizeCommand
+from domain.authorization import AuthorizationStatus, AuthorizeCommand, VoidCommand
 from domain.exceptions import IsoPackError
 from infrastructure.iso.codec import (
     asc_to_bcd,
@@ -14,7 +14,10 @@ from infrastructure.iso.codec import (
     longitude_to_int_bcd,
     longitude_to_int_hex,
 )
-from infrastructure.iso.message_builder import build_purchase_request
+from infrastructure.iso.message_builder import (
+    build_purchase_request,
+    build_void_request,
+)
 from infrastructure.iso.packer import IsoMessage, pack_iso, set_present, unpack_iso
 from infrastructure.iso.response_mapper import map_iso_response
 
@@ -154,10 +157,9 @@ def test_build_purchase_request_sets_fields() -> None:
         card_number="4111111111111111",
         terminal_id="TERM0001",
         stan="000001",
-        transaction_number="OP-260716-0001",
+        ticket_number="00000042",
         expiration_date="2912",
     )
-
     iso = build_purchase_request(
         cmd,
         settings,
@@ -170,11 +172,38 @@ def test_build_purchase_request_sets_fields() -> None:
     assert iso.dateexpire_14 == "2912"
     assert iso.currcode_49 == "993"
     assert iso.termid_41 == "TERM0001"
-    assert iso.field_62 == "0001"
+    assert iso.field_62 == "00000042"
     assert bitmap_get(iso.bitmap, 62)
-
     assert not bitmap_get(iso.bitmap, 42)
 
+
+def test_build_void_request_sets_fields() -> None:
+    settings = Settings()
+    cmd = VoidCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="4111111111111111",
+        terminal_id="TERM0001",
+        stan="654321",
+        original_ticket="00000042",
+        void_ticket="654321",
+        expiration_date="2912",
+    )
+    iso = build_void_request(
+        cmd,
+        settings,
+        now=datetime(2026, 7, 16, 12, 15, 30),
+    )
+    assert iso.mtype == "0200"
+    assert iso.procode_3 == "020000"
+    assert iso.amount_4 == "000000150050"
+    assert iso.field_60 == "000000150050"
+    assert iso.retrefnum_37 == "000000000042"
+    assert iso.field_62 == "654321"
+    assert iso.systracenum_11 == "654321"
+    assert bitmap_get(iso.bitmap, 37)
+    assert bitmap_get(iso.bitmap, 60)
+    assert bitmap_get(iso.bitmap, 62)
 
 
 def test_map_iso_response_approved() -> None:

@@ -20,6 +20,12 @@ MSG_UNKNOWN = (
     "No pudimos confirmar el pago. No vuelva a intentarlo; consulte la operación."
 )
 MSG_DECLINED_DEFAULT = "Pago rechazado"
+MSG_VOIDED = "Anulación aprobada"
+MSG_VOID_DECLINED = "Anulación rechazada"
+MSG_VOID_UNKNOWN = (
+    "No pudimos confirmar la anulación. Consulte el estado de la operación."
+)
+MSG_VOID_FAILED = "No se pudo anular. Intente nuevamente."
 
 
 def message_for_code(response_code: str | None, *, approved: bool) -> str:

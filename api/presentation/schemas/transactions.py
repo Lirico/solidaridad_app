@@ -14,6 +14,12 @@ class CreateTransactionRequest(BaseModel):
     expiration_date: str | None = Field(default=None, max_length=4)
 
 
+class VoidTransactionRequest(BaseModel):
+    card_number: str = Field(min_length=13, max_length=19)
+    cvv: str | None = Field(default=None, min_length=3, max_length=4)
+    expiration_date: str | None = Field(default=None, max_length=4)
+
+
 class TransactionResponse(BaseModel):
     transaction_number: str
     status: str

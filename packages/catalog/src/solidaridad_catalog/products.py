@@ -23,19 +23,54 @@ class ProcessorCode(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class ProductUnit:
+    singular: str
+    plural: str
+
+
+@dataclass(frozen=True, slots=True)
 class ProductInfo:
     code: Product
     processor_code: ProcessorCode
     label: str
+    unit: ProductUnit
     active: bool = True
 
 
+_UNIT = ProductUnit(singular="unidad", plural="unidades")
+_CUBIC_METER = ProductUnit(singular="m3", plural="m3")
+
 _CATALOG: tuple[ProductInfo, ...] = (
-    ProductInfo(Product.GARRAFA_10, ProcessorCode.CODE_993, "Garrafa 10 kg"),
-    ProductInfo(Product.GARRAFA_15, ProcessorCode.CODE_994, "Garrafa 15 kg"),
-    ProductInfo(Product.GARRAFA_30, ProcessorCode.CODE_995, "Garrafa 30 kg"),
-    ProductInfo(Product.TUBO_45, ProcessorCode.CODE_996, "Tubo 45 kg"),
-    ProductInfo(Product.GRANEL, ProcessorCode.CODE_997, "Granel"),
+    ProductInfo(
+        Product.GARRAFA_10,
+        ProcessorCode.CODE_993,
+        "Garrafa 10 kg",
+        _UNIT,
+    ),
+    ProductInfo(
+        Product.GARRAFA_15,
+        ProcessorCode.CODE_994,
+        "Garrafa 15 kg",
+        _UNIT,
+    ),
+    ProductInfo(
+        Product.GARRAFA_30,
+        ProcessorCode.CODE_995,
+        "Garrafa 30 kg",
+        _UNIT,
+    ),
+    ProductInfo(
+        Product.TUBO_45,
+        ProcessorCode.CODE_996,
+        "Tubo 45 kg",
+        _UNIT,
+    ),
+    ProductInfo(
+        Product.GRANEL,
+        ProcessorCode.CODE_997,
+        "Granel",
+        _CUBIC_METER,
+    ),
 )
 
 _BY_PRODUCT: dict[Product, ProductInfo] = {item.code: item for item in _CATALOG}

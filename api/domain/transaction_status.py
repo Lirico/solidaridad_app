@@ -9,3 +9,4 @@ class TransactionStatus(StrEnum):
     DECLINED = "DECLINED"
     FAILED = "FAILED"
     UNKNOWN = "UNKNOWN"
+    VOIDED = "VOIDED"

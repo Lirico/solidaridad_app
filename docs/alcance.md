@@ -85,20 +85,26 @@ claridad operativa.
 - Terminal origen: el `installation_id` del login es el terminal id que se
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).
+- Endpoint de anulación de venta aprobada:
+  `POST /v1/transactions/{transaction_number}/void`, con reingreso de tarjeta
+  (sin persistir PAN) e `Idempotency-Key`.
 - Validación de datos mínimos: producto/especie, importe/cantidad, datos de
   tarjeta requeridos según modo de entrada, terminal origen.
 - Persistencia de la transacción, delegación al gateway, normalización de
-  estados (`aprobada` / `rechazada` / `error` / `timeout` / equivalentes).
+  estados (`aprobada` / `rechazada` / `anulada` / `error` / `timeout` /
+  equivalentes).
 - Traducción de códigos técnicos a mensajes claros para la app.
 - Endpoints de listado básico y detalle/comprobante.
 - Logs básicos de auditoría y soporte (sin almacenar datos sensibles completos
-  de tarjeta).
+  de tarjeta). Incluye historial append-only de estados de transacción en
+  Postgres (`transaction_status_events`); sin exposición HTTP en esta etapa.
 - Ambientes y deploy (objetivo: AWS, con conectividad segura al procesador
   on-premises).
 
 ### 2.3 Gateway de pagos / mensajería ISO
 
 - Construcción y envío del mensaje ISO de venta al procesador.
+- Construcción y envío del mensaje ISO de anulación (`0200` / `020000`).
 - Parseo de respuesta e interpretación de aprobación / rechazo / error.
 - Timeouts y errores de comunicación.
 - Respuesta normalizada hacia la API.
@@ -109,6 +115,8 @@ claridad operativa.
 ### 2.4 Procesador existente (on-premises)
 
 - Sigue siendo responsable de validación de tarjeta, saldo y autorización.
+- El PAN del programa usa el dígito verificador MOD-TDF del procesador; la API
+  y el gateway validan formato (solo dígitos y longitud), pero no aplican Luhn.
 - Valida que la terminal esté dada de alta/vigente.
 - La app y la API no acceden a bases internas de usuarios/tarjetas en este MVP.
 - Altas de comercios, usuarios y terminales: provisión desde central sobre
@@ -138,7 +146,7 @@ App Flutter (Verifone)
 | Captura fallback | Ingreso manual. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
-| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). |
+| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |
 
 ---
 

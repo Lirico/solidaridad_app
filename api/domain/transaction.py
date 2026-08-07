@@ -28,3 +28,5 @@ class Transaction:
     request_fingerprint: str
     created_at: datetime
     updated_at: datetime
+    processor_ticket: str | None = None
+    void_idempotency_key: str | None = None

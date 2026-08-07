@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from config.settings import Settings
-from domain.authorization import AuthorizationStatus, AuthorizeCommand
-from domain.exceptions import ProcessorUnavailable
+from domain.authorization import AuthorizationStatus, AuthorizeCommand, VoidCommand
+from domain.exceptions import ProcessorUnavailable, ProcessorUnreachable
 from infrastructure.iso.packer import IsoMessage, pack_iso, set_present
 from infrastructure.iso.tcp_processor import TcpIsoProcessor
 
@@ -16,9 +16,20 @@ def _cmd() -> AuthorizeCommand:
         card_number="4111111111111111",
         terminal_id="TERM0001",
         stan="000001",
-        transaction_number="OP-260716-0001",
+        ticket_number="00000001",
     )
 
+
+def _void_cmd() -> VoidCommand:
+    return VoidCommand(
+        product_code="993",
+        amount_minor=100,
+        card_number="4111111111111111",
+        terminal_id="TERM0001",
+        stan="000002",
+        original_ticket="00000001",
+        void_ticket="000002",
+    )
 
 
 def _approved_response_frame() -> bytes:
@@ -61,7 +72,22 @@ def test_tcp_processor_failed_on_bad_response() -> None:
     assert result.status == AuthorizationStatus.FAILED
 
 
-def test_tcp_processor_raises_unavailable_on_connect_error() -> None:
+def test_tcp_processor_void_maps_approved_response() -> None:
+    settings = Settings(iso_transport="tcp")
+    processor = TcpIsoProcessor(settings)
+    frame = _approved_response_frame()
+
+    with patch("infrastructure.iso.tcp_processor.socket.create_connection") as conn:
+        sock = MagicMock()
+        conn.return_value.__enter__.return_value = sock
+        sock.recv.side_effect = [frame[:2], frame[2:]]
+        result = processor.void(_void_cmd())
+
+    assert result.status == AuthorizationStatus.APPROVED
+    sock.sendall.assert_called_once()
+
+
+def test_tcp_processor_raises_unreachable_on_connect_error() -> None:
     settings = Settings(iso_transport="tcp")
     processor = TcpIsoProcessor(settings)
     with (
@@ -69,9 +95,25 @@ def test_tcp_processor_raises_unavailable_on_connect_error() -> None:
             "infrastructure.iso.tcp_processor.socket.create_connection",
             side_effect=TimeoutError(),
         ),
-        pytest.raises(ProcessorUnavailable),
+        pytest.raises(ProcessorUnreachable),
     ):
         processor.authorize(_cmd())
+
+
+def test_tcp_processor_raises_unavailable_on_read_timeout() -> None:
+    settings = Settings(iso_transport="tcp")
+    processor = TcpIsoProcessor(settings)
+    sock = MagicMock()
+    sock.recv.side_effect = TimeoutError()
+    with (
+        patch(
+            "infrastructure.iso.tcp_processor.socket.create_connection"
+        ) as conn,
+        pytest.raises(ProcessorUnavailable) as exc_info,
+    ):
+        conn.return_value.__enter__.return_value = sock
+        processor.authorize(_cmd())
+    assert not isinstance(exc_info.value, ProcessorUnreachable)
 
 
 def test_recv_exact_raises_on_closed_socket() -> None:

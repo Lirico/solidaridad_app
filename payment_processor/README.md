@@ -50,4 +50,4 @@ make seed-refresh
 
 La imagen compila en `debian:bookworm` con `default-libmysqlclient-dev` y un include de compatibilidad ([`docker/stubs/legacy_compat.h`](docker/stubs/legacy_compat.h)) para headers que el código asumía vía `my_global.h` de MySQL 5.7. Fuentes en [`legacy/bin/`](legacy/bin/).
 
-El **servidor** de datos local es MySQL **5.7** (`mysql:5.7`).
+El **servidor** de datos local es MySQL **5.7** (`mysql:5.7`, `platform: linux/amd64` porque esa tag no publica arm64; en Apple Silicon corre con emulación).

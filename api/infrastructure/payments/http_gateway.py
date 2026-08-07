@@ -1,4 +1,4 @@
-"""HTTP client for payment-gateway authorize."""
+"""HTTP client for payment-gateway authorize / void."""
 
 import httpx
 
@@ -6,6 +6,7 @@ from application.payments.ports import (
     AuthorizeRequest,
     AuthorizeResult,
     GatewayOutcome,
+    VoidRequest,
 )
 
 
@@ -35,14 +36,29 @@ class HttpPaymentGateway:
             "card_number": request.card_number,
             "terminal_id": request.terminal_id,
             "stan": request.stan,
-            "transaction_number": request.transaction_number,
+            "ticket_number": request.ticket_number,
         }
-
         if request.expiration_date is not None:
             payload["expiration_date"] = request.expiration_date
+        return self._post("/v1/authorize", payload)
 
+    def void(self, request: VoidRequest) -> AuthorizeResult:
+        payload = {
+            "product_code": request.product_code,
+            "amount_minor": request.amount_minor,
+            "card_number": request.card_number,
+            "terminal_id": request.terminal_id,
+            "stan": request.stan,
+            "original_ticket": request.original_ticket,
+            "void_ticket": request.void_ticket,
+        }
+        if request.expiration_date is not None:
+            payload["expiration_date"] = request.expiration_date
+        return self._post("/v1/void", payload)
+
+    def _post(self, path: str, payload: dict[str, object]) -> AuthorizeResult:
         try:
-            response = self._client.post("/v1/authorize", json=payload)
+            response = self._client.post(path, json=payload)
         except httpx.ConnectError:
             return AuthorizeResult(outcome=GatewayOutcome.FAILED)
         except httpx.TimeoutException:
@@ -50,13 +66,15 @@ class HttpPaymentGateway:
         except httpx.HTTPError:
             return AuthorizeResult(outcome=GatewayOutcome.UNKNOWN)
 
+        # 503 = el gateway no llegó a conectar con el procesador: el mensaje ISO
+        # nunca salió, así que no hay impacto posible. 502 sí es ambiguo.
+        if response.status_code == 503:
+            return AuthorizeResult(outcome=GatewayOutcome.FAILED)
         if response.status_code == 502:
             return AuthorizeResult(outcome=GatewayOutcome.UNKNOWN)
         if response.status_code >= 500:
             return AuthorizeResult(outcome=GatewayOutcome.UNKNOWN)
         if response.status_code >= 400:
-            # Validation / domain errors from gateway — treat as no impact
-            # only if we never reached processor; gateway 400 means bad request.
             return AuthorizeResult(outcome=GatewayOutcome.FAILED)
 
         try:
@@ -70,7 +88,6 @@ class HttpPaymentGateway:
         elif status == "DECLINED":
             outcome = GatewayOutcome.DECLINED
         elif status == "FAILED":
-            # Gateway FAILED is often unparseable ISO after send → UNKNOWN
             outcome = GatewayOutcome.UNKNOWN
         else:
             outcome = GatewayOutcome.UNKNOWN

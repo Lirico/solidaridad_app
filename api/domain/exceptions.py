@@ -59,7 +59,7 @@ class InvalidAmount(DomainError):
 
 
 class InvalidCardNumber(DomainError):
-    """Raised when the PAN fails basic format/Luhn checks."""
+    """Raised when the PAN fails basic format checks."""
 
     def __init__(self, message: str = "Número de tarjeta inválido") -> None:
         super().__init__(message)
@@ -102,11 +102,28 @@ class MissingTerminalId(DomainError):
         super().__init__(message)
 
 
-class TransactionNumberExhausted(DomainError):
-    """Raised when the daily transaction_number counter overflows."""
+class TransactionNotFound(DomainError):
+    """Raised when a transaction_number does not exist for the terminal."""
+
+    def __init__(self, message: str = "Transacción no encontrada") -> None:
+        super().__init__(message)
+
+
+class TransactionNotVoidable(DomainError):
+    """Raised when the transaction cannot be voided in its current status."""
 
     def __init__(
         self,
-        message: str = "Se alcanzó el límite diario de operaciones",
+        message: str = "Solo se pueden anular transacciones aprobadas",
+    ) -> None:
+        super().__init__(message)
+
+
+class CardMismatch(DomainError):
+    """Raised when the re-entered card does not match the original sale."""
+
+    def __init__(
+        self,
+        message: str = "La tarjeta no coincide con la de la venta original",
     ) -> None:
         super().__init__(message)

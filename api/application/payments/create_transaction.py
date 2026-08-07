@@ -33,7 +33,10 @@ from domain.product import Product, parse_product, processor_product_code
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.installation_repository import InstallationRepository
-from persistence.repositories.transaction_repository import TransactionRepository
+from persistence.repositories.transaction_repository import (
+    TransactionRepository,
+    ticket_from_transaction_number,
+)
 
 
 class CreateTransactionHttpStatus(IntEnum):
@@ -45,19 +48,6 @@ class CreateTransactionHttpStatus(IntEnum):
 class CreateTransactionResult:
     transaction: Transaction
     http_status: CreateTransactionHttpStatus
-
-
-def _luhn_ok(pan: str) -> bool:
-    digits = [int(c) for c in pan]
-    checksum = 0
-    parity = len(digits) % 2
-    for i, d in enumerate(digits):
-        if i % 2 == parity:
-            d *= 2
-            if d > 9:
-                d -= 9
-        checksum += d
-    return checksum % 10 == 0
 
 
 def _fingerprint(
@@ -85,11 +75,9 @@ def _validate_cvv(cvv: str) -> str:
     return cleaned
 
 
-def _validate_pan(card_number: str, *, skip_luhn: bool = False) -> str:
+def _validate_pan(card_number: str) -> str:
     pan = card_number.replace(" ", "").strip()
     if not pan.isdigit() or not (13 <= len(pan) <= 19):
-        raise InvalidCardNumber()
-    if not skip_luhn and not _luhn_ok(pan):
         raise InvalidCardNumber()
     return pan
 
@@ -101,14 +89,11 @@ class CreateTransaction:
         transactions: TransactionRepository,
         installations: InstallationRepository,
         gateway: PaymentGateway,
-        *,
-        luhn_check_enabled: bool = True,
     ) -> None:
         self._session = session
         self._transactions = transactions
         self._installations = installations
         self._gateway = gateway
-        self._skip_luhn = not luhn_check_enabled
 
     def execute(
         self,
@@ -128,7 +113,7 @@ class CreateTransaction:
 
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
-        pan = _validate_pan(card_number, skip_luhn=self._skip_luhn)
+        pan = _validate_pan(card_number)
         _validate_cvv(cvv)
         card_last4 = pan[-4:]
         exp = expiration_date.strip() if expiration_date else None
@@ -146,7 +131,7 @@ class CreateTransaction:
             idempotency_key=key,
         )
         if existing is not None:
-            return self._replay(existing, fingerprint)
+            return self._replay(existing, fingerprint, idempotency_key=key)
 
         installation = self._installations.get_by_installation_id(installation_id)
         if installation is None:
@@ -157,6 +142,7 @@ class CreateTransaction:
 
         business_date = datetime.now(UTC).date()
         transaction_number = self._transactions.next_transaction_number(business_date)
+        processor_ticket = ticket_from_transaction_number(transaction_number)
         stan = f"{secrets.randbelow(1_000_000):06d}"
         proc_code = processor_product_code(parsed_product)
 
@@ -171,6 +157,7 @@ class CreateTransaction:
                 amount_minor=money.amount_minor,
                 card_last4=card_last4,
                 stan=stan,
+                processor_ticket=processor_ticket,
                 idempotency_key=key,
                 request_fingerprint=fingerprint,
                 user_message=MSG_PENDING,
@@ -184,7 +171,7 @@ class CreateTransaction:
             )
             if raced is None:
                 raise
-            return self._replay(raced, fingerprint)
+            return self._replay(raced, fingerprint, idempotency_key=key)
 
         gateway_result = self._gateway.authorize(
             AuthorizeRequest(
@@ -193,11 +180,10 @@ class CreateTransaction:
                 card_number=pan,
                 terminal_id=terminal_id[:8].ljust(8),
                 stan=stan,
-                transaction_number=transaction_number,
+                ticket_number=processor_ticket,
                 expiration_date=exp,
             )
         )
-
         final = self._apply_gateway_result(pending.id, gateway_result)
         self._session.commit()
         return CreateTransactionResult(
@@ -209,9 +195,20 @@ class CreateTransaction:
         self,
         existing: Transaction,
         fingerprint: str,
+        *,
+        idempotency_key: str,
     ) -> CreateTransactionResult:
         if existing.request_fingerprint != fingerprint:
             raise IdempotencyConflict()
+        self._transactions.record_idempotent_hit(
+            transaction_id=existing.id,
+            status=existing.status,
+            actor_user_id=existing.user_id,
+            idempotency_key=idempotency_key,
+            user_message=existing.user_message,
+            processor_response_code=existing.processor_response_code,
+        )
+        self._session.commit()
         if existing.status == TransactionStatus.PENDING:
             return CreateTransactionResult(
                 transaction=existing,

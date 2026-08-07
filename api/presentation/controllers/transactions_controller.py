@@ -11,14 +11,17 @@ from application.payments.create_transaction import (
     CreateTransactionHttpStatus,
 )
 from application.payments.list_transactions import ListTransactions
+from application.payments.void_transaction import VoidTransaction
 from domain.exceptions import (
+    CardMismatch,
     IdempotencyConflict,
     InvalidAmount,
     InvalidCardNumber,
     InvalidCvv,
     MissingIdempotencyKey,
     MissingTerminalId,
-    TransactionNumberExhausted,
+    TransactionNotFound,
+    TransactionNotVoidable,
     UnsupportedProduct,
 )
 from domain.money import AMOUNT_EXPONENT
@@ -27,12 +30,14 @@ from presentation.dependencies import (
     get_create_transaction,
     get_current_user,
     get_list_transactions,
+    get_void_transaction,
 )
 from presentation.schemas.transactions import (
     CreateTransactionRequest,
     TransactionItemResponse,
     TransactionListResponse,
     TransactionResponse,
+    VoidTransactionRequest,
 )
 
 router = APIRouter()
@@ -130,7 +135,6 @@ def create_transaction(
         InvalidCvv,
         MissingIdempotencyKey,
         MissingTerminalId,
-        TransactionNumberExhausted,
     ) as exc:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -154,3 +158,58 @@ def create_transaction(
             content=payload.model_dump(mode="json"),
         )
     return payload
+
+
+@router.post(
+    "/{transaction_number}/void",
+    status_code=status.HTTP_200_OK,
+    response_model=TransactionResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Validation / domain error",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing/invalid token",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Transaction not found",
+        },
+    },
+)
+def void_transaction(
+    transaction_number: str,
+    body: VoidTransactionRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[VoidTransaction, Depends(get_void_transaction)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> TransactionResponse | JSONResponse:
+    try:
+        result = use_case.execute(
+            terminal_id=current_user.installation_id,
+            transaction_number=transaction_number,
+            idempotency_key=idempotency_key,
+            card_number=body.card_number,
+            expiration_date=body.expiration_date,
+        )
+    except TransactionNotFound as exc:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": str(exc)},
+        )
+    except (
+        InvalidCardNumber,
+        MissingIdempotencyKey,
+        TransactionNotVoidable,
+        CardMismatch,
+    ) as exc:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": str(exc)},
+        )
+
+    return TransactionResponse(
+        transaction_number=result.transaction.transaction_number,
+        status=result.transaction.status.value,
+        user_message=result.user_message,
+        created_at=result.transaction.created_at,
+    )

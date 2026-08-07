@@ -4,31 +4,49 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-07-08
+Última revisión: 2026-08-07
 
+> ✅ **Último cambio:** tabla append-only `transaction_status_events` en la API
+> (CREATED / GATEWAY_RESULT / VOID_RESULT / IDEMPOTENT_HIT). Persistencia
+> enganchada en create/update/void e idempotent replay; **sin** exposición
+> HTTP todavía.
 
-
-> ✅ **Último cambio (2026-06-08):** Lograda una **transacción aprobada (código 00)** de punta a punta (gateway → authkig → MySQL). El bloqueo era que el gateway **no enviaba el DE62 (`numero_comprobante`)**, y el autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como `numero_comprobante = %s` (sin comillas), generando un error de sintaxis SQL (`near 'AND tipo_mensaje = '0200'...'`). Se agregó `field_62` (con el STAN como valor) al `build_purchase_request()` en `payment-gateway/infrastructure/iso/message_builder.py` y el bit 62 al bitmap. Verificado en `sgas_cup` (id 4709112, `numero_comprobante=123456`, `procode=000000`, `nro_tarjeta=6063007014007401`, `tipo_mensaje=0200`). Ver G-P0-19.
+> ✅ **Transacción aprobada (código 00) de punta a punta (2026-06-08):** el
+> bloqueo era que el gateway **no enviaba el DE62 (`numero_comprobante`)**, y el
+> autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como
+> `numero_comprobante = %s` (sin comillas), generando un error de sintaxis SQL.
+> Se agregó `field_62` y el bit 62 al bitmap en
+> `payment-gateway/infrastructure/iso/message_builder.py`. Ver G-P0-19.
 >
-> **Segundo bloqueo (código 17) resuelto:** al re-probar una segunda venta de la misma tarjeta/producto, el autorizador devolvía **17** porque `validaTiempoUltimaVenta()` rechaza ventas de la misma tarjeta/producto dentro de `venta_min_horas_ultima_venta` horas (default **72**). Se seteó `venta_min_horas_ultima_venta = 0` en `soli_config` (aplicado en vivo y agregado al `fix_demo.sql`). Verificado: segunda venta aprobada (id 4709113, `numero_comprobante=654321`).
+> **DE62 = parte numérica del ID de transacción (2026-07-08):** el DE62
+> (`numero_comprobante`) dejó de usar el STAN y ahora lleva la sección numérica
+> del ID de transacción (`OP-YYMMDD-NNNNNNNN` → `NNNNNNN`). El `transaction_number`
+> viaja desde la API (`AuthorizeRequest`) hasta el gateway (`AuthorizeCommand`) y
+> se extrae con `_transaction_number()` en
+> `payment-gateway/infrastructure/iso/message_builder.py`. Ver G-P0-19.
 >
-> **Tercer bloqueo (saldo agotado) resuelto:** el autorizador calcula saldo disponible = `saldo_anterior - consumo_vivo` (suma de ventas en `sgas_cup`). Con saldo 2000 y 2 ventas de $100 (2000 unidades internas), `saldo_actual = 0` y la venta se rechaza. Se recargó la tarjeta `6063007014007401` a **20000** en `sgas_usuario_cta` (aplicado en vivo y agregado al `fix_demo.sql`). Verificado: flujo completo vía API (`POST /v1/transactions`) devuelve `APPROVED`/`Pago aprobado` (OP-260806-0002).
+> **Inicialización automática del demo (2026-07-08):** el script de preparación
+> de datos de prueba `payment_processor/docker/mysql/fix_demo.sql` se renombró a
+> `03_fix_demo.sql` y se montó en `/docker-entrypoint-initdb.d/` desde
+> `payment_processor/docker-compose.yml`, junto a `01_schema.sql` y
+> `02_seed.sql.gz`. Ahora MySQL lo ejecuta automáticamente en cada corrida en
+> limpio (volumen nuevo), sin necesidad de correrlo a mano. Ver G-P0-18.
 >
-> **Nota de tarjeta:** la tarjeta de demo que aprueba en vivo es `6063007014007401` (Luhn-válida, con saldo 2000 en producto 993). El `fix_demo.sql` y G-P0-18 referencian `6063007014007403` (la original de Lillo, que **no** pasa Luhn); mantener `6063007014007401` como la tarjeta de referencia para el demo.
+> **Nota de tarjeta de demo:** la tarjeta que aprueba en vivo es
+> `6063007014007401` (Luhn-válida, con saldo en producto 993). El `fix_demo.sql`
+> y G-P0-18 referencian `6063007014007403` (la original de Lillo, que **no** pasa
+> Luhn); mantener `6063007014007401` como la tarjeta de referencia para el demo.
 >
-> **Cuarto bloqueo (rechazo desde el frontend, código 89) resuelto:** al probar la venta desde la app Flutter, el autorizador devolvía **89** (`valida_terminal() NUM_ROWS: 0` → `valida_operacion(): valida terminal = 89`). Causa raíz: el frontend usaba `installation_id: 'dev-term'` por defecto (`mobile/lib/features/auth/data/auth_repository.dart`), y ese terminal **no existe** en la tabla `terminales` del autorizador (solo existe `05000001`). Se cambió el default a `05000001`. Ver G-P0-08.
+> **Bug conocido (2026-06-08):** la tarjeta `4111111111111111` (VISA de prueba)
+> **cuelga el autorizador** en `calcula_saldo_vivo()` (bug del código C) y Docker
+> reinicia el contenedor. **No usar para el demo.** Usar siempre
+> `6063007014007401`.
 >
-> **Recarga demo (2026-06-08):** se recargaron ambas tarjetas de prueba a **100000** en producto `993` y se extendió la vigencia de `6063007014007401` a **2028-12-30** (DE14 `1228`) vía `payment_processor/docker/mysql/recarga_demo.sql`. Verificado: `POST /v1/authorize` con `expiration_date=1228` devuelve `APPROVED`/`00` (auth_id 930886, `vencimiento=1228` en `sgas_cup`). Guía de reproducción: `docs/demo-transaccion-aprobada.md`.
->
-> **Bug conocido (2026-06-08):** la tarjeta `4111111111111111` (VISA de prueba, saldo 100000) **cuelga el autorizador** en `calcula_saldo_vivo()` (bug del código C) y Docker reinicia el contenedor. **No usar para el demo.** Usar siempre `6063007014007401`.
->
-> **Ajuste de consistencia operativa POS mobile (2026-08-06):** `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart` — el resumen de cantidad ya no muestra `.0` cuando la cantidad es entera; por ejemplo, `2 unidades` en lugar de `2.0 unidades`, preservando decimales reales cuando existan.
->
-> **DE62 = parte numérica del ID de transacción (2026-07-08):** el DE62 (`numero_comprobante`) dejó de usar el STAN y ahora lleva la sección numérica del ID de transacción (`OP-YYMMDD-NNNNNNNN` → `NNNNNNN`). El `transaction_number` viaja desde la API (`AuthorizeRequest`) hasta el gateway (`AuthorizeCommand`) y se extrae con `_transaction_number()` en `payment-gateway/infrastructure/iso/message_builder.py`. Ver G-P0-19.
->
-> **Inicialización automática del demo (2026-07-08):** el script de preparación de datos de prueba `payment_processor/docker/mysql/fix_demo.sql` se renombró a `03_fix_demo.sql` y se montó en `/docker-entrypoint-initdb.d/` desde `payment_processor/docker-compose.yml`, junto a `01_schema.sql` y `02_seed.sql.gz`. Ahora MySQL lo ejecuta automáticamente en cada corrida en limpio (volumen nuevo), sin necesidad de correrlo a mano. Ver G-P0-18.
-
-
+> **Ajuste de consistencia operativa POS mobile (2026-08-06):**
+> `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart` — el
+> resumen de cantidad ya no muestra `.0` cuando la cantidad es entera; por
+> ejemplo, `2 unidades` en lugar de `2.0 unidades`, preservando decimales reales
+> cuando existan.
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -87,6 +105,9 @@ Verifone (banda + térmica).
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
 | G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
 | G-P1-06 | Entry mode ISO acorde al modo de captura | open | DE22 fijo `012` (manual). Falta track/swipe cuando haya banda. |
+| G-P1-08 | UI mobile de anulación | open | Backend `POST /v1/transactions/{tn}/void` listo; la app aún no ofrece flujo de anulación con reingreso de tarjeta. |
+| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
+| G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 
 ---
 
@@ -110,9 +131,13 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 |------|-------|
 | Auth API (login / register / change-password + JWT) | Implementado en `api/` |
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
+| `POST /v1/transactions/{tn}/void` (anulación con reingreso de tarjeta) | Implementado en `api/`; status `VOIDED`; DE62 ticket = sufijo de `transaction_number` |
 | `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
-| Catálogo `GET /v1/products` | Implementado en `api/` |
+| Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
+| Gateway `POST /v1/void` → ISO anulación (`0200`/`020000`) | Implementado en `payment-gateway/` |
+| Procesador caído ≠ resultado ambiguo | Gateway: `ProcessorUnreachable` (fallo de connect) → 503; `ProcessorUnavailable` (falla tras enviar el ISO) → 502. API: 503 → `FAILED`, 502 → `UNKNOWN`. Ver `payment-gateway/infrastructure/iso/tcp_processor.py` y `api/infrastructure/payments/http_gateway.py`. |
+| Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
 | `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
@@ -122,6 +147,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | ProductSelector con catálogo del backend | `ProductSelector` widget consume `GET /v1/products` y muestra productos de gas (GARRAFA_10, etc.) en vez de ARS/USD. Payload de venta envía `product`. |
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
+| Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
 
 
 ---

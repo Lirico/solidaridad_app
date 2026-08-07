@@ -8,8 +8,13 @@ from sqlalchemy.orm import Session
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
+from domain.transaction_status_event import (
+    TransactionStatusActorType,
+    TransactionStatusEventType,
+)
 from persistence.models.transaction import Transaction as TransactionModel
 from persistence.models.transaction import TransactionNumberCounter
+from persistence.models.transaction_status_event import TransactionStatusEvent
 
 
 def ticket_from_transaction_number(transaction_number: str) -> str:
@@ -46,6 +51,34 @@ def _to_domain(row: TransactionModel) -> Transaction:
 class TransactionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def _append_status_event(
+        self,
+        *,
+        transaction_id: int,
+        from_status: str | None,
+        to_status: str,
+        event_type: TransactionStatusEventType,
+        actor_type: TransactionStatusActorType,
+        actor_user_id: int | None = None,
+        processor_response_code: str | None = None,
+        user_message: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> None:
+        self._session.add(
+            TransactionStatusEvent(
+                transaction_id=transaction_id,
+                from_status=from_status,
+                to_status=to_status,
+                event_type=event_type.value,
+                actor_type=actor_type.value,
+                actor_user_id=actor_user_id,
+                processor_response_code=processor_response_code,
+                user_message=user_message,
+                idempotency_key=idempotency_key,
+                created_at=datetime.now(UTC),
+            )
+        )
 
     def get_by_idempotency(
         self,
@@ -141,6 +174,17 @@ class TransactionRepository:
         )
         self._session.add(row)
         self._session.flush()
+        self._append_status_event(
+            transaction_id=row.id,
+            from_status=None,
+            to_status=TransactionStatus.PENDING.value,
+            event_type=TransactionStatusEventType.CREATED,
+            actor_type=TransactionStatusActorType.USER,
+            actor_user_id=user_id,
+            user_message=user_message,
+            idempotency_key=idempotency_key,
+        )
+        self._session.flush()
         return _to_domain(row)
 
     def list_by_terminal_id(
@@ -180,12 +224,24 @@ class TransactionRepository:
         row = self._session.get(TransactionModel, transaction_id)
         if row is None:
             raise LookupError(f"transaction {transaction_id} not found")
+        from_status = row.status
         row.status = status.value
         row.user_message = user_message
         row.processor_response_code = processor_response_code
         row.auth_id = auth_id
         row.retrieval_reference = retrieval_reference
         row.updated_at = datetime.now(UTC)
+        self._append_status_event(
+            transaction_id=row.id,
+            from_status=from_status,
+            to_status=status.value,
+            event_type=TransactionStatusEventType.GATEWAY_RESULT,
+            actor_type=TransactionStatusActorType.SYSTEM,
+            actor_user_id=row.user_id,
+            processor_response_code=processor_response_code,
+            user_message=user_message,
+            idempotency_key=row.idempotency_key,
+        )
         self._session.flush()
         return _to_domain(row)
 
@@ -201,6 +257,7 @@ class TransactionRepository:
         row = self._session.get(TransactionModel, transaction_id)
         if row is None:
             raise LookupError(f"transaction {transaction_id} not found")
+        from_status = row.status
         row.status = status.value
         row.void_idempotency_key = void_idempotency_key
         if user_message is not None:
@@ -208,5 +265,41 @@ class TransactionRepository:
         if processor_response_code is not None:
             row.processor_response_code = processor_response_code
         row.updated_at = datetime.now(UTC)
+        self._append_status_event(
+            transaction_id=row.id,
+            from_status=from_status,
+            to_status=status.value,
+            event_type=TransactionStatusEventType.VOID_RESULT,
+            actor_type=TransactionStatusActorType.USER,
+            actor_user_id=row.user_id,
+            processor_response_code=processor_response_code,
+            user_message=user_message if user_message is not None else row.user_message,
+            idempotency_key=void_idempotency_key,
+        )
         self._session.flush()
         return _to_domain(row)
+
+    def record_idempotent_hit(
+        self,
+        *,
+        transaction_id: int,
+        status: TransactionStatus,
+        actor_user_id: int,
+        idempotency_key: str | None = None,
+        user_message: str | None = None,
+        processor_response_code: str | None = None,
+    ) -> None:
+        """Record a replay that did not change transaction status."""
+        status_value = status.value
+        self._append_status_event(
+            transaction_id=transaction_id,
+            from_status=status_value,
+            to_status=status_value,
+            event_type=TransactionStatusEventType.IDEMPOTENT_HIT,
+            actor_type=TransactionStatusActorType.USER,
+            actor_user_id=actor_user_id,
+            processor_response_code=processor_response_code,
+            user_message=user_message,
+            idempotency_key=idempotency_key,
+        )
+        self._session.flush()

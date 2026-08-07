@@ -23,7 +23,9 @@ def _payload(**overrides: Any) -> dict[str, Any]:
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
         "stan": "123456",
+        "transaction_number": "OP-260716-0001",
     }
+
     body.update(overrides)
     return body
 

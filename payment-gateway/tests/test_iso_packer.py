@@ -154,8 +154,10 @@ def test_build_purchase_request_sets_fields() -> None:
         card_number="4111111111111111",
         terminal_id="TERM0001",
         stan="000001",
+        transaction_number="OP-260716-0001",
         expiration_date="2912",
     )
+
     iso = build_purchase_request(
         cmd,
         settings,
@@ -168,8 +170,9 @@ def test_build_purchase_request_sets_fields() -> None:
     assert iso.dateexpire_14 == "2912"
     assert iso.currcode_49 == "993"
     assert iso.termid_41 == "TERM0001"
-    assert iso.field_62 == "000001"
+    assert iso.field_62 == "0001"
     assert bitmap_get(iso.bitmap, 62)
+
     assert not bitmap_get(iso.bitmap, 42)
 
 

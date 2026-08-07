@@ -47,6 +47,8 @@ class AuthorizePayment:
             card_number=pan,
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
             stan=stan.zfill(6),
+            transaction_number=command.transaction_number,
             expiration_date=command.expiration_date,
         )
+
         return self._processor.authorize(normalized)

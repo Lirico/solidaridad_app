@@ -16,7 +16,9 @@ def _cmd() -> AuthorizeCommand:
         card_number="4111111111111111",
         terminal_id="TERM0001",
         stan="000001",
+        transaction_number="OP-260716-0001",
     )
+
 
 
 def _approved_response_frame() -> bytes:

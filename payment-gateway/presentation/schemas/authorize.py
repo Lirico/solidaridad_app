@@ -10,7 +10,9 @@ class AuthorizeRequest(BaseModel):
     card_number: str = Field(min_length=13, max_length=19)
     terminal_id: str = Field(min_length=1, max_length=8)
     stan: str = Field(min_length=1, max_length=6)
+    transaction_number: str = Field(min_length=1, max_length=32)
     expiration_date: str | None = Field(default=None, max_length=4)
+
 
 
 class AuthorizeResponse(BaseModel):

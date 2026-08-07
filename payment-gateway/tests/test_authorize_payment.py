@@ -21,7 +21,9 @@ def _cmd(**overrides: object) -> AuthorizeCommand:
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
         "stan": "123456",
+        "transaction_number": "OP-260716-0001",
     }
+
     base.update(overrides)
     return AuthorizeCommand(**base)  # type: ignore[arg-type]
 

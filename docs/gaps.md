@@ -4,7 +4,9 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-06
+Última revisión: 2026-07-08
+
+
 
 > ✅ **Último cambio (2026-06-08):** Lograda una **transacción aprobada (código 00)** de punta a punta (gateway → authkig → MySQL). El bloqueo era que el gateway **no enviaba el DE62 (`numero_comprobante`)**, y el autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como `numero_comprobante = %s` (sin comillas), generando un error de sintaxis SQL (`near 'AND tipo_mensaje = '0200'...'`). Se agregó `field_62` (con el STAN como valor) al `build_purchase_request()` en `payment-gateway/infrastructure/iso/message_builder.py` y el bit 62 al bitmap. Verificado en `sgas_cup` (id 4709112, `numero_comprobante=123456`, `procode=000000`, `nro_tarjeta=6063007014007401`, `tipo_mensaje=0200`). Ver G-P0-19.
 >
@@ -21,6 +23,12 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > **Bug conocido (2026-06-08):** la tarjeta `4111111111111111` (VISA de prueba, saldo 100000) **cuelga el autorizador** en `calcula_saldo_vivo()` (bug del código C) y Docker reinicia el contenedor. **No usar para el demo.** Usar siempre `6063007014007401`.
 >
 > **Ajuste de consistencia operativa POS mobile (2026-08-06):** `mobile/lib/features/sales/presentation/widgets/sale_review_content.dart` — el resumen de cantidad ya no muestra `.0` cuando la cantidad es entera; por ejemplo, `2 unidades` en lugar de `2.0 unidades`, preservando decimales reales cuando existan.
+>
+> **DE62 = parte numérica del ID de transacción (2026-07-08):** el DE62 (`numero_comprobante`) dejó de usar el STAN y ahora lleva la sección numérica del ID de transacción (`OP-YYMMDD-NNNNNNNN` → `NNNNNNN`). El `transaction_number` viaja desde la API (`AuthorizeRequest`) hasta el gateway (`AuthorizeCommand`) y se extrae con `_transaction_number()` en `payment-gateway/infrastructure/iso/message_builder.py`. Ver G-P0-19.
+>
+> **Inicialización automática del demo (2026-07-08):** el script de preparación de datos de prueba `payment_processor/docker/mysql/fix_demo.sql` se renombró a `03_fix_demo.sql` y se montó en `/docker-entrypoint-initdb.d/` desde `payment_processor/docker-compose.yml`, junto a `01_schema.sql` y `02_seed.sql.gz`. Ahora MySQL lo ejecuta automáticamente en cada corrida en limpio (volumen nuevo), sin necesidad de correrlo a mano. Ver G-P0-18.
+
+
 
 Leyenda de estado: `open` · `partial` · `done`
 
@@ -58,8 +66,10 @@ Verifone (banda + térmica).
 | G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | TC-067 (venta rechazada) mostró "Transacción Rechazada" con código 51 (Fondos Insuficientes) en Motorola ZY22FSJKKV. La app se compiló con `--dart-define=API_BASE_URL=http://192.168.0.4:8000/v1`. El problema de conexión del hallazgo #18 era específico del emulador (IP `10.0.2.2`). El ANR del hallazgo #17 tampoco se reproduce en dispositivo real. Ver hallazgo #21 en `docs/test_cases.md`. |
 
 | G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases.md`. |
-| G-P0-18 | Transacción de demo siempre rechazada por comercio inválido en autorizador | done | **Fix aplicado (2026-06-08):** el terminal `05000001` (installation_id de la app) tenía `cod_comercio='000000'` en `terminales`, que no existe en `sgas_comercio`, por lo que `valida_comercio()` rechazaba siempre (`COMER_DES_SUP`). Se corrigió a `012502` (GOBIERNO, `situacion='V'`). Además se dio saldo (2000) y recarga (4000) a la tarjeta `6063007014007403` (Lillo) en producto `993` para que `venta_cupon()` apruebe ventas de hasta $200. Cambios en seed `payment_processor/docker/mysql/02_seed.sql.gz` y script `payment_processor/docker/mysql/fix_demo.sql`. Requiere reconstruir la base (`make reset`) o aplicar `fix_demo.sql` en vivo. |
-| G-P0-19 | Gateway no enviaba DE62 (`numero_comprobante`) → error SQL en autorizador | done | **Fix aplicado (2026-06-08):** el gateway no empaquetaba el DE62, y el autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como `numero_comprobante = %s` (sin comillas), generando error de sintaxis SQL (`near 'AND tipo_mensaje = '0200'...'`) y respuesta 96. Se agregó `field_62` (valor = STAN) y el bit 62 al bitmap en `payment-gateway/infrastructure/iso/message_builder.py` (`build_purchase_request`). `make check` pasa (lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓). Verificado: `POST /v1/authorize` devuelve `APPROVED`/`00` y se registra en `sgas_cup` (id 4709112, `numero_comprobante=123456`, `procode=000000`, `nro_tarjeta=6063007014007401`, `tipo_mensaje=0200`). |
+| G-P0-18 | Transacción de demo siempre rechazada por comercio inválido en autorizador | done | **Fix aplicado (2026-06-08):** el terminal `05000001` (installation_id de la app) tenía `cod_comercio='000000'` en `terminales`, que no existe en `sgas_comercio`, por lo que `valida_comercio()` rechazaba siempre (`COMER_DES_SUP`). Se corrigió a `012502` (GOBIERNO, `situacion='V'`). Además se dio saldo (2000) y recarga (4000) a la tarjeta `6063007014007403` (Lillo) en producto `993` para que `venta_cupon()` apruebe ventas de hasta $200. Cambios en seed `payment_processor/docker/mysql/02_seed.sql.gz` y script `payment_processor/docker/mysql/03_fix_demo.sql`. **2026-07-08:** `03_fix_demo.sql` se monta en `/docker-entrypoint-initdb.d/` desde `docker-compose.yml`, por lo que se aplica automáticamente en cada corrida en limpio (reconstruir con `make reset`); ya no se corre a mano. |
+
+| G-P0-19 | Gateway no enviaba DE62 (`numero_comprobante`) → error SQL en autorizador | done | **Fix aplicado (2026-06-08):** el gateway no empaquetaba el DE62, y el autorizador lo usa en `valida_cupon_dup()`/`valida_cupon()` como `numero_comprobante = %s` (sin comillas), generando error de sintaxis SQL (`near 'AND tipo_mensaje = '0200'...'`) y respuesta 96. Se agregó `field_62` y el bit 62 al bitmap en `payment-gateway/infrastructure/iso/message_builder.py` (`build_purchase_request`). **2026-07-08:** el DE62 dejó de usar el STAN y ahora lleva la parte numérica del ID de transacción (`OP-YYMMDD-NNNNNNNN` → `NNNNNNN`), propagado desde la API (`AuthorizeRequest.transaction_number`) hasta el gateway (`AuthorizeCommand.transaction_number`) y extraído con `_transaction_number()`. `make check` pasa en API (96 tests, 94.92%) y gateway (34 tests, 98.76%). |
+
 
 
 

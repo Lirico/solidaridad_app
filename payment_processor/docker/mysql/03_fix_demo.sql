@@ -2,8 +2,9 @@
 -- FIX DEMO: habilitar transacción exitosa para el terminal 05000001
 -- y la tarjeta de prueba 6063007014007403 (Lillo Espinoza Silvia Del)
 --
--- Aplicar contra la base kigsolidario2 del autorizador (MySQL 5.7).
--- Ejecutar con:  mysql -h127.0.0.1 -P3307 -ukigadmin2 -plocaldev kigsolidario2 < fix_demo.sql
+-- Se ejecuta automáticamente por MySQL en cada corrida en limpio
+-- (montado en /docker-entrypoint-initdb.d/ desde docker-compose.yml),
+-- junto con 01_schema.sql y 02_seed.sql.gz. No correr a mano.
 -- ============================================================
 
 -- 1) Arreglar el comercio del terminal 05000001.

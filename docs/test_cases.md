@@ -1,6 +1,8 @@
 # Test Cases — Solidaridad App
 
-> **Última actualización:** 2026-08-05
+> **Última actualización:** 2026-07-08
+
+
 
 > Archivo vivo de casos de prueba. Se actualiza a medida que se documentan y ejecutan tests.
 
@@ -73,7 +75,8 @@ Adaptador HTTP → ISO8583. Traduce las solicitudes de la API al formato del pro
 | Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
 |-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
 | 043 | Gateway | Ping / Health check | `GET /ping` | Código 200. `{"status": "ok"}` | `{"status":"ok"}` — 200 OK | Pass | Endpoint en `/ping` (no `/v1/ping`) |
-| 044 | Gateway | Autorizar venta exitosa (entry mode manual 012) | `POST /v1/authorize` — `product_code: "993"`, `amount_minor: 150000`, `card_number: "4111111111111111"`, `terminal_id: "TERM001"`, `stan: "000002"`, `expiration_date: "1228"` | Código 200. `status: "approved"`, `response_code`, `auth_id`, `retrieval_reference`, `user_message` | **Mock:** `{"status":"APPROVED","response_code":"00","user_message":"Aprobada","auth_id":"MOCK01","retrieval_reference":"000000000001"}` — 200 OK. **Procesador real:** `{"status":"DECLINED","response_code":"89","user_message":"Rechazada","auth_id":"636915","retrieval_reference":"000000692777"}` — 200 OK | Pass | Mock: APPROVED. Procesador real: DECLINED con código 89 (terminal desconocida). TERM001 no está dada de alta en la base del procesador. |
+| 044 | Gateway | Autorizar venta exitosa (entry mode manual 012) | `POST /v1/authorize` — `product_code: "993"`, `amount_minor: 150000`, `card_number: "4111111111111111"`, `terminal_id: "TERM001"`, `stan: "000002"`, `transaction_number: "OP-260716-0001"`, `expiration_date: "1228"` | Código 200. `status: "approved"`, `response_code`, `auth_id`, `retrieval_reference`, `user_message` | **Mock:** `{"status":"APPROVED","response_code":"00","user_message":"Aprobada","auth_id":"MOCK01","retrieval_reference":"000000000001"}` — 200 OK. **Procesador real:** `{"status":"DECLINED","response_code":"89","user_message":"Rechazada","auth_id":"636915","retrieval_reference":"000000692777"}` — 200 OK | Pass | Mock: APPROVED. Procesador real: DECLINED con código 89 (terminal desconocida). TERM001 no está dada de alta en la base del procesador. El DE62 (`numero_comprobante`) se completa con la parte numérica del `transaction_number` (`0001`), no con el STAN. |
+
 | 045 | Gateway | Autorizar con tarjeta sin fondos | `POST /v1/authorize` — monto superior al límite de la tarjeta | Código 200. `status: "declined"`, `response_code` de rechazo, `user_message` explicativo | No probado | Pendiente | Requiere tarjeta con límite configurado en el procesador |
 | 046 | Gateway | Autorizar con terminal inválida | `POST /v1/authorize` — `terminal_id: "INVALIDO"` | Código 400. Mensaje: "Terminal inválida" | **Mock:** `{"status":"APPROVED",...}` — 200 OK (Fail). **Procesador real:** `{"status":"DECLINED","response_code":"89","user_message":"Rechazada","auth_id":"238335","retrieval_reference":"000000747793"}` — 200 OK | Pass | El procesador real rechaza correctamente con código 89 (terminal desconocida). El mock no valida (ver hallazgo #11). |
 | 047 | Gateway | Autorizar con STAN inválido | `POST /v1/authorize` — `stan: ""` (vacío) | Código 400. Mensaje: "STAN inválido" | `{"message":"stan: String should have at least 1 character"}` — 400 Bad Request | Pass | |
@@ -82,6 +85,8 @@ Adaptador HTTP → ISO8583. Traduce las solicitudes de la API al formato del pro
 | 050 | Gateway | Autorizar con producto no soportado | `POST /v1/authorize` — `product_code: "INVALIDO"` | Código 400. Mensaje: "Producto no soportado" | `{"message":"product_code: Input should be '993', '994', '995', '996' or '997'"}` — 400 Bad Request | Pass | El gateway usa códigos de procesador (993-997), no nombres de producto |
 | 051 | Gateway | Timeout de conexión al procesador | Procesador detenido con `docker compose stop auth` | Código 502. Mensaje: "Procesador de pagos no disponible" | `{"message":"Procesador de pagos no disponible"}` — 502 Bad Gateway | Pass | El gateway detecta correctamente la caída del procesador y devuelve 502. |
 | 052 | Gateway | Autorizar con entry mode de banda (020) | `POST /v1/authorize` — `entry_mode: "020"` con datos de track | Código 200. `status: "approved"` | | | Pendiente de implementación de captura por banda (G-P0-06) |
+| 093 | Gateway | Autorizar con `transaction_number` → DE62 usa la parte numérica del ID | `POST /v1/authorize` — `product_code: "993"`, `amount_minor: 150050`, `card_number: "4111111111111111"`, `terminal_id: "TERM0001"`, `stan: "000001"`, `transaction_number: "OP-260716-0001"` | El mensaje ISO 0200 lleva DE62 (`numero_comprobante`) = `0001` (parte numérica del ID) y DE11 (STAN) = `000001` (sin cambios) | Verificado por test unitario `test_build_purchase_request_sets_fields` en `payment-gateway/tests/test_iso_packer.py`: `iso.field_62 == "0001"` y `iso.systracenum_11 == "000001"` | Pass | El DE62 ya no usa el STAN; se completa con la sección `NNNNNNN` del ID `OP-YYMMDD-NNNNNNNN`. Ver hallazgo #28 y G-P0-19. |
+
 
 ---
 
@@ -149,10 +154,11 @@ Aplicación Android que corre en la terminal Verifone.
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
 | API | 42 | 37 | 1 | 0 | 3 | 2 |
-| Payment Gateway | 10 | 8 | 0 | 0 | 0 | 2 |
+| Payment Gateway | 11 | 9 | 0 | 0 | 0 | 2 |
 | POC Verifone | 7 | 7 | 0 | 0 | 0 | 0 |
 | Mobile | 33 | 20 | 1 | 0 | 2 | 10 |
-| **Total** | **92** | **72** | **2** | **0** | **5** | **14** |
+| **Total** | **93** | **73** | **2** | **0** | **5** | **14** |
+
 
 
 ---
@@ -172,11 +178,13 @@ Aplicación Android que corre en la terminal Verifone.
 | 9 | 2026-07-30 | API | **El endpoint `GET /v1/transactions/{id}` no existe.** Solo están implementados `GET /v1/transactions` (listado) y `POST /v1/transactions` (crear). | No se puede obtener el detalle de una transacción individual. La app mobile podría necesitarlo para el detalle desde historial. | Abierto | TC-040, TC-041, TC-042 |
 | 10 | 2026-07-30 | API | **La API no valida el formato del CVV en el backend.** Se probó con `cvv: "12"` (2 dígitos) y la API lo rechazó por validación de esquema (min 3 caracteres). | La validación de longitud funciona correctamente. | Resuelto | TC-023 |
 | 11 | 2026-07-30 | Gateway | **El mock del gateway no valida la terminal.** Se probó con `terminal_id: "INVALIDO"` y el mock devolvió APPROVED. | El mock no replica la validación del procesador real. Solo afecta pruebas locales. | Resuelto | TC-046 |
-| 12 | 2026-07-30 | Gateway | **El procesador real rechaza terminales de prueba con código 89.** Se probó con `terminal_id: "TERM001"` y el procesador devolvió DECLINED con código 89 (terminal desconocida). | Las terminales de prueba no están dadas de alta en la base del procesador. Se debe dar de alta la terminal para probar aprobaciones. | Abierto | TC-044 |
+| 12 | 2026-07-30 | Gateway | **El procesador real rechaza terminales de prueba con código 89.** Se probó con `terminal_id: "TERM001"` y el procesador devolvió DECLINED con código 89 (terminal desconocida). | Las terminales de prueba no están dadas de alta en la base del procesador. Se debe dar de alta la terminal para probar aprobaciones. **Resuelto (2026-07-08):** el script `payment_processor/docker/mysql/03_fix_demo.sql` (montado en `/docker-entrypoint-initdb.d/` desde `docker-compose.yml`) da de alta el comercio del terminal `05000001` (`cod_comercio='012502'`), por lo que se aplica automáticamente en cada corrida en limpio. | Resuelto | TC-044 |
+
 | 13 | 2026-07-30 | API | **La API no valida el checksum de Luhn en el número de tarjeta (confirmado por segunda vez).** Se probó con `card_number: "4111111111111112"` y la API lo aceptó. | Riesgo de aceptar tarjetas inválidas. Se debe implementar validación de Luhn en la API. | Resuelto | TC-024 |
 | 14 | 2026-07-30 | API | **La API no valida el formato del CVV en el backend (confirmado).** Se probó con `cvv: "12345"` (5 dígitos) y la API lo rechazó por validación de esquema (max 4). | El CVV se valida solo por longitud en el esquema, no por regla de negocio. | Resuelto | TC-022 |
 | 15 | 2026-07-30 | API | **La API no valida el formato del monto (confirmado).** Se probó con `amount: "-100.00"` y la API lo rechazó con "Monto inválido". | La validación de monto funciona correctamente. | Resuelto | TC-025 |
-| 16 | 2026-07-30 | Gateway | **El procesador rechaza terminales de prueba con código 89.** Se probó con `terminal_id: "TERM001"` y el procesador devolvió DECLINED con código 89 (terminal desconocida). | Las terminales de prueba no están dadas de alta en la base del procesador. Se debe dar de alta la terminal para probar aprobaciones. | Abierto | TC-044 |
+| 16 | 2026-07-30 | Gateway | **El procesador rechaza terminales de prueba con código 89.** Se probó con `terminal_id: "TERM001"` y el procesador devolvió DECLINED con código 89 (terminal desconocida). | Las terminales de prueba no están dadas de alta en la base del procesador. Se debe dar de alta la terminal para probar aprobaciones. **Resuelto (2026-07-08):** el script `payment_processor/docker/mysql/03_fix_demo.sql` (montado en `/docker-entrypoint-initdb.d/` desde `docker-compose.yml`) da de alta el comercio del terminal `05000001` (`cod_comercio='012502'`), por lo que se aplica automáticamente en cada corrida en limpio. | Resuelto | TC-044 |
+
 | 17 | 2026-07-31 | Mobile | **ANR (Application Not Responding) al reiniciar la app tras logout.** Al hacer logout y volver a abrir la app, se produce un ANR en el emulador. | El ANR no se reproduce en dispositivo real (ver hallazgo #21). Es específico del emulador. | Resuelto | TC-059 |
 | 18 | 2026-07-31 | Mobile | **La app no contacta la API desde el emulador.** Al intentar login desde el emulador, la app no puede conectarse a la API. | El emulador no puede acceder a `localhost` de la máquina host. Se debe usar `10.0.2.2` en el emulador. | Resuelto | TC-053 |
 | 19 | 2026-07-31 | Gateway | **El procesador responde código 96 (ISO inválida) en varios escenarios.** Se probó con distintos payloads y el procesador devolvió código 96 en varios casos. | El formato ISO generado por el gateway no es válido para el procesador. Se debe revisar el empaquetado ISO. | Abierto | TC-044 |
@@ -188,6 +196,8 @@ Aplicación Android que corre en la terminal Verifone.
 | 25 | 2026-08-04 | POC Verifone | **VCL (Verifone Common Library) enmascara datos de tarjetas en el MSR.** Al leer banda magnética real (mock OFF), el SDK devuelve `ERR_EXECUTION` con PAN y tracks llenos de `FF` (0xFF). `hasClearData: false`. Los tags de transacción (`fetchTxnTags`) también vienen enmascarados. | **Actualizado (2026-08-05):** en pruebas posteriores, los datos llegaron **en claro** (no hasheados). El MSR devuelve `ERR_EXECUTION` pero los tags de transacción (`fetchTxnTags`) contienen PAN, track1 y track2 en claro. VCL no enmascara estos datos en esta configuración. | Resuelto | TC-088, TC-091 |
 | 26 | 2026-08-05 | API | **Falta de cobertura de tests para la rama `skip_luhn`/`luhn_check_enabled` en `create_transaction.py`.** Se agregó la configuración `luhn_check_enabled` (constructor) que se traduce en `skip_luhn` en `_validate_pan`, permitiendo omitir la validación de Luhn. Sin embargo, solo existía `test_invalid_pan` (cubre la rama con Luhn habilitado: PAN inválido → `InvalidCardNumber`), pero no había ningún test que verificara la rama con Luhn deshabilitado (PAN inválido que **pasa** la validación). Lo marcó Copilot en el PR: sin un test, una refactorización podría romper el flag silenciosamente. | **Resuelto (2026-08-05):** se agregó `test_invalid_pan_accepted_when_luhn_disabled` en `api/tests/test_create_transaction.py`, que construye el use case con `luhn_check_enabled=False` y verifica que el PAN `4111111111111112` (Luhn inválido) pasa la validación y la transacción llega al gateway (APPROVED). También se extendió el helper `_build()` para aceptar `luhn_check_enabled`. Complementa los hallazgos #7 y #13 sobre Luhn. | Resuelto | TC-024 |
 | 27 | 2026-08-05 | POC Verifone | **Bug de decodificación de track2 BCD a ASCII en `PsdkBridge.kt`.** El campo `tags.track2` se mostraba con caracteres corruptos (`"\u00060\u0007..."`) porque se intentaba convertir bytes BCD directamente a ASCII con `bytesAsAscii()`. El track2 en BCD empaqueta dos dígitos decimales por byte (ej: `B6063007014007403D3012F8`). | **Resuelto (2026-08-05):** se agregó la función `bytesAsBcdAscii()` que decodifica cada nibble correctamente: `0xB`→`;` (sentinel inicio), `0xD`→`=` (separador), `0xF`→`?` (sentinel fin), dígitos `0-9`→dígitos ASCII. Ahora `track2` se muestra legible: `;6063007014007403=3012?8`. | Resuelto | TC-092 |
+| 28 | 2026-07-08 | Gateway | **El DE62 (`numero_comprobante`) usaba el STAN como valor, pero el STAN cumple otra función (DE11, trazabilidad de terminal).** El DE62 debe llevar la parte numérica del ID de transacción (`OP-YYMMDD-NNNNNNNN` → `NNNNNNN`). | El número de comprobante que registra el autorizador en `sgas_cup` ahora es el número de transacción real, no el STAN. Se propagó `transaction_number` desde la API (`AuthorizeRequest`) hasta el gateway (`AuthorizeCommand`) y se extrae con `_transaction_number()` en `message_builder.py`. | Resuelto | TC-093, G-P0-19 |
+
 
 
 ### Detalle del cambio (estilo PR)
@@ -240,6 +250,33 @@ Aplicación Android que corre en la terminal Verifone.
 ```
 
 **Validación:** `make check` en `api/` pasó completo (Ruff ✓, mypy ✓, 96 tests ✓, cobertura 94.91% ≥ 90%).
+
+---
+
+### Detalle del cambio (estilo PR) — DE62 = parte numérica del ID de transacción
+
+**Archivos modificados:** `api/application/payments/ports.py`, `api/application/payments/create_transaction.py`, `api/infrastructure/payments/http_gateway.py`, `payment-gateway/presentation/schemas/authorize.py`, `payment-gateway/presentation/controllers/authorize_controller.py`, `payment-gateway/domain/authorization.py`, `payment-gateway/application/payments/authorize_payment.py`, `payment-gateway/infrastructure/iso/message_builder.py`, tests de API y gateway.
+
+**Motivo:** el DE62 (`numero_comprobante`) usaba el STAN como valor, pero el STAN cumple otra función (DE11, trazabilidad de terminal). El DE62 debe llevar la parte numérica del ID de transacción (`OP-YYMMDD-NNNNNNNN` → `NNNNNNN`).
+
+**Cambios:**
+
+1. **API:** se agregó `transaction_number` al `AuthorizeRequest` (ports.py), se pasa en `create_transaction.py` y se envía en `http_gateway.py`.
+2. **Gateway:** se agregó `transaction_number` al schema HTTP, al dataclass `AuthorizeCommand` (domain) y se propaga en `authorize_payment.py`.
+3. **Builder ISO:** en `message_builder.py`, `field_62` ahora usa `_transaction_number(command.transaction_number)` en lugar de `command.stan`. La función `_transaction_number()` extrae la sección después del último guión (`OP-260716-0001` → `0001`).
+
+```python
+# payment-gateway/infrastructure/iso/message_builder.py
+def _transaction_number(transaction_number: str) -> str:
+    # "OP-YYMMDD-NNNNNNNN" -> "NNNNNNN"
+    return transaction_number.rsplit("-", 1)[-1]
+
+# ...
+field_62=_transaction_number(command.transaction_number),
+```
+
+**Validación:** `make check` pasa en API (96 tests, 94.92% cobertura) y gateway (34 tests, 98.76% cobertura). Verificado por `test_build_purchase_request_sets_fields` en `payment-gateway/tests/test_iso_packer.py` (`iso.field_62 == "0001"`). Ver hallazgo #28 y G-P0-19.
+
 
 
 

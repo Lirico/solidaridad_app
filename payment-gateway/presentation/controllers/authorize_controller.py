@@ -55,8 +55,10 @@ def authorize(
         card_number=body.card_number,
         terminal_id=body.terminal_id,
         stan=body.stan,
+        transaction_number=body.transaction_number,
         expiration_date=body.expiration_date,
     )
+
     try:
         result = use_case.execute(command)
     except (

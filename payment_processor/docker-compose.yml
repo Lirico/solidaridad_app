@@ -18,6 +18,7 @@ services:
       - processor_mysqldata:/var/lib/mysql
       - ./docker/mysql/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ./docker/mysql/02_seed.sql.gz:/docker-entrypoint-initdb.d/02_seed.sql.gz:ro
+      - ./docker/mysql/03_fix_demo.sql:/docker-entrypoint-initdb.d/03_fix_demo.sql:ro
     healthcheck:
       test:
         [

@@ -33,7 +33,10 @@ from domain.product import Product, parse_product, processor_product_code
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.installation_repository import InstallationRepository
-from persistence.repositories.transaction_repository import TransactionRepository
+from persistence.repositories.transaction_repository import (
+    TransactionRepository,
+    ticket_from_transaction_number,
+)
 
 
 class CreateTransactionHttpStatus(IntEnum):
@@ -139,6 +142,7 @@ class CreateTransaction:
 
         business_date = datetime.now(UTC).date()
         transaction_number = self._transactions.next_transaction_number(business_date)
+        processor_ticket = ticket_from_transaction_number(transaction_number)
         stan = f"{secrets.randbelow(1_000_000):06d}"
         proc_code = processor_product_code(parsed_product)
 
@@ -153,6 +157,7 @@ class CreateTransaction:
                 amount_minor=money.amount_minor,
                 card_last4=card_last4,
                 stan=stan,
+                processor_ticket=processor_ticket,
                 idempotency_key=key,
                 request_fingerprint=fingerprint,
                 user_message=MSG_PENDING,
@@ -175,6 +180,7 @@ class CreateTransaction:
                 card_number=pan,
                 terminal_id=terminal_id[:8].ljust(8),
                 stan=stan,
+                ticket_number=processor_ticket,
                 expiration_date=exp,
             )
         )

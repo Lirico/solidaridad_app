@@ -51,6 +51,7 @@ class Transaction(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     card_last4: Mapped[str] = mapped_column(String(4), nullable=False)
     stan: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    processor_ticket: Mapped[str | None] = mapped_column(String(24), nullable=True)
     auth_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     retrieval_reference: Mapped[str | None] = mapped_column(
         String(32),
@@ -62,6 +63,10 @@ class Transaction(Base):
     )
     user_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    void_idempotency_key: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+    )
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

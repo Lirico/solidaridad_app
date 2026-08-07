@@ -12,6 +12,11 @@ from persistence.models.transaction import Transaction as TransactionModel
 from persistence.models.transaction import TransactionNumberCounter
 
 
+def ticket_from_transaction_number(transaction_number: str) -> str:
+    """Extract numeric DE62 ticket from OP-YYMMDD-NNNNNNNN."""
+    return transaction_number.rsplit("-", 1)[-1]
+
+
 def _to_domain(row: TransactionModel) -> Transaction:
     return Transaction(
         id=row.id,
@@ -33,6 +38,8 @@ def _to_domain(row: TransactionModel) -> Transaction:
         request_fingerprint=row.request_fingerprint,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        processor_ticket=row.processor_ticket,
+        void_idempotency_key=row.void_idempotency_key,
     )
 
 
@@ -49,6 +56,21 @@ class TransactionRepository:
         stmt = select(TransactionModel).where(
             TransactionModel.user_id == user_id,
             TransactionModel.idempotency_key == idempotency_key,
+        )
+        row = self._session.scalars(stmt).first()
+        if row is None:
+            return None
+        return _to_domain(row)
+
+    def get_by_transaction_number(
+        self,
+        *,
+        transaction_number: str,
+        terminal_id: str,
+    ) -> Transaction | None:
+        stmt = select(TransactionModel).where(
+            TransactionModel.transaction_number == transaction_number,
+            TransactionModel.terminal_id == terminal_id,
         )
         row = self._session.scalars(stmt).first()
         if row is None:
@@ -93,6 +115,7 @@ class TransactionRepository:
         amount_minor: int,
         card_last4: str,
         stan: str,
+        processor_ticket: str,
         idempotency_key: str,
         request_fingerprint: str,
         user_message: str,
@@ -109,6 +132,7 @@ class TransactionRepository:
             status=TransactionStatus.PENDING.value,
             card_last4=card_last4,
             stan=stan,
+            processor_ticket=processor_ticket,
             user_message=user_message,
             idempotency_key=idempotency_key,
             request_fingerprint=request_fingerprint,
@@ -161,6 +185,28 @@ class TransactionRepository:
         row.processor_response_code = processor_response_code
         row.auth_id = auth_id
         row.retrieval_reference = retrieval_reference
+        row.updated_at = datetime.now(UTC)
+        self._session.flush()
+        return _to_domain(row)
+
+    def apply_void_result(
+        self,
+        *,
+        transaction_id: int,
+        status: TransactionStatus,
+        void_idempotency_key: str,
+        user_message: str | None = None,
+        processor_response_code: str | None = None,
+    ) -> Transaction:
+        row = self._session.get(TransactionModel, transaction_id)
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        row.status = status.value
+        row.void_idempotency_key = void_idempotency_key
+        if user_message is not None:
+            row.user_message = user_message
+        if processor_response_code is not None:
+            row.processor_response_code = processor_response_code
         row.updated_at = datetime.now(UTC)
         self._session.flush()
         return _to_domain(row)

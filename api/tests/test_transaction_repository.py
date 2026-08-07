@@ -27,11 +27,13 @@ def test_to_domain_maps_fields() -> None:
     row.status = "APPROVED"
     row.card_last4 = "1111"
     row.stan = "1"
+    row.processor_ticket = "00000007"
     row.auth_id = "A"
     row.retrieval_reference = "R"
     row.processor_response_code = "00"
     row.user_message = "ok"
     row.idempotency_key = "k"
+    row.void_idempotency_key = None
     row.request_fingerprint = "fp"
     row.created_at = now
     row.updated_at = now
@@ -85,6 +87,7 @@ def test_create_pending_and_update_result() -> None:
         amount_minor=150,
         card_last4="1111",
         stan="000001",
+        processor_ticket="00000001",
         idempotency_key="k",
         request_fingerprint="fp",
         user_message="pending",
@@ -105,11 +108,13 @@ def test_create_pending_and_update_result() -> None:
     row.status = "PENDING"
     row.card_last4 = "1111"
     row.stan = "000001"
+    row.processor_ticket = "00000001"
     row.auth_id = None
     row.retrieval_reference = None
     row.processor_response_code = None
     row.user_message = "pending"
     row.idempotency_key = "k"
+    row.void_idempotency_key = None
     row.request_fingerprint = "fp"
     row.created_at = datetime.now(UTC)
     row.updated_at = datetime.now(UTC)

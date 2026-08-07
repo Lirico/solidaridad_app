@@ -106,6 +106,11 @@ def test_create_approves() -> None:
     assert result.http_status == CreateTransactionHttpStatus.CREATED
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
+    auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.ticket_number == "00000001"
+    transactions.create_pending.assert_called_once()
+    create_kwargs = transactions.create_pending.call_args.kwargs
+    assert create_kwargs["processor_ticket"] == "00000001"
     transactions.update_result.assert_called_once()
 
 

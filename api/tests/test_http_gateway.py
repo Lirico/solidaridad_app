@@ -11,6 +11,7 @@ def _request() -> AuthorizeRequest:
         card_number="4111111111111111",
         terminal_id="05000001",
         stan="000001",
+        ticket_number="00000001",
         expiration_date="2912",
     )
 
@@ -118,3 +119,34 @@ def test_authorize_invalid_json_is_unknown() -> None:
 def test_close_owned_client() -> None:
     gateway = HttpPaymentGateway(base_url="http://gw", timeout_seconds=1)
     gateway.close()
+
+
+def test_void_approved() -> None:
+    from application.payments.ports import VoidRequest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/void"
+        return httpx.Response(
+            200,
+            json={
+                "status": "APPROVED",
+                "response_code": "00",
+                "user_message": "Aprobada",
+                "auth_id": "V1",
+                "retrieval_reference": "R2",
+            },
+        )
+
+    result = _gateway(handler).void(
+        VoidRequest(
+            product_code="993",
+            amount_minor=150,
+            card_number="4111111111111111",
+            terminal_id="05000001",
+            stan="000002",
+            original_ticket="00000001",
+            void_ticket="000002",
+        )
+    )
+    assert result.outcome == GatewayOutcome.APPROVED
+    assert result.auth_id == "V1"

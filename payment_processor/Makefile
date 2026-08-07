@@ -1,4 +1,4 @@
-.PHONY: up down logs build reset seed-refresh help
+.PHONY: up down logs build reset seed-refresh recarga help
 
 COMPOSE := docker compose --env-file .env
 
@@ -10,6 +10,7 @@ help:
 	@echo "  make build          Rebuild auth image"
 	@echo "  make reset          Wipe mysql volume and recreate"
 	@echo "  make seed-refresh   Re-dump schema/seed from desa (needs VPN + .env DESA_*)"
+	@echo "  make recarga        Cargar saldo alto en las tarjetas de demo (recarga_demo.sql)"
 
 up:
 	$(COMPOSE) up -d --build --wait
@@ -29,3 +30,8 @@ reset:
 
 seed-refresh:
 	./docker/mysql/dump_seed_from_desa.sh
+
+recarga:
+	docker exec -i solidaridad-processor-mysql mysql -ukigadmin2 -plocaldev kigsolidario2 < docker/mysql/recarga_demo.sql
+
+

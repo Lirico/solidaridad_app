@@ -25,10 +25,16 @@ VALUES
 
 -- 2) Recarga alta para 4111111111111111 (VISA de prueba).
 --    saldo = 100000.00 -> permite 1000 ventas de $100.
+--    importe = -100000.00 (negativo) -> el autorizador la detecta como recarga
+--    (obtieneUltimaRecarga() busca importe < 0). Con 0.00 no se comportaría como recarga.
+--    ADVERTENCIA: el autorizador se cuelga en calcula_saldo_vivo() cuando se intenta
+--    autorizar con este PAN (bug del código C) y Docker reinicia el contenedor.
+--    No usar esta tarjeta para el demo; usar siempre 6063007014007401.
 INSERT INTO sgas_usuario_cta
     (id_usuario, nro_tarjeta, fecha_operacion, cod_operacion, importe, saldo, prod_id, id_cierre, ts_operacion)
 VALUES
-    ('12345678', '4111111111111111', CURDATE(), 2, 0.00, 100000.00, '993', 0, NOW());
+    ('12345678', '4111111111111111', CURDATE(), 2, -100000.00, 100000.00, '993', 0, NOW());
+
 
 -- Verificación (debe devolver saldo=100000 para ambas):
 -- SELECT nro_tarjeta, prod_id, importe, saldo FROM sgas_usuario_cta

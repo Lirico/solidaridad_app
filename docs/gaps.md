@@ -6,10 +6,27 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-07
 
+> ✅ **Último cambio (2026-08-07):** limpieza de scripts de demo y docs.
+> - `payment_processor/Makefile`: nuevo target `make recarga` que aplica
+>   `docker/mysql/recarga_demo.sql` contra el contenedor MySQL (ya no se corre
+>   SQL a mano).
+> - `payment_processor/docker/mysql/recarga_demo.sql`: la recarga de
+>   `4111111111111111` pasó de `importe=0.00` a `-100000.00` (negativo) para que
+>   el autorizador la detecte como recarga (`obtieneUltimaRecarga()` busca
+>   `importe < 0`), y se agregó advertencia de que ese PAN cuelga el autorizador.
+> - `docs/demo-transaccion-aprobada.md`: se corrigió la afirmación sobre Luhn
+>   (API/gateway no validan Luhn, solo formato numérico y longitud 13–19), el
+>   link roto `fix_demo.sql` → `03_fix_demo.sql`, y la sección de recarga ahora
+>   usa `make -C payment_processor recarga`.
+> - `mobile/lib/features/auth/data/auth_repository.dart`: comentario aclarando
+>   que el default `05000001` es un terminal real (GOBIERNO) del demo, no un
+>   valor solo de desarrollo.
+
 > ✅ **Último cambio:** tabla append-only `transaction_status_events` en la API
 > (CREATED / GATEWAY_RESULT / VOID_RESULT / IDEMPOTENT_HIT). Persistencia
 > enganchada en create/update/void e idempotent replay; **sin** exposición
 > HTTP todavía.
+
 
 > ✅ **Transacción aprobada (código 00) de punta a punta (2026-06-08):** el
 > bloqueo era que el gateway **no enviaba el DE62 (`numero_comprobante`)**, y el
@@ -33,9 +50,13 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > limpio (volumen nuevo), sin necesidad de correrlo a mano. Ver G-P0-18.
 >
 > **Nota de tarjeta de demo:** la tarjeta que aprueba en vivo es
-> `6063007014007401` (Luhn-válida, con saldo en producto 993). El `fix_demo.sql`
-> y G-P0-18 referencian `6063007014007403` (la original de Lillo, que **no** pasa
-> Luhn); mantener `6063007014007401` como la tarjeta de referencia para el demo.
+> `6063007014007401` (con saldo en producto 993). El `03_fix_demo.sql` y G-P0-18
+> referencian `6063007014007403` (la original de Lillo, que no está dada de alta
+> con saldo en el autorizador); mantener `6063007014007401` como la tarjeta de
+> referencia para el demo. La API y el gateway **no** validan Luhn (solo formato
+> numérico y longitud 13–19), por lo que el rechazo de `6063007014007403` no se
+> debe a Luhn.
+
 >
 > **Bug conocido (2026-06-08):** la tarjeta `4111111111111111` (VISA de prueba)
 > **cuelga el autorizador** en `calcula_saldo_vivo()` (bug del código C) y Docker
@@ -73,7 +94,8 @@ Verifone (banda + térmica).
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
 | G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
-| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-06-08:** el default pasó de `dev-term` a `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (el terminal `dev-term` no existe en `terminales` del autorizador → código 89). Pendiente: lectura runtime desde config del device. |
+| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-06-08:** el default pasó de `dev-term` a `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (el terminal `dev-term` no existe en `terminales` del autorizador → código 89). **2026-08-07:** se aclaró el comentario del default para indicar que `05000001` es un terminal real (GOBIERNO) del demo, no un valor solo de desarrollo. Pendiente: lectura runtime desde config del device. |
+
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases.md`. |

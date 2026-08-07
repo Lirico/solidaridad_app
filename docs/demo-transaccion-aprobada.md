@@ -23,19 +23,32 @@ La tarjeta que aprueba en vivo es la de **Lillo** (Luhn-válida):
 | Saldo | **100000** en producto `993` |
 | Titular | LILLO ESPINOZA SILVIA DEL |
 
-> **Importante:** la tarjeta original de Lillo (`6063007014007403`) **no** pasa
-> la validación Luhn del gateway y se rechaza antes de llegar al autorizador.
-> Usar siempre `6063007014007401`.
+> **Importante:** la tarjeta original de Lillo (`6063007014007403`) no está
+> dada de alta con saldo en el autorizador y se rechaza. Usar siempre
+> `6063007014007401`.
+>
+> Nota: la API y el gateway **no** aplican validación Luhn (las tarjetas del
+> programa usan dígito verificador MOD-TDF); solo validan que el PAN sea
+> numérico y tenga entre 13 y 19 dígitos. El rechazo de `6063007014007403`
+> no se debe a Luhn.
+
 
 ### Cómo recargar saldo / extender vigencia
 
 El script `payment_processor/docker/mysql/recarga_demo.sql` deja la tarjeta con
 saldo **100000** y vigencia **2028-12-30**. Aplicarlo contra la base del
-autorizador:
+autorizador con el target de make (requiere el stack levantado):
+
+```bash
+make -C payment_processor recarga
+```
+
+Equivalente manual:
 
 ```bash
 docker exec -i solidaridad-processor-mysql mysql -ukigadmin2 -plocaldev kigsolidario2 < payment_processor/docker/mysql/recarga_demo.sql
 ```
+
 
 ---
 
@@ -162,8 +175,9 @@ docker exec solidaridad-processor-mysql mysql -ukigadmin2 -plocaldev kigsolidari
 | **96** | Gateway no envía DE62 (`numero_comprobante`) → error SQL en `valida_cupon_dup()` | Ver G-P0-19 en `docs/gaps.md`. El gateway debe empaquetar `field_62`. |
 | **17** | `validaTiempoUltimaVenta()` rechaza ventas repetidas de la misma tarjeta/producto | Setear `venta_min_horas_ultima_venta = 0` en `soli_config`. |
 | **89** | Terminal desconocida (`valida_terminal() NUM_ROWS: 0`) | Usar `installation_id=05000001` (existe en `terminales`). |
-| **51** | Fondos insuficientes (`saldo_anterior - consumo_vivo < importe`) | Recargar saldo con `recarga_demo.sql`. |
-| **Rechazo antes de autorizador** | Tarjeta no pasa Luhn | Usar `6063007014007401` (Luhn-válida). |
+| **51** | Fondos insuficientes (`saldo_anterior - consumo_vivo < importe`) | Recargar saldo con `make -C payment_processor recarga`. |
+| **Rechazo antes de autorizador** | Tarjeta no dada de alta / sin saldo en el autorizador | Usar `6063007014007401` (dada de alta con saldo). |
+
 
 ---
 
@@ -180,4 +194,7 @@ para el demo.** Usar siempre `6063007014007401`.
 
 - `docs/gaps.md` — inventario de brechas y fixes (G-P0-18, G-P0-19).
 - `payment_processor/docker/mysql/recarga_demo.sql` — recarga + vigencia.
-- `payment_processor/docker/mysql/fix_demo.sql` — fixes de terminal/comercio.
+- `payment_processor/docker/mysql/03_fix_demo.sql` — fixes de terminal/comercio
+  (se ejecuta automáticamente en cada corrida en limpio vía docker-compose).
+
+

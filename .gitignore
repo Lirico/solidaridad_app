@@ -5,6 +5,7 @@
 *.iws
 .vscode/
 .kilo/
+.dart_tool/
 
 
 # OS

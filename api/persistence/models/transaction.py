@@ -30,7 +30,7 @@ class Transaction(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     transaction_number: Mapped[str] = mapped_column(
-        String(14),
+        String(24),
         nullable=False,
         unique=True,
     )

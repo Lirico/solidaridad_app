@@ -30,7 +30,7 @@ client = TestClient(app)
 def _tx(**overrides: object) -> Transaction:
     base = dict(
         id=1,
-        transaction_number="OP-260716-0001",
+        transaction_number="OP-260716-00000001",
         user_id=1,
         installation_id=1,
         terminal_id="05000001",
@@ -104,7 +104,7 @@ def test_create_transaction_201() -> None:
 
     assert response.status_code == 201
     data = response.json()
-    assert data["transaction_number"] == "OP-260716-0001"
+    assert data["transaction_number"] == "OP-260716-00000001"
     assert data["status"] == "APPROVED"
     assert data["user_message"] == "Pago aprobado"
     assert "card_number" not in data
@@ -185,7 +185,7 @@ def test_list_transactions_200() -> None:
     assert data["total"] == 1
     assert len(data["items"]) == 1
     item = data["items"][0]
-    assert item["transaction_number"] == "OP-260716-0001"
+    assert item["transaction_number"] == "OP-260716-00000001"
     assert item["product"] == "GARRAFA_10"
     assert item["amount"] == "1.5"
     assert item["card_last4"] == "1111"

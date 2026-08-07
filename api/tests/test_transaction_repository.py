@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from domain.exceptions import TransactionNumberExhausted
 from domain.product import Product
 from domain.transaction_status import TransactionStatus
 from persistence.models.transaction import Transaction as TransactionModel
@@ -18,7 +17,7 @@ def test_to_domain_maps_fields() -> None:
     now = datetime.now(UTC)
     row = MagicMock(spec=TransactionModel)
     row.id = 7
-    row.transaction_number = "OP-260716-0007"
+    row.transaction_number = "OP-260716-00000007"
     row.user_id = 1
     row.installation_id = 10
     row.terminal_id = "05000001"
@@ -57,17 +56,18 @@ def test_next_transaction_number_creates_counter() -> None:
     session.scalars.return_value.one.return_value = counter
     repo = TransactionRepository(session)
     number = repo.next_transaction_number(date(2026, 7, 16))
-    assert number == "OP-260716-0001"
+    assert number == "OP-260716-00000001"
     assert counter.last_value == 1
 
 
-def test_next_transaction_number_exhausted() -> None:
+def test_next_transaction_number_beyond_former_daily_cap() -> None:
     session = MagicMock()
     counter = TransactionNumberCounter(business_date=date(2026, 7, 16), last_value=9999)
     session.scalars.return_value.first.return_value = counter
     repo = TransactionRepository(session)
-    with pytest.raises(TransactionNumberExhausted):
-        repo.next_transaction_number(date(2026, 7, 16))
+    number = repo.next_transaction_number(date(2026, 7, 16))
+    assert number == "OP-260716-00010000"
+    assert counter.last_value == 10000
 
 
 def test_create_pending_and_update_result() -> None:
@@ -76,7 +76,7 @@ def test_create_pending_and_update_result() -> None:
     user_id = 1
 
     created = repo.create_pending(
-        transaction_number="OP-260716-0001",
+        transaction_number="OP-260716-00000001",
         user_id=user_id,
         installation_id=10,
         terminal_id="05000001",
@@ -95,7 +95,7 @@ def test_create_pending_and_update_result() -> None:
 
     row = MagicMock(spec=TransactionModel)
     row.id = 1
-    row.transaction_number = "OP-260716-0001"
+    row.transaction_number = "OP-260716-00000001"
     row.user_id = user_id
     row.installation_id = 10
     row.terminal_id = "05000001"

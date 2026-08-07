@@ -23,7 +23,7 @@ from domain.transaction_status import TransactionStatus
 def _tx(**overrides: object) -> Transaction:
     base = dict(
         id=1,
-        transaction_number="OP-260716-0001",
+        transaction_number="OP-260716-00000001",
         user_id=1,
         installation_id=10,
         terminal_id="05000001",
@@ -70,7 +70,7 @@ def _build(
         if installation_code is not None
         else None
     )
-    transactions.next_transaction_number.return_value = "OP-260716-0001"
+    transactions.next_transaction_number.return_value = "OP-260716-00000001"
     pending = _tx(status=TransactionStatus.PENDING, user_message="pending")
     # fingerprint filled by use case after create; for create path we stub update
     transactions.create_pending.return_value = pending

@@ -1,4 +1,4 @@
-enum PaymentResult { approved, declined, connectionError }
+enum PaymentResult { approved, declined, connectionError, voided }
 
 class OperationModel {
   final String id;
@@ -8,6 +8,7 @@ class OperationModel {
   final String cardNumber;
   final PaymentResult result;
   final DateTime date;
+  final String? userMessage;
 
   const OperationModel({
     required this.id,
@@ -17,6 +18,7 @@ class OperationModel {
     required this.cardNumber,
     required this.result,
     required this.date,
+    this.userMessage,
   });
 
   factory OperationModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +33,7 @@ class OperationModel {
       date:
           DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.now(),
+      userMessage: json['user_message'] as String?,
     );
   }
 
@@ -57,6 +60,8 @@ class OperationModel {
         return PaymentResult.approved;
       case 'DECLINED':
         return PaymentResult.declined;
+      case 'VOIDED':
+        return PaymentResult.voided;
       case 'FAILED':
       case 'UNKNOWN':
       case 'PENDING':

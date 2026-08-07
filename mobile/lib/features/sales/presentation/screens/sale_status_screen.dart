@@ -35,6 +35,11 @@ class SaleStatusScreen extends StatelessWidget {
         statusTitle = 'Error de Conexión';
         statusSubtitle =
             'No se pudo contactar con el POSNET. Verifique su conectividad y reintente.';
+      case PaymentResult.voided:
+        statusColor = Colors.grey;
+        statusIcon = Icons.undo;
+        statusTitle = 'Transacción Anulada';
+        statusSubtitle = 'La venta fue anulada correctamente.';
     }
 
     return Scaffold(

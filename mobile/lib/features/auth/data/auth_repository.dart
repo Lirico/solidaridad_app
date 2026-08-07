@@ -12,7 +12,7 @@ String _resolveInstallationId() {
   // Use a compile-time constant or fall back to a dev default.
   const fromDefine = String.fromEnvironment(
     'INSTALLATION_ID',
-    defaultValue: 'dev-term',
+    defaultValue: '05000001',
   );
   return fromDefine;
 }

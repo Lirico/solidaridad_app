@@ -90,7 +90,7 @@ def test_void_approves() -> None:
 
 def test_void_already_voided_is_idempotent() -> None:
     existing = _tx(status=TransactionStatus.VOIDED, user_message="Anulación aprobada")
-    use_case, _, gateway = _build(existing=existing)
+    use_case, transactions, gateway = _build(existing=existing)
     result = use_case.execute(
         terminal_id="05000001",
         transaction_number="OP-260716-00000001",
@@ -99,11 +99,12 @@ def test_void_already_voided_is_idempotent() -> None:
     )
     assert result.transaction.status == TransactionStatus.VOIDED
     gateway.void.assert_not_called()
+    transactions.record_idempotent_hit.assert_called_once()
 
 
 def test_void_same_idempotency_key_replays_without_gateway() -> None:
     existing = _tx(void_idempotency_key="void-1")
-    use_case, _, gateway = _build(existing=existing)
+    use_case, transactions, gateway = _build(existing=existing)
     result = use_case.execute(
         terminal_id="05000001",
         transaction_number="OP-260716-00000001",
@@ -112,6 +113,14 @@ def test_void_same_idempotency_key_replays_without_gateway() -> None:
     )
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.void.assert_not_called()
+    transactions.record_idempotent_hit.assert_called_once_with(
+        transaction_id=existing.id,
+        status=TransactionStatus.APPROVED,
+        actor_user_id=existing.user_id,
+        idempotency_key="void-1",
+        user_message=existing.user_message,
+        processor_response_code=existing.processor_response_code,
+    )
 
 
 def test_void_not_found() -> None:

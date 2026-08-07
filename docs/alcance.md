@@ -96,7 +96,8 @@ claridad operativa.
 - Traducción de códigos técnicos a mensajes claros para la app.
 - Endpoints de listado básico y detalle/comprobante.
 - Logs básicos de auditoría y soporte (sin almacenar datos sensibles completos
-  de tarjeta).
+  de tarjeta). Incluye historial append-only de estados de transacción en
+  Postgres (`transaction_status_events`); sin exposición HTTP en esta etapa.
 - Ambientes y deploy (objetivo: AWS, con conectividad segura al procesador
   on-premises).
 

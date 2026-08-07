@@ -131,7 +131,7 @@ class CreateTransaction:
             idempotency_key=key,
         )
         if existing is not None:
-            return self._replay(existing, fingerprint)
+            return self._replay(existing, fingerprint, idempotency_key=key)
 
         installation = self._installations.get_by_installation_id(installation_id)
         if installation is None:
@@ -171,7 +171,7 @@ class CreateTransaction:
             )
             if raced is None:
                 raise
-            return self._replay(raced, fingerprint)
+            return self._replay(raced, fingerprint, idempotency_key=key)
 
         gateway_result = self._gateway.authorize(
             AuthorizeRequest(
@@ -195,9 +195,20 @@ class CreateTransaction:
         self,
         existing: Transaction,
         fingerprint: str,
+        *,
+        idempotency_key: str,
     ) -> CreateTransactionResult:
         if existing.request_fingerprint != fingerprint:
             raise IdempotencyConflict()
+        self._transactions.record_idempotent_hit(
+            transaction_id=existing.id,
+            status=existing.status,
+            actor_user_id=existing.user_id,
+            idempotency_key=idempotency_key,
+            user_message=existing.user_message,
+            processor_response_code=existing.processor_response_code,
+        )
+        self._session.commit()
         if existing.status == TransactionStatus.PENDING:
             return CreateTransactionResult(
                 transaction=existing,

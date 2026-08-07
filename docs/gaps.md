@@ -6,10 +6,10 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-07
 
-> ✅ **Último cambio:** el gateway distingue "no se pudo conectar con el
-> procesador" (503, el ISO nunca salió) de "falla después de enviar" (502,
-> ambiguo). La API mapea 503 → `FAILED` y 502 → `UNKNOWN`, así que un procesador
-> apagado ya no deja transacciones en `UNKNOWN` sin impacto posible.
+> ✅ **Último cambio:** tabla append-only `transaction_status_events` en la API
+> (CREATED / GATEWAY_RESULT / VOID_RESULT / IDEMPOTENT_HIT). Persistencia
+> enganchada en create/update/void e idempotent replay; **sin** exposición
+> HTTP todavía.
 
 
 
@@ -66,6 +66,7 @@ Verifone (banda + térmica).
 | G-P1-06 | Entry mode ISO acorde al modo de captura | open | DE22 fijo `012` (manual). Falta track/swipe cuando haya banda. |
 | G-P1-08 | UI mobile de anulación | open | Backend `POST /v1/transactions/{tn}/void` listo; la app aún no ofrece flujo de anulación con reingreso de tarjeta. |
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
+| G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 
 ---
 
@@ -105,6 +106,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | ProductSelector con catálogo del backend | `ProductSelector` widget consume `GET /v1/products` y muestra productos de gas (GARRAFA_10, etc.) en vez de ARS/USD. Payload de venta envía `product`. |
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
+| Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
 
 
 ---

@@ -199,6 +199,9 @@ def test_replay_pending_returns_202() -> None:
     assert result.transaction.status == TransactionStatus.PENDING
     gateway.authorize.assert_not_called()
     transactions.create_pending.assert_not_called()
+    transactions.record_idempotent_hit.assert_called_once()
+    session = use_case._session
+    session.commit.assert_called()
 
 
 def test_replay_approved_returns_201_without_gateway() -> None:
@@ -211,7 +214,7 @@ def test_replay_approved_returns_201_without_gateway() -> None:
         expiration_date=None,
     )
     existing = _tx(status=TransactionStatus.APPROVED, request_fingerprint=fp)
-    use_case, _, _, gateway = _build(existing=existing)
+    use_case, transactions, _, gateway = _build(existing=existing)
     result = use_case.execute(
         user_id=existing.user_id,
         installation_id="inst-1",
@@ -224,6 +227,14 @@ def test_replay_approved_returns_201_without_gateway() -> None:
     assert result.http_status == CreateTransactionHttpStatus.CREATED
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_not_called()
+    transactions.record_idempotent_hit.assert_called_once_with(
+        transaction_id=existing.id,
+        status=TransactionStatus.APPROVED,
+        actor_user_id=existing.user_id,
+        idempotency_key="key-1",
+        user_message=existing.user_message,
+        processor_response_code=existing.processor_response_code,
+    )
 
 
 def test_replay_conflict_on_different_body() -> None:

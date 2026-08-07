@@ -90,6 +90,7 @@ class VoidTransaction:
             raise TransactionNotFound()
 
         if tx.status == TransactionStatus.VOIDED:
+            self._record_idempotent_hit(tx, key)
             return VoidTransactionResult(
                 transaction=tx,
                 http_status=VoidTransactionHttpStatus.OK,
@@ -100,6 +101,7 @@ class VoidTransaction:
             raise TransactionNotVoidable()
 
         if tx.void_idempotency_key is not None and tx.void_idempotency_key == key:
+            self._record_idempotent_hit(tx, key)
             return VoidTransactionResult(
                 transaction=tx,
                 http_status=VoidTransactionHttpStatus.OK,
@@ -133,6 +135,17 @@ class VoidTransaction:
             http_status=VoidTransactionHttpStatus.OK,
             user_message=message,
         )
+
+    def _record_idempotent_hit(self, tx: Transaction, idempotency_key: str) -> None:
+        self._transactions.record_idempotent_hit(
+            transaction_id=tx.id,
+            status=tx.status,
+            actor_user_id=tx.user_id,
+            idempotency_key=idempotency_key,
+            user_message=tx.user_message,
+            processor_response_code=tx.processor_response_code,
+        )
+        self._session.commit()
 
     def _apply_gateway_result(
         self,

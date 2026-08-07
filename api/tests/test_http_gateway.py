@@ -95,6 +95,13 @@ def test_authorize_502_is_unknown() -> None:
     assert _gateway(handler).authorize(_request()).outcome == GatewayOutcome.UNKNOWN
 
 
+def test_authorize_503_is_failed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, json={"message": "processor unreachable"})
+
+    assert _gateway(handler).authorize(_request()).outcome == GatewayOutcome.FAILED
+
+
 def test_authorize_500_is_unknown() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, json={"message": "err"})

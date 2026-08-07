@@ -66,6 +66,10 @@ class HttpPaymentGateway:
         except httpx.HTTPError:
             return AuthorizeResult(outcome=GatewayOutcome.UNKNOWN)
 
+        # 503 = el gateway no llegó a conectar con el procesador: el mensaje ISO
+        # nunca salió, así que no hay impacto posible. 502 sí es ambiguo.
+        if response.status_code == 503:
+            return AuthorizeResult(outcome=GatewayOutcome.FAILED)
         if response.status_code == 502:
             return AuthorizeResult(outcome=GatewayOutcome.UNKNOWN)
         if response.status_code >= 500:

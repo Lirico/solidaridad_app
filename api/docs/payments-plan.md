@@ -88,6 +88,17 @@ idempotente.
 | `UNKNOWN` | Resultado ambiguo (posible impacto); no reintentar con key nueva |
 | `PENDING` | En curso; solo en replay de idempotencia → reintentar misma key |
 
+Mapeo de la respuesta del gateway:
+
+| Respuesta del gateway | Status |
+|-----------------------|--------|
+| `APPROVED` / `DECLINED` | `APPROVED` / `DECLINED` |
+| 4xx (validación) | `FAILED` |
+| 503 (no conectó con el procesador) | `FAILED` |
+| 502 / otro 5xx / body ilegible / `FAILED` | `UNKNOWN` |
+| Sin conexión al gateway | `FAILED` |
+| Timeout hacia el gateway | `UNKNOWN` |
+
 ### Idempotencia (venta)
 
 | Estado existente | HTTP | Acción |

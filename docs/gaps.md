@@ -6,11 +6,10 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-07
 
-> ✅ **Último cambio:** anulación de transacciones aprobadas de punta a punta
-> (API → gateway → ISO). `POST /v1/transactions/{tn}/void` con reingreso de
-> tarjeta; gateway `POST /v1/void` (MTI `0200` / DE3 `020000`); DE62 de venta =
-> sufijo numérico de `transaction_number` (no STAN). Estado `VOIDED`. UI mobile
-> de anulación y reverso automático (`0400`) quedan abiertos.
+> ✅ **Último cambio:** el gateway distingue "no se pudo conectar con el
+> procesador" (503, el ISO nunca salió) de "falla después de enviar" (502,
+> ambiguo). La API mapea 503 → `FAILED` y 502 → `UNKNOWN`, así que un procesador
+> apagado ya no deja transacciones en `UNKNOWN` sin impacto posible.
 
 
 
@@ -95,6 +94,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Gateway `POST /v1/void` → ISO anulación (`0200`/`020000`) | Implementado en `payment-gateway/` |
+| Procesador caído ≠ resultado ambiguo | Gateway: `ProcessorUnreachable` (fallo de connect) → 503; `ProcessorUnavailable` (falla tras enviar el ISO) → 502. API: 503 → `FAILED`, 502 → `UNKNOWN`. Ver `payment-gateway/infrastructure/iso/tcp_processor.py` y `api/infrastructure/payments/http_gateway.py`. |
 | Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |

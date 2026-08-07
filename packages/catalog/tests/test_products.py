@@ -16,6 +16,10 @@ def test_list_products_returns_active_catalog() -> None:
     assert products[0].code == Product.GARRAFA_10
     assert products[0].processor_code == "993"
     assert products[0].label == "Garrafa 10 kg"
+    assert products[0].unit.singular == "unidad"
+    assert products[0].unit.plural == "unidades"
+    assert products[-1].unit.singular == "m3"
+    assert products[-1].unit.plural == "m3"
 
 
 def test_parse_product_and_processor_code() -> None:

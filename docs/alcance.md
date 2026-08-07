@@ -138,7 +138,7 @@ App Flutter (Verifone)
 | Captura fallback | Ingreso manual. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
-| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). |
+| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |
 
 ---
 

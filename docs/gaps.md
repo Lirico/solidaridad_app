@@ -6,7 +6,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-06
 
-> ✅ **Último cambio:** ajuste de consistencia operativa POS mobile (`mobile/lib/features/sales/presentation/widgets/sale_review_content.dart`): el resumen de cantidad ya no muestra `.0` cuando la cantidad es entera; por ejemplo, `2 unidades` en lugar de `2.0 unidades`, preservando decimales reales cuando existan.
+> ✅ **Último cambio:** `GET /v1/products` exige `Authorization: Bearer` (mismo `get_current_user` que transacciones) y además informa `unit` con textos `singular`/`plural` (`unidad`/`unidades` o `m3`/`m3`).
 
 
 
@@ -85,7 +85,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Auth API (login / register / change-password + JWT) | Implementado en `api/` |
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
 | `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
-| Catálogo `GET /v1/products` | Implementado en `api/` |
+| Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |

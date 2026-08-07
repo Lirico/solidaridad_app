@@ -17,6 +17,19 @@ class AuthorizeCommand:
     card_number: str
     terminal_id: str
     stan: str
+    ticket_number: str
+    expiration_date: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VoidCommand:
+    product_code: str
+    amount_minor: int
+    card_number: str
+    terminal_id: str
+    stan: str
+    original_ticket: str
+    void_ticket: str
     expiration_date: str | None = None
 
 

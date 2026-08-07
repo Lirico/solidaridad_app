@@ -1,12 +1,12 @@
-"""Authorize HTTP controller."""
+"""Void (anulación) HTTP controller."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
-from application.payments.authorize_payment import AuthorizePayment
-from domain.authorization import AuthorizeCommand
+from application.payments.void_payment import VoidPayment
+from domain.authorization import VoidCommand
 from domain.exceptions import (
     DomainError,
     InvalidAmount,
@@ -17,8 +17,8 @@ from domain.exceptions import (
     ProcessorUnavailable,
     UnsupportedProduct,
 )
-from presentation.dependencies import get_authorize_payment
-from presentation.schemas.authorize import AuthorizeRequest, AuthorizeResponse
+from presentation.dependencies import get_void_payment
+from presentation.schemas.authorize import AuthorizeResponse, VoidRequest
 
 router = APIRouter()
 
@@ -46,17 +46,18 @@ router = APIRouter()
         },
     },
 )
-def authorize(
-    body: AuthorizeRequest,
-    use_case: Annotated[AuthorizePayment, Depends(get_authorize_payment)],
+def void_transaction(
+    body: VoidRequest,
+    use_case: Annotated[VoidPayment, Depends(get_void_payment)],
 ) -> AuthorizeResponse | JSONResponse:
-    command = AuthorizeCommand(
+    command = VoidCommand(
         product_code=body.product_code,
         amount_minor=body.amount_minor,
         card_number=body.card_number,
         terminal_id=body.terminal_id,
         stan=body.stan,
-        ticket_number=body.ticket_number,
+        original_ticket=body.original_ticket,
+        void_ticket=body.void_ticket,
         expiration_date=body.expiration_date,
     )
     try:

@@ -1,7 +1,7 @@
-"""Authorize a purchase via the ISO processor port."""
+"""Void (anulación) a purchase via the ISO processor port."""
 
 from application.payments.ports import IsoProcessor
-from domain.authorization import AuthorizationResult, AuthorizeCommand
+from domain.authorization import AuthorizationResult, VoidCommand
 from domain.exceptions import (
     InvalidAmount,
     InvalidCardNumber,
@@ -12,11 +12,11 @@ from domain.exceptions import (
 from domain.product import product_code_de49
 
 
-class AuthorizePayment:
+class VoidPayment:
     def __init__(self, processor: IsoProcessor) -> None:
         self._processor = processor
 
-    def execute(self, command: AuthorizeCommand) -> AuthorizationResult:
+    def execute(self, command: VoidCommand) -> AuthorizationResult:
         if command.amount_minor <= 0:
             raise InvalidAmount()
         pan = command.card_number.strip()
@@ -28,17 +28,21 @@ class AuthorizePayment:
         stan = command.stan.strip()
         if not stan.isdigit() or len(stan) > 6:
             raise InvalidStan()
-        ticket = "".join(c for c in command.ticket_number.strip() if c.isdigit())
-        if not ticket:
+        original = "".join(c for c in command.original_ticket.strip() if c.isdigit())
+        if not original:
             raise InvalidTicket()
+        void_ticket = "".join(c for c in command.void_ticket.strip() if c.isdigit())
+        if not void_ticket:
+            raise InvalidTicket("ticket de anulación inválido")
 
-        normalized = AuthorizeCommand(
+        normalized = VoidCommand(
             product_code=command.product_code,
             amount_minor=command.amount_minor,
             card_number=pan,
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
             stan=stan.zfill(6),
-            ticket_number=ticket,
+            original_ticket=original,
+            void_ticket=void_ticket,
             expiration_date=command.expiration_date,
         )
-        return self._processor.authorize(normalized)
+        return self._processor.void(normalized)

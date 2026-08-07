@@ -21,6 +21,7 @@ def _cmd(**overrides: object) -> AuthorizeCommand:
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
         "stan": "123456",
+        "ticket_number": "00000042",
     }
     base.update(overrides)
     return AuthorizeCommand(**base)  # type: ignore[arg-type]
@@ -92,6 +93,17 @@ def test_authorize_rejects_bad_stan() -> None:
         pass
 
 
+def test_authorize_rejects_empty_ticket() -> None:
+    from domain.exceptions import InvalidTicket
+
+    uc = AuthorizePayment(MockIsoProcessor())
+    try:
+        uc.execute(_cmd(ticket_number="abc"))
+        raise AssertionError("expected InvalidTicket")
+    except InvalidTicket:
+        pass
+
+
 def test_authorize_normalizes_stan_and_terminal() -> None:
     class CapturingProcessor:
         last: AuthorizeCommand | None = None
@@ -104,9 +116,13 @@ def test_authorize_normalizes_stan_and_terminal() -> None:
                 user_message="ok",
             )
 
+        def void(self, command: object) -> AuthorizationResult:
+            raise AssertionError("void should not be called")
+
     processor = CapturingProcessor()
     uc = AuthorizePayment(processor)
     uc.execute(_cmd(stan="42", terminal_id="T1"))
     assert processor.last is not None
     assert processor.last.stan == "000042"
     assert processor.last.terminal_id == "T1      "
+    assert processor.last.ticket_number == "00000042"

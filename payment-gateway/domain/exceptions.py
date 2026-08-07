@@ -28,6 +28,11 @@ class InvalidStan(DomainError):
         super().__init__(message)
 
 
+class InvalidTicket(DomainError):
+    def __init__(self, message: str = "número de comprobante inválido") -> None:
+        super().__init__(message)
+
+
 class UnsupportedProduct(DomainError):
     def __init__(self, product_code: str) -> None:
         self.product_code = product_code

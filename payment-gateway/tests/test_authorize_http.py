@@ -11,7 +11,11 @@ from domain.authorization import (
 from domain.exceptions import ProcessorUnavailable
 from infrastructure.iso.mock_processor import MockIsoProcessor
 from main import app
-from presentation.dependencies import get_authorize_payment, get_iso_processor
+from presentation.dependencies import (
+    get_authorize_payment,
+    get_iso_processor,
+    get_void_payment,
+)
 
 client = TestClient(app)
 
@@ -23,6 +27,21 @@ def _payload(**overrides: Any) -> dict[str, Any]:
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
         "stan": "123456",
+        "ticket_number": "00000042",
+    }
+    body.update(overrides)
+    return body
+
+
+def _void_payload(**overrides: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "product_code": "993",
+        "amount_minor": 150050,
+        "card_number": "4111111111111111",
+        "terminal_id": "TERM0001",
+        "stan": "654321",
+        "original_ticket": "00000042",
+        "void_ticket": "654321",
     }
     body.update(overrides)
     return body
@@ -102,6 +121,7 @@ def test_authorize_http_with_processor_override() -> None:
     class FixedProcessor:
         def authorize(self, command: AuthorizeCommand) -> AuthorizationResult:
             assert command.product_code == "994"
+            assert command.ticket_number == "00000042"
             return AuthorizationResult(
                 status=AuthorizationStatus.APPROVED,
                 response_code="00",
@@ -110,11 +130,64 @@ def test_authorize_http_with_processor_override() -> None:
                 retrieval_reference="RRN",
             )
 
+        def void(self, command: object) -> AuthorizationResult:
+            raise AssertionError("void should not be called")
 
     app.dependency_overrides[get_iso_processor] = lambda: FixedProcessor()
     try:
         response = client.post("/v1/authorize", json=_payload(product_code="994"))
         assert response.status_code == 200
         assert response.json()["auth_id"] == "FIX001"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_void_http_approved_mock() -> None:
+    app.dependency_overrides[get_iso_processor] = lambda: MockIsoProcessor()
+    try:
+        response = client.post("/v1/void", json=_void_payload())
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "APPROVED"
+        assert data["response_code"] == "00"
+        assert data["auth_id"] == "MOCKVD"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_void_http_declined_mock() -> None:
+    app.dependency_overrides[get_iso_processor] = lambda: MockIsoProcessor()
+    try:
+        response = client.post(
+            "/v1/void",
+            json=_void_payload(card_number="4000000000000002"),
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "DECLINED"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_void_http_processor_unavailable() -> None:
+    use_case = MagicMock()
+    use_case.execute.side_effect = ProcessorUnavailable()
+    app.dependency_overrides[get_void_payment] = lambda: use_case
+    try:
+        response = client.post("/v1/void", json=_void_payload())
+        assert response.status_code == 502
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_void_http_generic_domain_error() -> None:
+    from domain.exceptions import IsoPackError
+
+    use_case = MagicMock()
+    use_case.execute.side_effect = IsoPackError("boom")
+    app.dependency_overrides[get_void_payment] = lambda: use_case
+    try:
+        response = client.post("/v1/void", json=_void_payload())
+        assert response.status_code == 400
+        assert response.json()["message"] == "boom"
     finally:
         app.dependency_overrides.clear()

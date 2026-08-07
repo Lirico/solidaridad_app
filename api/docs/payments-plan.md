@@ -9,7 +9,7 @@ idempotencia, mensajes); el gateway es adaptador ISO; el procesador autoriza.
 |------|----------|
 | Ruta | `POST /v1/transactions` (Bearer JWT) |
 | Producto | Enum legible en el client; API mapea a `993`–`997` |
-| Identidad | PK técnico `BIGINT IDENTITY`; clave pública `transaction_number` (`OP-YYMMDD-NNNN`) |
+| Identidad | PK técnico `BIGINT IDENTITY`; clave pública `transaction_number` (`OP-YYMMDD-NNNNNNNN`) |
 | Idempotencia | Header requerido `Idempotency-Key` (scope user) |
 | PCI | No persistir PAN ni CVV; solo `card_last4` |
 | Gateway | `POST /v1/authorize` con `product_code` |
@@ -52,7 +52,7 @@ Notas:
 
 ```json
 {
-  "transaction_number": "OP-260716-0042",
+  "transaction_number": "OP-260716-00000042",
   "status": "APPROVED",
   "user_message": "Pago aprobado",
   "created_at": "2026-07-16T19:00:00Z"

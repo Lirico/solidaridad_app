@@ -100,13 +100,3 @@ class MissingTerminalId(DomainError):
         message: str = "La instalación no tiene terminal configurada",
     ) -> None:
         super().__init__(message)
-
-
-class TransactionNumberExhausted(DomainError):
-    """Raised when the daily transaction_number counter overflows."""
-
-    def __init__(
-        self,
-        message: str = "Se alcanzó el límite diario de operaciones",
-    ) -> None:
-        super().__init__(message)

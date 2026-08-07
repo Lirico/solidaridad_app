@@ -5,7 +5,6 @@ from datetime import UTC, date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from domain.exceptions import TransactionNumberExhausted
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -57,7 +56,11 @@ class TransactionRepository:
         return _to_domain(row)
 
     def next_transaction_number(self, business_date: date) -> str:
-        """Atomically allocate OP-YYMMDD-NNNN for the business date."""
+        """Atomically allocate OP-YYMMDD-NNNNNNNN for the business date.
+
+        Sequence is zero-padded to at least 8 digits and grows beyond that
+        without truncating if daily volume ever exceeds 99_999_999.
+        """
         stmt = (
             select(TransactionNumberCounter)
             .where(TransactionNumberCounter.business_date == business_date)
@@ -74,12 +77,9 @@ class TransactionRepository:
             # Re-lock in case of concurrent insert race
             counter = self._session.scalars(stmt).one()
 
-        if counter.last_value >= 9999:
-            raise TransactionNumberExhausted()
-
         counter.last_value += 1
         self._session.flush()
-        return f"OP-{business_date.strftime('%y%m%d')}-{counter.last_value:04d}"
+        return f"OP-{business_date.strftime('%y%m%d')}-{counter.last_value:08d}"
 
     def create_pending(
         self,

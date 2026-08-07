@@ -1,18 +1,21 @@
 # Plan: transacciones (POST /v1/transactions)
 
-Contrato vivo de compra/autorización. La API es la capa de negocio (auth, ledger,
-idempotencia, mensajes); el gateway es adaptador ISO; el procesador autoriza.
+Contrato vivo de compra/autorización y anulación. La API es la capa de negocio
+(auth, ledger, idempotencia, mensajes); el gateway es adaptador ISO; el
+procesador autoriza.
 
 ## Decisiones
 
 | Tema | Decisión |
 |------|----------|
-| Ruta | `POST /v1/transactions` (Bearer JWT) |
+| Ruta venta | `POST /v1/transactions` (Bearer JWT) |
+| Ruta anulación | `POST /v1/transactions/{transaction_number}/void` |
 | Producto | Enum legible en el client; API mapea a `993`–`997` |
 | Identidad | PK técnico `BIGINT IDENTITY`; clave pública `transaction_number` (`OP-YYMMDD-NNNNNNNN`) |
-| Idempotencia | Header requerido `Idempotency-Key` (scope user) |
-| PCI | No persistir PAN ni CVV; solo `card_last4` |
-| Gateway | `POST /v1/authorize` con `product_code` |
+| Ticket ISO (DE62) | Sufijo numérico de `transaction_number` (`NNNNNNNN`), persistido como `processor_ticket` |
+| Idempotencia | Header requerido `Idempotency-Key` (scope user en venta; scope void en anulación) |
+| PCI | No persistir PAN ni CVV; solo `card_last4`; anulación exige reingreso de tarjeta |
+| Gateway | `POST /v1/authorize` / `POST /v1/void` |
 
 ## Productos
 
@@ -24,7 +27,7 @@ idempotencia, mensajes); el gateway es adaptador ISO; el procesador autoriza.
 | `TUBO_45` | `996` | TUBO45 |
 | `GRANEL` | `997` | GRANEL |
 
-## Request
+## Request venta
 
 ```json
 {
@@ -48,6 +51,21 @@ Notas:
 - El `installation_id` del JWT identifica la terminal configurada; la API lo
   resuelve en `installations` y envía ese valor como `terminal_id` al procesador.
 
+## Request anulación
+
+```json
+{
+  "card_number": "6063007014001602",
+  "expiration_date": "2912",
+  "cvv": "123"
+}
+```
+
+`POST /v1/transactions/OP-260716-00000042/void` con `Idempotency-Key`.
+
+Reglas: solo `APPROVED`; `card_last4` debe coincidir; ya `VOIDED` → 200
+idempotente.
+
 ## Response
 
 ```json
@@ -64,12 +82,13 @@ Notas:
 | Status | Significado |
 |--------|-------------|
 | `APPROVED` | Autorización confirmada |
+| `VOIDED` | Anulación confirmada |
 | `DECLINED` | Rechazo confirmado |
 | `FAILED` | Fallo antes de llegar al procesador (sin impacto) |
 | `UNKNOWN` | Resultado ambiguo (posible impacto); no reintentar con key nueva |
 | `PENDING` | En curso; solo en replay de idempotencia → reintentar misma key |
 
-### Idempotencia
+### Idempotencia (venta)
 
 | Estado existente | HTTP | Acción |
 |------------------|------|--------|
@@ -86,6 +105,7 @@ Shape: `{ "message": "..." }`
 |------|------|
 | Validación / producto / monto / PAN / sin Idempotency-Key | 400 |
 | Auth | 401 |
+| Transacción no encontrada (void) | 404 |
 | Body incompatible con key | 409 |
 
 ## E2E local
@@ -98,3 +118,4 @@ make dev   # API :8000 + gateway ISO_TRANSPORT=tcp + processor
 2. `POST /v1/transactions` con `product=GARRAFA_10`, PAN del seed, `Idempotency-Key`
 3. Esperar `APPROVED`/`DECLINED` y fila en Postgres
 4. Repetir misma key → misma respuesta sin segunda autorización
+5. `POST /v1/transactions/{tn}/void` con la misma tarjeta e `Idempotency-Key` distinta → `VOIDED`

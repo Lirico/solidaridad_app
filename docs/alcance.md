@@ -85,10 +85,14 @@ claridad operativa.
 - Terminal origen: el `installation_id` del login es el terminal id que se
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).
+- Endpoint de anulación de venta aprobada:
+  `POST /v1/transactions/{transaction_number}/void`, con reingreso de tarjeta
+  (sin persistir PAN) e `Idempotency-Key`.
 - Validación de datos mínimos: producto/especie, importe/cantidad, datos de
   tarjeta requeridos según modo de entrada, terminal origen.
 - Persistencia de la transacción, delegación al gateway, normalización de
-  estados (`aprobada` / `rechazada` / `error` / `timeout` / equivalentes).
+  estados (`aprobada` / `rechazada` / `anulada` / `error` / `timeout` /
+  equivalentes).
 - Traducción de códigos técnicos a mensajes claros para la app.
 - Endpoints de listado básico y detalle/comprobante.
 - Logs básicos de auditoría y soporte (sin almacenar datos sensibles completos
@@ -99,6 +103,7 @@ claridad operativa.
 ### 2.3 Gateway de pagos / mensajería ISO
 
 - Construcción y envío del mensaje ISO de venta al procesador.
+- Construcción y envío del mensaje ISO de anulación (`0200` / `020000`).
 - Parseo de respuesta e interpretación de aprobación / rechazo / error.
 - Timeouts y errores de comunicación.
 - Respuesta normalizada hacia la API.

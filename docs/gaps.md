@@ -4,11 +4,13 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-06
+Última revisión: 2026-08-07
 
-> ✅ **Último cambio:** se eliminó la validación Luhn de API y gateway porque
-> las tarjetas del programa usan el dígito verificador MOD-TDF del procesador.
-> Ambas capas mantienen validación de PAN numérico y longitud de 13–19 dígitos.
+> ✅ **Último cambio:** anulación de transacciones aprobadas de punta a punta
+> (API → gateway → ISO). `POST /v1/transactions/{tn}/void` con reingreso de
+> tarjeta; gateway `POST /v1/void` (MTI `0200` / DE3 `020000`); DE62 de venta =
+> sufijo numérico de `transaction_number` (no STAN). Estado `VOIDED`. UI mobile
+> de anulación y reverso automático (`0400`) quedan abiertos.
 
 
 
@@ -63,6 +65,8 @@ Verifone (banda + térmica).
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
 | G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
 | G-P1-06 | Entry mode ISO acorde al modo de captura | open | DE22 fijo `012` (manual). Falta track/swipe cuando haya banda. |
+| G-P1-08 | UI mobile de anulación | open | Backend `POST /v1/transactions/{tn}/void` listo; la app aún no ofrece flujo de anulación con reingreso de tarjeta. |
+| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 
 ---
 
@@ -86,9 +90,11 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 |------|-------|
 | Auth API (login / register / change-password + JWT) | Implementado en `api/` |
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
+| `POST /v1/transactions/{tn}/void` (anulación con reingreso de tarjeta) | Implementado en `api/`; status `VOIDED`; DE62 ticket = sufijo de `transaction_number` |
 | `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
 | Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
+| Gateway `POST /v1/void` → ISO anulación (`0200`/`020000`) | Implementado en `payment-gateway/` |
 | Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |

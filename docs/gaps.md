@@ -4,12 +4,11 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-07
+Última revisión: 2026-08-08
 
-> ✅ **Último cambio:** tabla append-only `transaction_status_events` en la API
-> (CREATED / GATEWAY_RESULT / VOID_RESULT / IDEMPOTENT_HIT). Persistencia
-> enganchada en create/update/void e idempotent replay; **sin** exposición
-> HTTP todavía.
+> ✅ **Último cambio:** UX mobile — botones de atrás/cancelar sin acción
+> (header de status/procesando, cancelar en espera de tarjeta, opción
+> Tarjeta) y mensajes de error/estado en inglés normalizados a español.
 
 
 
@@ -74,7 +73,7 @@ Verifone (banda + térmica).
 
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
-| G-P2-01 | UX: manual solo como fallback | open | Hoy el manual es el único flujo. |
+| G-P2-01 | UX: manual solo como fallback | partial | La opción **Tarjeta** ya navega a `WaitingForCardScreen` (UI de espera). Sigue sin lectura real de banda/chip/NFC (G-P0-06). **Ingreso manual** sigue siendo el único camino que completa el cobro. QR muestra aviso “disponible pronto” (G-P2-03). |
 | G-P2-02 | Track2 en authorize cuando hay swipe | open | Packer puede soportar DE35 en tests; el builder de purchase no envía track desde swipe. |
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
@@ -107,6 +106,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
+| UX: botones atrás/cancelar y copy en español | `SaleReviewHeader` oculta atrás si no hay callback (procesando/resultado); cancelar en espera de tarjeta hace `maybePop`; Tarjeta → waiting; QR aviso próximamente; mensajes de auth/ventas/status sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 
 ---

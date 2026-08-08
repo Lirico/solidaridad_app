@@ -3,13 +3,13 @@ import '../../../../core/theme/app_colors.dart';
 import 'payment_option_card.dart';
 
 class SelectNewOperationContent extends StatelessWidget {
-  final VoidCallback? onCardTap;
-  final VoidCallback? onManualCardTap;
+  final VoidCallback onCardTap;
+  final VoidCallback onManualCardTap;
 
   const SelectNewOperationContent({
     super.key,
-    this.onCardTap,
-    this.onManualCardTap,
+    required this.onCardTap,
+    required this.onManualCardTap,
   });
 
   @override
@@ -62,16 +62,22 @@ class SelectNewOperationContent extends StatelessWidget {
             icon: Icons.credit_card,
             title: 'Tarjeta',
             subtitle: 'Acercar, insertar\no deslizar',
-            onTap: onCardTap ?? () {},
+            onTap: onCardTap,
           ),
           const SizedBox(height: 12),
 
-          // Opción 2: QR
+          // Opción 2: QR (aún no disponible)
           PaymentOptionCard(
             icon: Icons.qr_code_2,
             title: 'QR',
             subtitle: 'Generar código QR\npara el pago',
-            onTap: () {},
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('El pago con QR estará disponible pronto.'),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
 
@@ -80,7 +86,7 @@ class SelectNewOperationContent extends StatelessWidget {
             icon: Icons.grid_view_rounded,
             title: 'Ingreso manual',
             subtitle: 'Ingresar datos de\ntarjeta manualmente',
-            onTap: onManualCardTap ?? () {},
+            onTap: onManualCardTap,
           ),
           const SizedBox(height: 20),
 

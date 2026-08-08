@@ -16,7 +16,7 @@ class ManualCardHeader extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: onBackPressed,
+        onPressed: onBackPressed ?? () => Navigator.maybePop(context),
       ),
       title: const Text(
         'Ingreso Manual',

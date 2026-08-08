@@ -18,10 +18,13 @@ class SaleReviewHeader extends StatelessWidget {
       padding: const EdgeInsets.only(top: 60, left: 24, right: 16),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: onBackPressed,
-          ),
+          if (onBackPressed != null)
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: onBackPressed,
+            )
+          else
+            const SizedBox(width: 48),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

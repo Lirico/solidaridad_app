@@ -180,7 +180,7 @@ class SalesRepository {
         isApproved: false,
         operationNumber: '',
         message:
-            'Tiempo de espera agotado con el procesador de pagos (Timeout). Reintente.',
+            'Tiempo de espera agotado con el procesador de pagos. Reintente.',
         errorCode: '99',
         connectionError: true,
       );
@@ -189,7 +189,7 @@ class SalesRepository {
         isApproved: false,
         operationNumber: '',
         message:
-            'No se pudo establecer conexión con el servidor de AWS. Verifique su red.',
+            'No se pudo establecer conexión con el servidor. Verifique su red.',
         errorCode: 'CONN_ERR',
         connectionError: true,
       );
@@ -197,15 +197,15 @@ class SalesRepository {
       return const SaleResponse(
         isApproved: false,
         operationNumber: '',
-        message: 'Error en el protocolo de comunicación con la API.',
+        message: 'Error de comunicación con el servidor. Reintente.',
         errorCode: 'HTTP_ERR',
         connectionError: true,
       );
     } catch (e) {
-      return SaleResponse(
+      return const SaleResponse(
         isApproved: false,
         operationNumber: '',
-        message: 'Error inesperado: ${e.toString()}',
+        message: 'Ocurrió un error inesperado. Reintente.',
         errorCode: 'UNKNOWN',
       );
     }

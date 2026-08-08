@@ -59,11 +59,9 @@ class SaleProcessingScreen extends StatelessWidget {
         top: false,
         child: Column(
           children: [
-            SaleReviewHeader(
+            const SaleReviewHeader(
               title: 'Procesando Transacción',
-              onBackPressed:
-                  null, // No se puede volver durante el procesamiento
-            ),
+            ), // Sin volver durante el procesamiento
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -162,7 +160,7 @@ class SaleProcessingScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Enviando mensaje ISO de seguridad a AWS.\n'
+                          'Estamos autorizando el pago.\n'
                           'Por favor, no cierre la aplicación.',
                           textAlign: TextAlign.center,
                           style: TextStyle(

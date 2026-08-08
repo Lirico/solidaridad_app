@@ -58,14 +58,14 @@ class SaleStatusContent extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _buildTicketRow('Terminal ID', 'TERM-00432'),
+              _buildTicketRow('ID de terminal', 'TERM-00432'),
               const Divider(height: 20),
               _buildTicketRow(
                 'Nro. Operación',
                 result == PaymentResult.approved ? 'OP-987452' : '---',
               ),
               const Divider(height: 20),
-              _buildTicketRow('Código Respuesta', _responseCode(result)),
+              _buildTicketRow('Código de respuesta', _responseCode(result)),
             ],
           ),
         ),
@@ -99,11 +99,11 @@ class SaleStatusContent extends StatelessWidget {
   String _responseCode(PaymentResult result) {
     switch (result) {
       case PaymentResult.approved:
-        return '00 (OK)';
+        return '00 (Aprobado)';
       case PaymentResult.declined:
-        return '51 (Fondos Insuf.)';
+        return '51 (Fondos insuficientes)';
       case PaymentResult.connectionError:
-        return '99 (Timeout)';
+        return '99 (Tiempo agotado)';
     }
   }
 

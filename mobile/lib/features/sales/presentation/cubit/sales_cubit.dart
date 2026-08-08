@@ -162,12 +162,18 @@ class SalesCubit extends Cubit<SalesState> {
     required String cardNumber,
     String? expirationDate,
   }) async {
-    final result = await salesRepository.voidTransaction(
-      token: token,
-      transactionNumber: transactionNumber,
-      cardNumber: cardNumber,
-      expirationDate: expirationDate,
-    );
+    VoidResult result;
+    try {
+      result = await salesRepository.voidTransaction(
+        token: token,
+        transactionNumber: transactionNumber,
+        cardNumber: cardNumber,
+        expirationDate: expirationDate,
+      );
+    } on SessionExpiredException {
+      emit(const SalesSessionExpired());
+      return const VoidResult.sessionExpiredResult();
+    }
 
     if (result.sessionExpired) {
       emit(const SalesSessionExpired());

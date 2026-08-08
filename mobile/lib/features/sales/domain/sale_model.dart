@@ -71,6 +71,63 @@ class OperationModel {
   }
 }
 
+/// Resultado de una anulación. Reemplaza el mock en el Paso 5 con la respuesta
+/// real del repositorio.
+class VoidResult {
+  final bool isVoided;
+  final bool isDeclined;
+  final bool isUnknown;
+  final bool connectionError;
+  final bool sessionExpired;
+  final String message;
+
+  const VoidResult({
+    required this.isVoided,
+    required this.isDeclined,
+    required this.isUnknown,
+    required this.connectionError,
+    required this.sessionExpired,
+    required this.message,
+  });
+
+  const VoidResult.voided({this.message = 'Anulación aprobada'})
+    : isVoided = true,
+      isDeclined = false,
+      isUnknown = false,
+      connectionError = false,
+      sessionExpired = false;
+
+  const VoidResult.declined({this.message = 'Anulación rechazada'})
+    : isVoided = false,
+      isDeclined = true,
+      isUnknown = false,
+      connectionError = false,
+      sessionExpired = false;
+
+  const VoidResult.unknown({this.message = 'No pudimos confirmar la anulación'})
+    : isVoided = false,
+      isDeclined = false,
+      isUnknown = true,
+      connectionError = false,
+      sessionExpired = false;
+
+  const VoidResult.connectionFailure({
+    this.message = 'No se pudo anular. Intente nuevamente.',
+  })  : isVoided = false,
+        isDeclined = false,
+        isUnknown = false,
+        connectionError = true,
+        sessionExpired = false;
+
+  const VoidResult.sessionExpiredResult()
+    : isVoided = false,
+      isDeclined = false,
+      isUnknown = false,
+      connectionError = false,
+      sessionExpired = true,
+      message = 'Su sesión ha expirado. Vuelva a iniciar sesión.';
+}
+
 class SaleResponse {
   final bool isApproved;
   final String operationNumber;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../widgets/sale_detail_ticket.dart';
@@ -120,10 +121,10 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     if (confirmed != true) return;
     if (!context.mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Anulación en desarrollo. Próximamente se pedirá re-ingresar la tarjeta.'),
-      ),
+    Navigator.pushNamed(
+      context,
+      AppRoutes.voidCard,
+      arguments: operation,
     );
   }
 }

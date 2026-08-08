@@ -154,6 +154,57 @@ class SalesCubit extends Cubit<SalesState> {
     emit(SalesInitial());
   }
 
+  /// Anula una venta aprobada llamando a la API y actualiza la operación
+  /// en el historial en memoria con el resultado.
+  Future<VoidResult> voidSale({
+    required String token,
+    required String transactionNumber,
+    required String cardNumber,
+    String? expirationDate,
+  }) async {
+    final result = await salesRepository.voidTransaction(
+      token: token,
+      transactionNumber: transactionNumber,
+      cardNumber: cardNumber,
+      expirationDate: expirationDate,
+    );
+
+    if (result.sessionExpired) {
+      emit(const SalesSessionExpired());
+      return result;
+    }
+
+    // La API deja la venta original en APPROVED cuando la anulación es
+    // rechazada o falla: solo reflejamos en el historial los casos que
+    // cambian el estado real (VOIDED) o quedan ambiguos (UNKNOWN).
+    if (!result.isVoided && !result.isUnknown) {
+      return result;
+    }
+
+    final PaymentResult mappedResult = result.isVoided
+        ? PaymentResult.voided
+        : PaymentResult.connectionError;
+
+    final updatedHistory = state.history.map((op) {
+      if (op.id == transactionNumber) {
+        return OperationModel(
+          id: op.id,
+          productCode: op.productCode,
+          productLabel: op.productLabel,
+          amount: op.amount,
+          cardNumber: op.cardNumber,
+          result: mappedResult,
+          date: op.date,
+          userMessage: result.message,
+        );
+      }
+      return op;
+    }).toList();
+
+    emit(SalesInitialWithHistory(history: updatedHistory));
+    return result;
+  }
+
   /// Appends more history items (used for pagination / load-more).
   void appendHistory(List<OperationModel> items) {
     emit(SalesInitialWithHistory(history: [...state.history, ...items]));

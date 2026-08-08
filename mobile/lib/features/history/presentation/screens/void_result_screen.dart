@@ -73,10 +73,9 @@ class VoidResultScreen extends StatelessWidget {
                       statusTitle: statusTitle,
                       statusSubtitle: statusSubtitle,
                       onFinalize: () {
-                        Navigator.pushNamedAndRemoveUntil(
+                        Navigator.popUntil(
                           context,
-                          AppRoutes.salesHistory,
-                          (route) => false,
+                          (route) => route.settings.name == AppRoutes.salesHistory,
                         );
                       },
                     ),

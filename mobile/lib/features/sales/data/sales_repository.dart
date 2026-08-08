@@ -69,6 +69,83 @@ class SalesRepository {
     ];
   }
 
+  Future<VoidResult> voidTransaction({
+    required String token,
+    required String transactionNumber,
+    required String cardNumber,
+    String? expirationDate,
+  }) async {
+    final url = Uri.parse('$_baseUrl/transactions/$transactionNumber/void');
+
+    final Map<String, dynamic> bodyPayload = {
+      'card_number': cardNumber.replaceAll(' ', ''),
+    };
+    if (expirationDate != null && expirationDate.isNotEmpty) {
+      bodyPayload['expiration_date'] = expirationDate;
+    }
+
+    final idempotencyKey = _generateIdempotencyKey();
+
+    try {
+      final response = await _httpClient
+          .post(
+            url,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+              'Idempotency-Key': idempotencyKey,
+            },
+            body: jsonEncode(bodyPayload),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 401) {
+        throw const SessionExpiredException();
+      }
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        final String status =
+            (responseData['status'] as String? ?? '').toUpperCase();
+        final String message =
+            responseData['user_message'] as String? ?? 'Operación procesada';
+
+        if (status == 'VOIDED') {
+          return VoidResult.voided(message: message);
+        }
+        if (status == 'UNKNOWN') {
+          return VoidResult.unknown(message: message);
+        }
+        return VoidResult.declined(message: message);
+      }
+
+      return VoidResult.declined(
+        message:
+            responseData['user_message'] as String? ??
+            'Anulación rechazada por la entidad emisora.',
+      );
+    } on SessionExpiredException {
+      rethrow;
+    } on TimeoutException {
+      return const VoidResult.connectionFailure(
+        message: 'Tiempo de espera agotado con el procesador de pagos (Timeout). Reintente.',
+      );
+    } on SocketException {
+      return const VoidResult.connectionFailure(
+        message: 'No se pudo establecer conexión con el servidor. Verifique su red.',
+      );
+    } on HttpException {
+      return const VoidResult.connectionFailure(
+        message: 'Error en el protocolo de comunicación con la API.',
+      );
+    } catch (e) {
+      return VoidResult.declined(
+        message: 'Error inesperado: ${e.toString()}',
+      );
+    }
+  }
+
   Future<List<OperationModel>> fetchHistory({
     required String token,
     int limit = 20,

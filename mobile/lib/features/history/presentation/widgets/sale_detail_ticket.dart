@@ -8,25 +8,28 @@ class SaleDetailTicket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isSuccess = operation.result == PaymentResult.approved;
-    final bool isConnectionError =
-        operation.result == PaymentResult.connectionError;
+    final Color statusColor;
+    final IconData statusIcon;
+    final String statusTitle;
 
-    final Color statusColor = isSuccess
-        ? Colors.green
-        : isConnectionError
-        ? Colors.orange
-        : Colors.red;
-    final IconData statusIcon = isSuccess
-        ? Icons.check_circle
-        : isConnectionError
-        ? Icons.wifi_off
-        : Icons.cancel;
-    final String statusTitle = isSuccess
-        ? 'VENTA EXITOSA'
-        : isConnectionError
-        ? 'ERROR DE CONEXIÓN'
-        : 'VENTA RECHAZADA';
+    switch (operation.result) {
+      case PaymentResult.approved:
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusTitle = 'VENTA EXITOSA';
+      case PaymentResult.declined:
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        statusTitle = 'VENTA RECHAZADA';
+      case PaymentResult.connectionError:
+        statusColor = Colors.orange;
+        statusIcon = Icons.wifi_off;
+        statusTitle = 'ERROR DE CONEXIÓN';
+      case PaymentResult.voided:
+        statusColor = Colors.grey;
+        statusIcon = Icons.undo;
+        statusTitle = 'VENTA ANULADA';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,6 +69,10 @@ class SaleDetailTicket extends StatelessWidget {
           '${operation.date.hour.toString().padLeft(2, '0')}:${operation.date.minute.toString().padLeft(2, '0')} hs',
         ),
         _buildTicketRow('Tarjeta (PAN):', operation.cardNumber),
+        if (operation.userMessage != null && operation.userMessage!.isNotEmpty) ...[
+          const Divider(height: 24, thickness: 1),
+          _buildTicketRow('Mensaje:', operation.userMessage!),
+        ],
         const Divider(height: 40, thickness: 1),
         const Center(
           child: Text(

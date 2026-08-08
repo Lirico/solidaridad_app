@@ -37,6 +37,7 @@ mobile/app.*.map.json
 mobile/android/app/debug
 mobile/android/app/profile
 mobile/android/app/release
+mobile/devtools_options.yaml
 
 
 # POC Verifone (Flutter) — also covered by poc_verifone/.gitignore

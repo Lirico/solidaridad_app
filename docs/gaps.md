@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-07
+Última revisión: 2026-08-08
 
 > ✅ **Último cambio:** tabla append-only `transaction_status_events` en la API
 > (CREATED / GATEWAY_RESULT / VOID_RESULT / IDEMPOTENT_HIT). Persistencia
@@ -64,7 +64,7 @@ Verifone (banda + térmica).
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
 | G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
 | G-P1-06 | Entry mode ISO acorde al modo de captura | open | DE22 fijo `012` (manual). Falta track/swipe cuando haya banda. |
-| G-P1-08 | UI mobile de anulación | open | Backend `POST /v1/transactions/{tn}/void` listo; la app aún no ofrece flujo de anulación con reingreso de tarjeta. |
+| G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 
@@ -91,6 +91,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Auth API (login / register / change-password + JWT) | Implementado en `api/` |
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
 | `POST /v1/transactions/{tn}/void` (anulación con reingreso de tarjeta) | Implementado en `api/`; status `VOIDED`; DE62 ticket = sufijo de `transaction_number` |
+| UI mobile de anulación con reingreso de tarjeta | Flujo completo: detalle → reingreso tarjeta → resultado → historial actualizado. `voidSale()` solo marca `VOIDED`/`UNKNOWN` en el historial; rechazos dejan la venta en `APPROVED` como hace la API. Ver `sales_history_screen.dart`, `sales_cubit.dart`, `void_card_screen.dart`, `void_result_screen.dart`. |
 | `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
 | Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |

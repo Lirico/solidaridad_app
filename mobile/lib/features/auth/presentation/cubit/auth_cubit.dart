@@ -63,6 +63,7 @@ class AuthCubit extends Cubit<AuthState> {
     final response = await _authRepository.changePassword(
       currentPassword: currentPassword,
       newPassword: newPassword,
+      token: previousUser?.token ?? '',
     );
 
     if (response.sessionExpired) {

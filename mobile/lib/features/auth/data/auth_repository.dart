@@ -149,6 +149,7 @@ class AuthRepository {
   Future<AuthResponse> changePassword({
     required String currentPassword,
     required String newPassword,
+    required String token,
   }) async {
     final url = Uri.parse('$_baseUrl/auth/change-password');
 
@@ -156,7 +157,10 @@ class AuthRepository {
       final response = await _httpClient
           .post(
             url,
-            headers: {HttpHeaders.contentTypeHeader: 'application/json'},
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
             body: jsonEncode({
               'current_password': currentPassword,
               'new_password': newPassword,

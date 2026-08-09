@@ -6,12 +6,20 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-09-08
 
-> ✅ **Último cambio:** UX mobile — hora del historial de transacciones en zona
-> horaria local. La API guarda `created_at` en UTC y la app la mostraba sin
+> ✅ **Último cambio:** Auth mobile — `change-password` no enviaba el Bearer
+> token. El endpoint `POST /v1/auth/change-password` está protegido
+> (`get_current_user`); sin `Authorization: Bearer <token>` el backend devolvía
+> 401 y la contraseña nunca se actualizaba (seguía entrando con la vieja). Se
+> agregó el header en `AuthRepository.changePassword` y el token se pasa desde
+> `AuthCubit.changePassword` (`previousUser.token`). Cierra G-P0-02.
+>
+> ✅ **Último cambio previo:** UX mobile — hora del historial de transacciones en
+> zona horaria local. La API guarda `created_at` en UTC y la app la mostraba sin
 > convertir, por lo que la hora figuraba adelantada (ej. 17:48 en vez de 15:30
 > en Argentina, UTC-3). Se agregó `.toLocal()` al parsear `created_at` en
 > `mobile/lib/features/sales/domain/sale_model.dart`. Afecta a
 > `sales_history_screen.dart` y `sale_detail_ticket.dart`.
+
 >
 > ✅ **Último cambio previo:** UX mobile — montos del historial de transacciones
 > sin decimales cuando son enteros. Se creó
@@ -68,7 +76,8 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P0-01 | Mobile no usa el contrato vivo de ventas | done | Cliente: `POST /v1/transactions` (migrado desde `/v1/sales/gas`). Payload alineado: `product`, `amount` (string), `card_number`, `cvv`, `expiration_date` (opcional). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
-| G-P0-02 | Auth mobile incompleto vs API | partial | Login/register ya envían `installation_id` y manejan `must_change_password`. Pendiente: change-password sin Bearer. |
+| G-P0-02 | Auth mobile incompleto vs API | done | Login/register envían `installation_id` y manejan `must_change_password`. **2026-09-08:** `change-password` ahora envía `Authorization: Bearer <token>` en `AuthRepository.changePassword` (token desde `AuthCubit.changePassword` vía `previousUser.token`). Sin el Bearer el backend devolvía 401 y la contraseña no se actualizaba. |
+
 | G-P0-03 | Token de venta no enlazado a sesión real | done | `SalesCubit.loadHistory()`, `sendIsoMessage()` y `fetchProducts()` reciben el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
@@ -127,6 +136,8 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Ítem | Notas |
 |------|-------|
 | Auth API (login / register / change-password + JWT) | Implementado en `api/` |
+| Change-password mobile envía Bearer token | `AuthRepository.changePassword` envía `Authorization: Bearer <token>` (token desde `AuthCubit.changePassword` vía `previousUser.token`). Sin el Bearer el backend devolvía 401 y la contraseña no se actualizaba. Ver G-P0-02. |
+
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
 | `POST /v1/transactions/{tn}/void` (anulación con reingreso de tarjeta) | Implementado en `api/`; status `VOIDED`; DE62 ticket = sufijo de `transaction_number` |
 | UI mobile de anulación con reingreso de tarjeta | Flujo completo: detalle → reingreso tarjeta → resultado → historial actualizado. `voidSale()` solo marca `VOIDED`/`UNKNOWN` en el historial; rechazos dejan la venta en `APPROVED` como hace la API. Ver `sales_history_screen.dart`, `sales_cubit.dart`, `void_card_screen.dart`, `void_result_screen.dart`. |

@@ -9,7 +9,9 @@ import '../domain/auth_model.dart';
 ///
 /// In a production app this would be persisted (e.g. SharedPreferences).
 String _resolveInstallationId() {
-  // Use a compile-time constant or fall back to a dev default.
+  // Use a compile-time constant or fall back to the default terminal id.
+  // NOTE: 05000001 is a real terminal (GOBIERNO) used for the local demo,
+  // not a throwaway dev-only value.
   const fromDefine = String.fromEnvironment(
     'INSTALLATION_ID',
     defaultValue: '05000001',

@@ -10,15 +10,16 @@ App Flutter → API → Payment Gateway → Autorizador (authkig) → MySQL
 
 | Campo | Valor |
 |-------|-------|
-| Tarjeta | `6063007014007401` |
+| Tarjeta | `6063007014007403` |
 | CVV | `878` |
 | Vencimiento (DE14) | `1228` |
 | Producto | `993` |
 | `installation_id` / terminal | `05000001` |
 | Comercio del terminal | `012502` (GOBIERNO) |
 
-Usar siempre `6063007014007401`. No usar `4111111111111111`: cuelga el
+Usar siempre `6063007014007403`. No usar `4111111111111111`: cuelga el
 autorizador en `calcula_saldo_vivo()` (bug del C).
+
 
 ## 2. Levantar el stack
 
@@ -52,7 +53,7 @@ make -C payment_processor recarga
 curl -X POST http://127.0.0.1:8001/v1/authorize \
   -H "Content-Type: application/json" \
   -d '{
-    "card_number": "6063007014007401",
+    "card_number": "6063007014007403",
     "expiration_date": "1228",
     "amount_minor": 10000,
     "product_code": "993",
@@ -60,6 +61,7 @@ curl -X POST http://127.0.0.1:8001/v1/authorize \
     "stan": "000001",
     "ticket_number": "0001"
   }'
+
 ```
 
 Esperado: `"status":"APPROVED"`, `"response_code":"00"`.
@@ -74,10 +76,11 @@ curl -X POST http://127.0.0.1:8000/v1/transactions \
   -d '{
     "product": "993",
     "amount": "100.00",
-    "card_number": "6063007014007401",
+    "card_number": "6063007014007403",
     "cvv": "878",
     "expiration_date": "1228"
   }'
+
 ```
 
 ### App Flutter

@@ -32,4 +32,4 @@ seed-refresh:
 	./docker/mysql/dump_seed_from_desa.sh
 
 recarga:
-	docker exec -i solidaridad-processor-mysql mysql -ukigadmin2 -plocaldev kigsolidario2 < utils/demo/recarga.sql
+	docker exec -i solidaridad-processor-mysql sh -c 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql -u"$$MYSQL_USER" "$$MYSQL_DATABASE"' < utils/demo/recarga.sql

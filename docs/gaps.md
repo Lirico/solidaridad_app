@@ -4,9 +4,25 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-09
+Última revisión: 2026-09-08
 
-> ✅ **Último cambio:** `make -C payment_processor recarga` arreglado en Windows.
+> ✅ **Último cambio:** UX mobile — hora del historial de transacciones en zona
+> horaria local. La API guarda `created_at` en UTC y la app la mostraba sin
+> convertir, por lo que la hora figuraba adelantada (ej. 17:48 en vez de 15:30
+> en Argentina, UTC-3). Se agregó `.toLocal()` al parsear `created_at` en
+> `mobile/lib/features/sales/domain/sale_model.dart`. Afecta a
+> `sales_history_screen.dart` y `sale_detail_ticket.dart`.
+>
+> ✅ **Último cambio previo:** UX mobile — montos del historial de transacciones
+> sin decimales cuando son enteros. Se creó
+> `mobile/lib/core/formatters/amount_formatter.dart` (`formatAmount`) que muestra
+> `100` en vez de `100.00` y conserva decimales solo cuando existen (ej. `100.5`).
+> Aplicado en `sales_history_screen.dart`, `sale_detail_ticket.dart` y
+> `void_card_screen.dart` (reemplazando `toStringAsFixed(2)`).
+>
+> ✅ **Último cambio previo:** `make -C payment_processor recarga` arreglado en Windows.
+
+
 > El target usaba `sh -c '...'` con comillas simples (sintaxis POSIX) que
 > PowerShell/cmd rompía (`unexpected EOF while looking for matching '`). Se
 > reemplazó por `docker exec ... sh -c "MYSQL_PWD=localdev mysql -ukigadmin2

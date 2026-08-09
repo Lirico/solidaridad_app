@@ -31,8 +31,9 @@ class OperationModel {
       cardNumber: '•••• ${json['card_last4'] as String? ?? '0000'}',
       result: _parseStatus(json['status'] as String? ?? ''),
       date:
-          DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal() ??
           DateTime.now(),
+
       userMessage: json['user_message'] as String?,
     );
   }
@@ -113,11 +114,11 @@ class VoidResult {
 
   const VoidResult.connectionFailure({
     this.message = 'No se pudo anular. Intente nuevamente.',
-  })  : isVoided = false,
-        isDeclined = false,
-        isUnknown = false,
-        connectionError = true,
-        sessionExpired = false;
+  }) : isVoided = false,
+       isDeclined = false,
+       isUnknown = false,
+       connectionError = true,
+       sessionExpired = false;
 
   const VoidResult.sessionExpiredResult()
     : isVoided = false,

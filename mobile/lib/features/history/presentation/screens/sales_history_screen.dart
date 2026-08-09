@@ -162,11 +162,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 leading: Icon(
                   operation.result == PaymentResult.approved
                       ? Icons.check_circle
+                      : operation.result == PaymentResult.voided
+                      ? Icons.undo
                       : operation.result == PaymentResult.connectionError
                       ? Icons.wifi_off
                       : Icons.error,
                   color: operation.result == PaymentResult.approved
                       ? Colors.green
+                      : operation.result == PaymentResult.voided
+                      ? Colors.grey
                       : operation.result == PaymentResult.connectionError
                       ? Colors.orange
                       : Colors.red,

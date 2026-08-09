@@ -17,7 +17,8 @@ make up
 ```bash
 make logs          # seguir logs
 make down          # parar
-make reset         # borrar volumen MySQL y volver a cargar schema+seed
+make reset         # borrar volumen MySQL y volver a cargar schema+seed+demo
+make recarga       # recargar saldo de tarjetas de demo (sin resetear la DB)
 ```
 
 Desde la raíz del monorepo: `make processor-up` / `make up`.
@@ -37,6 +38,15 @@ Solo las **15 tablas** que usa el código C (no el resto de desa).
 
 - [`docker/mysql/01_schema.sql`](docker/mysql/01_schema.sql) — DDL
 - [`docker/mysql/02_seed.sql.gz`](docker/mysql/02_seed.sql.gz) — data: catálogos/usuarios completos; movimientos = últimos **2 meses de actividad por tabla** (relativo a `MAX(ts)` de cada una, porque desa puede estar quieta vs la fecha de hoy). En ctas se conserva además el último saldo por cuenta.
+- [`utils/demo/03_fix_demo.sql`](utils/demo/03_fix_demo.sql) — ajustes de demo (terminal `05000001` → comercio GOBIERNO, saldo en tarjetas de prueba, ventas seguidas). Compose lo monta como el paso `03` del init y corre solo con un volumen limpio (`make reset` / primer `make up`).
+
+Para recargar saldo **sin** borrar la DB (después de muchas ventas de prueba):
+
+```bash
+make recarga
+```
+
+Eso aplica [`utils/demo/recarga.sql`](utils/demo/recarga.sql). Ambos auxiliares de demo viven en `utils/demo`; únicamente schema y seed propios de la imagen quedan en `docker/mysql`. Guía end-to-end: [`docs/demo-transaccion-aprobada.md`](../docs/demo-transaccion-aprobada.md).
 
 Para regenerar desde desa (VPN + credenciales en `.env`):
 

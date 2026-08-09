@@ -104,6 +104,8 @@ class SaleStatusContent extends StatelessWidget {
         return '51 (Fondos insuficientes)';
       case PaymentResult.connectionError:
         return '99 (Tiempo agotado)';
+      case PaymentResult.voided:
+        return '00 (ANULADA)';
     }
   }
 

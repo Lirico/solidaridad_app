@@ -1,46 +1,43 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
-import '../../domain/sale_model.dart';
-import '../widgets/sale_review_header.dart';
-import '../widgets/sale_status_content.dart';
+import '../../../sales/domain/sale_model.dart';
+import '../../../sales/presentation/widgets/sale_review_header.dart';
+import '../../../sales/presentation/widgets/sale_status_content.dart';
 
-class SaleStatusScreen extends StatelessWidget {
-  const SaleStatusScreen({super.key});
+class VoidResultScreen extends StatelessWidget {
+  const VoidResultScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final PaymentResult result =
-        (ModalRoute.of(context)?.settings.arguments as PaymentResult?) ??
-        PaymentResult.approved;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final VoidResult result =
+        (args is VoidResult ? args : const VoidResult.voided());
 
     final Color statusColor;
     final IconData statusIcon;
     final String statusTitle;
     final String statusSubtitle;
 
-    switch (result) {
-      case PaymentResult.approved:
-        statusColor = const Color(0xFF2ECC71);
-        statusIcon = Icons.check_circle_outline;
-        statusTitle = '¡Transacción Aprobada!';
-        statusSubtitle =
-            'El pago fue autorizado correctamente.';
-      case PaymentResult.declined:
-        statusColor = const Color(0xFFE74C3C);
-        statusIcon = Icons.error_outline;
-        statusTitle = 'Transacción Rechazada';
-        statusSubtitle = 'La terminal reportó un error en la autorización.';
-      case PaymentResult.connectionError:
-        statusColor = const Color(0xFFFF8C00);
-        statusIcon = Icons.wifi_off_outlined;
-        statusTitle = 'Error de Conexión';
-        statusSubtitle =
-            'No se pudo contactar con el procesador. Verifique su conectividad y reintente.';
-      case PaymentResult.voided:
-        statusColor = Colors.grey;
-        statusIcon = Icons.undo;
-        statusTitle = 'Transacción Anulada';
-        statusSubtitle = 'La venta fue anulada correctamente.';
+    if (result.isVoided) {
+      statusColor = Colors.grey;
+      statusIcon = Icons.undo;
+      statusTitle = '¡Anulación Aprobada!';
+      statusSubtitle = result.message;
+    } else if (result.isDeclined) {
+      statusColor = const Color(0xFFE74C3C);
+      statusIcon = Icons.error_outline;
+      statusTitle = 'Anulación Rechazada';
+      statusSubtitle = result.message;
+    } else if (result.isUnknown) {
+      statusColor = const Color(0xFFE67E22);
+      statusIcon = Icons.help_outline;
+      statusTitle = 'No se pudo confirmar';
+      statusSubtitle = result.message;
+    } else {
+      statusColor = const Color(0xFFFF8C00);
+      statusIcon = Icons.wifi_off_outlined;
+      statusTitle = 'Error de Conexión';
+      statusSubtitle = result.message;
     }
 
     return Scaffold(
@@ -49,8 +46,7 @@ class SaleStatusScreen extends StatelessWidget {
         top: false,
         child: Column(
           children: [
-            // Sin botón de volver: la acción de salida es FINALIZAR
-            const SaleReviewHeader(title: 'Resultado del Cobro'),
+            const SaleReviewHeader(title: 'Resultado de la Anulación'),
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),
@@ -71,16 +67,15 @@ class SaleStatusScreen extends StatelessWidget {
                       ],
                     ),
                     child: SaleStatusContent(
-                      result: result,
+                      result: PaymentResult.voided,
                       statusColor: statusColor,
                       statusIcon: statusIcon,
                       statusTitle: statusTitle,
                       statusSubtitle: statusSubtitle,
                       onFinalize: () {
-                        Navigator.pushNamedAndRemoveUntil(
+                        Navigator.popUntil(
                           context,
-                          AppRoutes.saleForm,
-                          (route) => false,
+                          (route) => route.settings.name == AppRoutes.salesHistory,
                         );
                       },
                     ),

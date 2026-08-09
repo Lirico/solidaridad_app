@@ -20,6 +20,8 @@ import 'features/sales/presentation/screens/sale_manual_card_screen.dart';
 import 'features/sales/presentation/screens/sale_waiting_for_card_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
 import 'features/history/presentation/screens/sale_detail_screen.dart';
+import 'features/history/presentation/screens/void_card_screen.dart';
+import 'features/history/presentation/screens/void_result_screen.dart';
 import 'core/widgets/loading_screen.dart';
 import 'core/widgets/splash_screen.dart';
 
@@ -66,6 +68,8 @@ class MyApp extends StatelessWidget {
         AppRoutes.saleWaitingForCard: (context) => const WaitingForCardScreen(),
         AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
         AppRoutes.saleDetail: (context) => const SaleDetailScreen(),
+        AppRoutes.voidCard: (context) => const VoidCardScreen(),
+        AppRoutes.voidStatus: (context) => const VoidResultScreen(),
         AppRoutes.splash: (context) => const SplashScreen(),
         AppRoutes.loading: (context) => const LoadingScreen(),
       },

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/formatters/amount_formatter.dart';
 import '../../../sales/domain/sale_model.dart';
 
 class SaleDetailTicket extends StatelessWidget {
@@ -49,7 +50,7 @@ class SaleDetailTicket extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '${operation.productLabel} — ${operation.amount.toStringAsFixed(2)}',
+                '${operation.productLabel} — ${formatAmount(operation.amount)}',
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -69,7 +70,8 @@ class SaleDetailTicket extends StatelessWidget {
           '${operation.date.hour.toString().padLeft(2, '0')}:${operation.date.minute.toString().padLeft(2, '0')} hs',
         ),
         _buildTicketRow('Tarjeta (PAN):', operation.cardNumber),
-        if (operation.userMessage != null && operation.userMessage!.isNotEmpty) ...[
+        if (operation.userMessage != null &&
+            operation.userMessage!.isNotEmpty) ...[
           const Divider(height: 24, thickness: 1),
           _buildTicketRow('Mensaje:', operation.userMessage!),
         ],

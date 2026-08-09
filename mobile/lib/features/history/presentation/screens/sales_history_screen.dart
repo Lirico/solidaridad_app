@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/formatters/amount_formatter.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 
 import '../../../auth/presentation/cubit/auth_state.dart';
@@ -177,9 +178,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   size: 32,
                 ),
                 title: Text(
-                  '${operation.productLabel} — ${operation.amount.toStringAsFixed(2)}',
+                  '${operation.productLabel} — ${formatAmount(operation.amount)}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
+
                 subtitle: Text('${operation.cardNumber} \n${operation.id}'),
                 trailing: Text(
                   '${operation.date.hour.toString().padLeft(2, '0')}:${operation.date.minute.toString().padLeft(2, '0')}',

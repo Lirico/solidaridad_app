@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/formatters/amount_formatter.dart';
 import '../../../../core/theme/app_colors.dart';
+
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../sales/domain/sale_model.dart';
@@ -82,7 +84,9 @@ class _VoidCardScreenState extends State<VoidCardScreen> {
           iconTheme: const IconThemeData(color: Colors.white),
           elevation: 0,
         ),
-        body: const Center(child: Text('Error: datos de operación no disponibles')),
+        body: const Center(
+          child: Text('Error: datos de operación no disponibles'),
+        ),
       );
     }
 
@@ -128,7 +132,7 @@ class _VoidCardScreenState extends State<VoidCardScreen> {
                       const SizedBox(height: 4),
                       Text(
                         '${operation.productLabel} — '
-                        '${operation.amount.toStringAsFixed(2)}',
+                        '${formatAmount(operation.amount)}',
                         style: const TextStyle(color: Colors.black87),
                       ),
                     ],

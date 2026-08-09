@@ -78,9 +78,9 @@ class AuthRepository {
         message: 'No se pudo conectar con el servidor.',
       );
     } catch (e) {
-      return AuthResponse(
+      return const AuthResponse(
         isSuccess: false,
-        message: 'Error inesperado: ${e.toString()}',
+        message: 'Ocurrió un error inesperado. Reintente.',
       );
     }
   }
@@ -135,9 +135,9 @@ class AuthRepository {
         message: 'No se pudo conectar con el servidor.',
       );
     } catch (e) {
-      return AuthResponse(
+      return const AuthResponse(
         isSuccess: false,
-        message: 'Error inesperado: ${e.toString()}',
+        message: 'Ocurrió un error inesperado. Reintente.',
       );
     }
   }
@@ -196,9 +196,9 @@ class AuthRepository {
         message: 'No se pudo conectar con el servidor.',
       );
     } catch (e) {
-      return AuthResponse(
+      return const AuthResponse(
         isSuccess: false,
-        message: 'Error inesperado: ${e.toString()}',
+        message: 'Ocurrió un error inesperado. Reintente.',
       );
     }
   }

@@ -21,7 +21,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         Navigator.pop(context);
       });
       return const Scaffold(
-        body: Center(child: Text('Error: datos de operación no disponibles')),
+        body: Center(
+          child: Text('No hay datos de la operación disponibles'),
+        ),
       );
     }
 

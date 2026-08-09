@@ -23,7 +23,8 @@ class SaleStatusScreen extends StatelessWidget {
         statusColor = const Color(0xFF2ECC71);
         statusIcon = Icons.check_circle_outline;
         statusTitle = '¡Transacción Aprobada!';
-        statusSubtitle = 'El mensaje ISO fue procesado con éxito por AWS.';
+        statusSubtitle =
+            'El pago fue autorizado correctamente.';
       case PaymentResult.declined:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
@@ -34,7 +35,7 @@ class SaleStatusScreen extends StatelessWidget {
         statusIcon = Icons.wifi_off_outlined;
         statusTitle = 'Error de Conexión';
         statusSubtitle =
-            'No se pudo contactar con el POSNET. Verifique su conectividad y reintente.';
+            'No se pudo contactar con el procesador. Verifique su conectividad y reintente.';
       case PaymentResult.voided:
         statusColor = Colors.grey;
         statusIcon = Icons.undo;
@@ -48,7 +49,7 @@ class SaleStatusScreen extends StatelessWidget {
         top: false,
         child: Column(
           children: [
-            // 👑 REUTILIZADO: Usamos el mismo header base sin botón de volver
+            // Sin botón de volver: la acción de salida es FINALIZAR
             const SaleReviewHeader(title: 'Resultado del Cobro'),
             Expanded(
               child: Transform.translate(

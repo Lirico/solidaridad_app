@@ -26,6 +26,8 @@ class SelectNewOperationScreen extends StatelessWidget {
                 ),
               ),
               child: SelectNewOperationContent(
+                onCardTap: () =>
+                    Navigator.pushNamed(context, AppRoutes.saleWaitingForCard),
                 onManualCardTap: () =>
                     Navigator.pushNamed(context, AppRoutes.saleManualCard),
               ),

@@ -196,7 +196,8 @@ class WaitingForCardContent extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: onCancelOperation ?? () {},
+              onPressed:
+                  onCancelOperation ?? () => Navigator.maybePop(context),
               child: const Text(
                 'CANCELAR OPERACIÓN',
                 style: TextStyle(

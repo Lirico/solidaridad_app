@@ -6,7 +6,14 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-09
 
-> ✅ **Último cambio:** UX mobile — botones de atrás/cancelar sin acción
+> ✅ **Último cambio:** `make -C payment_processor recarga` arreglado en Windows.
+> El target usaba `sh -c '...'` con comillas simples (sintaxis POSIX) que
+> PowerShell/cmd rompía (`unexpected EOF while looking for matching '`). Se
+> reemplazó por `docker exec ... sh -c "MYSQL_PWD=localdev mysql -ukigadmin2
+> kigsolidario2"` con credenciales locales de demo, compatible con Windows.
+> Ver G-P0-18.
+>
+> ✅ **Último cambio previo:** UX mobile — botones de atrás/cancelar sin acción
 > (header de status/procesando, cancelar en espera de tarjeta, opción
 > Tarjeta) y mensajes de error/estado en inglés normalizados a español.
 >

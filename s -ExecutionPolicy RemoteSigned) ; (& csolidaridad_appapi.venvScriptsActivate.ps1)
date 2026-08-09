@@ -1,0 +1,20 @@
+[33md40b734[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m Record IDEMPOTENT_HIT on create and void replays.
+[33me38d0bc[m Persist append-only transaction status history events.
+[33m35f535a[m Map gateway 503 to FAILED when the processor never received the ISO.
+[33m2e7667a[m Distinguish unreachable processor from ambiguous gateway failure.
+[33m2b0934f[m Document the void flow in scope, gaps and contracts
+[33m44bc205[m Let merchants void an approved transaction
+[33madfa9f1[m Persist the processor ticket sent with each sale
+[33m7a976c8[m Add ISO void message support to the payment gateway
+[33mbdab294[m Remove Luhn validation for payment card numbers
+[33m61f4295[m Expose product units with singular/plural and require auth on catalog.
+[33m0d85b4e[m Specify MySQL 5.7 Docker platform as linux/amd64
+[33md10e203[m Expand transaction_number beyond daily 9999 cap
+[33m7309fa3[m[33m ([m[1;31morigin/fix/widen-transaction-number[m[33m)[m Expand transaction_number capacity beyond the daily 9999 cap.
+[33mdeb4ed8[m Remove accidental root Flutter scaffold and Verifone dumpsys dumps.
+[33m13010ee[m Merge pull request #5 from Lirico/changes-ux/ui
+[33ma0c4ea0[m[33m ([m[1;31morigin/changes-ux/ui[m[33m)[m Formatea cantidades enteras sin decimales
+[33m681294d[m Ajusta venta manual para POS
+[33mc8c11b6[m Consolida tema POS mobile
+[33m31fd5ba[m Ajusta tamanos POS en flujo de venta
+[33mfce06e7[m Merge pull request #4 from Lirico/feature_issue_hash_tarjeta_terminal_verifone

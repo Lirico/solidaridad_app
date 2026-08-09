@@ -30,7 +30,9 @@ VALUES
 -- 3) Permitir ventas seguidas en demo.
 --    validaTiempoUltimaVenta() rechaza (código 17) si hubo venta reciente
 --    dentro de venta_min_horas_ultima_venta (default 72h).
-UPDATE soli_config SET val_int = 0 WHERE name = 'venta_min_horas_ultima_venta';
+INSERT INTO soli_config (name, val_int, comment)
+VALUES ('venta_min_horas_ultima_venta', 0, 'Horas minimas desde la ultima venta para permitir una nueva')
+ON DUPLICATE KEY UPDATE val_int = VALUES(val_int);
 
 -- 4) Saldo alto para la tarjeta de demo recomendada: 6063007014007401.
 --    Es la que se usa en docs/demo-transaccion-aprobada.md.

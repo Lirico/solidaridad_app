@@ -12,6 +12,8 @@ class AuthorizeRequest(BaseModel):
     stan: str = Field(min_length=1, max_length=6)
     ticket_number: str = Field(min_length=1, max_length=24)
     expiration_date: str | None = Field(default=None, max_length=4)
+    entry_mode: str = Field(default="012", max_length=3)
+    track2: str | None = Field(default=None, max_length=37)
 
 
 class VoidRequest(BaseModel):

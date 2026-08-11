@@ -69,6 +69,8 @@ def authorize(
         stan=body.stan,
         ticket_number=body.ticket_number,
         expiration_date=body.expiration_date,
+        entry_mode=body.entry_mode,
+        track2=body.track2,
     )
     try:
         result = use_case.execute(command)

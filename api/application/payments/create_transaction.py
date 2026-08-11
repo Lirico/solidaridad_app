@@ -106,6 +106,8 @@ class CreateTransaction:
         card_number: str,
         cvv: str,
         expiration_date: str | None = None,
+        entry_mode: str = "012",
+        track2: str | None = None,
     ) -> CreateTransactionResult:
         if idempotency_key is None or not idempotency_key.strip():
             raise MissingIdempotencyKey()
@@ -182,6 +184,8 @@ class CreateTransaction:
                 stan=stan,
                 ticket_number=processor_ticket,
                 expiration_date=exp,
+                entry_mode=entry_mode,
+                track2=track2,
             )
         )
         final = self._apply_gateway_result(pending.id, gateway_result)

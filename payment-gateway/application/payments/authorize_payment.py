@@ -40,5 +40,7 @@ class AuthorizePayment:
             stan=stan.zfill(6),
             ticket_number=ticket,
             expiration_date=command.expiration_date,
+            entry_mode=command.entry_mode,
+            track2=command.track2,
         )
         return self._processor.authorize(normalized)

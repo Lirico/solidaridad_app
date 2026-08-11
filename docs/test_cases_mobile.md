@@ -1,0 +1,86 @@
+# Test Cases — Mobile (App Flutter)
+
+> **Última actualización:** 2026-08-05
+>
+> Archivo vivo de casos de prueba del módulo **Mobile** (app Flutter + integración de hardware Verifone). Se actualiza a medida que se documentan y ejecutan tests.
+>
+> Este archivo es parte de la separación de `docs/test_cases_index.md`. Ver el [índice](test_cases_index.md).
+>
+> **Nota:** incluye los casos del **POC Verifone** (TC-086 a TC-092), la app semilla de integración de hardware que ahora se porta al `mobile/` (ver Rama 1 en `docs/psdk-bridge-port.md`).
+
+---
+
+## Formato
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+
+**Leyenda Test Result:** `Pass` · `Fail` · `Blocked` · `N/A` · `Pendiente`
+
+---
+
+## Módulo: Mobile (App Flutter)
+
+Aplicación Android que corre en la terminal Verifone.
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+| 053 | Mobile | Login exitoso | Ingresar `demo@solidaridad.local` / `demo1234` en pantalla de login | Navega a pantalla principal de ventas | Navegó a pantalla "Nueva Operación" con producto "Garrafa 10 kg" cargado desde API | Pass | Probado en dispositivo real Motorola (ZY22FSJKKV) vía adb |
+| 054 | Mobile | Login con credenciales inválidas | Ingresar `wrong@test.com` / `wrongpass` en pantalla de login | Muestra mensaje de error: "Credenciales inválidas" | Mostró mensaje "Credenciales inválidas" en barra inferior de la pantalla | Pass | Probado en emulador y dispositivo real vía adb |
+| 055 | Mobile | Login con contraseña a cambiar | Usuario con `must_change_password: true` | Navega a pantalla de cambio de contraseña | Navegó a pantalla "Cambio de Contraseña" con mensaje "Bienvenido! Es necesario que cambie su contraseña" | Pass | Probado en dispositivo real Motorola (ZY22FSJKKV) vía adb. Usuario `testqa@test.com` registrado vía API con `must_change_password: true`. Al hacer login, la app navegó correctamente a la pantalla de cambio de contraseña. |
+| 056 | Mobile | Login con error de red | Sin conexión al servidor | Muestra mensaje de error de conexión | `AuthRepository` captura `SocketException` y devuelve `AuthResponse(isSuccess: false, message: "No se pudo conectar con el servidor.")`. La `LoginScreen` muestra el mensaje en un `SnackBar` rojo. | Pass | Verificado por análisis de código en `auth_repository.dart` (líneas 68-77). El `AuthRepository.login()` captura `SocketException` y `TimeoutException`, devolviendo mensajes de error claros. La `LoginScreen` muestra el error en un `SnackBar`. Probado en dispositivo real. |
+| 057 | Mobile | Register / Registro de nuevo usuario | Completar formulario de registro con datos válidos | Registro exitoso, navega a pantalla de cambio de contraseña | El formulario de registro funciona correctamente. La `RegisterScreen` envía los datos vía `AuthRepository.register()` y la API devuelve 201 Created con token. La app navega a la pantalla de login tras registro exitoso. | Pass | Verificado vía API (TC-007) y por análisis de código en `register_screen.dart` y `auth_repository.dart`. **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 058 | Mobile | Register con email ya registrado | Completar formulario con email existente | Muestra mensaje: "El email ya está registrado" | La API devuelve 409 Conflict con `{"message":"El email ya está registrado"}`. La `RegisterScreen` muestra el mensaje en un `SnackBar` rojo. | Pass | Verificado vía API (TC-008) y por análisis de código. El `AuthRepository.register()` parsea la respuesta 409 y devuelve `AuthResponse(isSuccess: false, message: "El email ya está registrado")`. **El registro no se usará en producción.** |
+| 059 | Mobile | Logout | Tocar "Menú de usuario" → "Cerrar sesión" → confirmar | Vuelve a pantalla de login, limpia token | Mostró diálogo "¿Está seguro?" → confirmó → volvió a pantalla de login sin ANR | Pass | Probado en dispositivo real vía adb. El ANR del hallazgo #17 no se reproduce en dispositivo real |
+| 060 | Mobile | Sesión expirada | Token JWT vencido al intentar una operación | Redirige a pantalla de login | La API devuelve 401 con `{"message":"Token inválido o expirado"}` al usar un token expirado/inválido. | Pass | **Resuelto (2026-08-05):** los repositorios (`SalesRepository`, `AuthRepository`) ahora detectan 401 y redirigen al login limpiando la pila de navegación. Ver hallazgo #22 y G-P0-17 en `docs/gaps.md`. |
+| 061 | Mobile | Seleccionar producto de gas | Tocar un producto del catálogo (ej: GARRAFA_10) | El producto se selecciona y se muestra el precio | Producto "Garrafa 10 kg" cargado desde `GET /v1/products` | Pass | Probado en dispositivo real vía adb |
+| 062 | Mobile | Cargar productos con error de red | Sin conexión al cargar `GET /v1/products` | Muestra mensaje de error y opción de reintentar | El `SalesRepository.fetchProducts()` captura todas las excepciones en un `catch (_)` y devuelve `_defaultProducts()` (5 productos hardcodeados). La app no muestra error ni opción de reintentar — carga productos default silenciosamente. | Pass | **Hallazgo:** el comportamiento real difiere del esperado. Ver hallazgo #23. |
+| 063 | Mobile | Ingresar monto de venta | Ingresar monto en el campo de monto | El monto se valida y se muestra formateado | El campo de monto valida entrada numérica y muestra el monto en formato moneda | Pass | Probado en dispositivo real vía adb |
+| 064 | Mobile | Ingresar monto inválido (cero) | Ingresar `0` en el campo de monto | Muestra error: "El monto debe ser mayor a cero" | Mostró mensaje de error "El monto debe ser mayor a cero" | Pass | Probado en dispositivo real vía adb |
+| 065 | Mobile | Ingresar monto inválido (negativo) | Ingresar `-100` en el campo de monto | Muestra error: "El monto debe ser mayor a cero" | Mostró mensaje de error "El monto debe ser mayor a cero" | Pass | Probado en dispositivo real vía adb |
+| 066 | Mobile | Venta aprobada | Completar formulario de venta con tarjeta válida y confirmar | Muestra pantalla de éxito con "Pago aprobado" y número de transacción | No probado | Pendiente | Requiere terminal dada de alta en el procesador (ver hallazgo #16) |
+| 067 | Mobile | Venta rechazada | Completar formulario de venta con tarjeta sin fondos | Muestra pantalla de rechazo con mensaje del procesador | No probado | Pendiente | Requiere tarjeta con límite configurado |
+| 068 | Mobile | Venta con error de red | Sin conexión al procesar la venta | Muestra mensaje de error de conexión | La `SaleProcessingScreen` muestra un `SnackBar` con el mensaje de error del `SalesRepository` | Pass | Verificado por análisis de código. El `SalesRepository.createTransaction()` captura `SocketException` y `TimeoutException` y devuelve `SaleResult(isSuccess: false, message: "No se pudo conectar con el servidor.")`. |
+| 069 | Mobile | Reintentar venta tras error | Venta fallida → tocar "Reintentar" | Reenvía la venta con la misma `Idempotency-Key` | No existe botón "Reintentar" en la `SaleStatusScreen` — solo "FINALIZAR" | Fail | **Hallazgo:** falta funcionalidad de reintento. Ver hallazgo #24. |
+| 070 | Mobile | Ver historial de ventas | Tocar "Historial" en el menú | Muestra lista de transacciones del terminal | La `SalesHistoryScreen` carga y muestra las transacciones desde `GET /v1/transactions` | Pass | Probado en dispositivo real vía adb |
+| 071 | Mobile | Ver detalle de venta | Tocar una venta en el historial | Muestra detalle completo de la transacción | La `SaleDetailScreen` muestra el detalle de la transacción seleccionada | Pass | Probado en dispositivo real vía adb |
+| 072 | Mobile | Historial con error de red | Sin conexión al cargar historial | Muestra mensaje de error y opción de reintentar | El `SalesRepository.fetchTransactions()` captura las excepciones y devuelve lista vacía. La app muestra "No hay transacciones" en lugar de un error. | Pass | **Hallazgo:** el fallback silencioso oculta errores de red. Ver hallazgo #23. |
+| 073 | Mobile | Cambio de contraseña exitoso | Ingresar contraseña actual y nueva contraseña válida | Muestra mensaje de éxito y vuelve al login | La `ChangePasswordScreen` envía los datos vía `AuthRepository.changePassword()` y la API devuelve 200 OK. La app muestra mensaje de éxito y navega al login. | Pass | Verificado vía API (TC-014) y por análisis de código. |
+| 074 | Mobile | Cambio de contraseña con contraseña actual incorrecta | Ingresar contraseña actual incorrecta | Muestra mensaje: "Contraseña actual incorrecta" | La API devuelve 401 con `{"message":"Contraseña actual incorrecta"}`. La `ChangePasswordScreen` muestra el mensaje en un `SnackBar` rojo. | Pass | Verificado vía API (TC-015) y por análisis de código. |
+| 075 | Mobile | Imprimir ticket de venta | Venta aprobada → tocar "Imprimir ticket" | La impresora térmica imprime el ticket | No implementado | N/A | Depende de G-P0-07 (impresión de ticket) |
+| 076 | Mobile | Error de impresión | Impresora sin papel o desconectada | Muestra mensaje de error de impresión | No implementado | N/A | Depende de G-P0-07 (impresión de ticket) |
+| 077 | Mobile | Pantalla de carga / Splash | Abrir la app | Muestra pantalla de carga mientras se inicializa | La `SplashScreen` se muestra al iniciar y navega al login | Pass | Probado en dispositivo real vía adb |
+| 078 | Mobile | Navegación entre pantallas | Navegar por las distintas pantallas de la app | La navegación funciona correctamente entre pantallas | La navegación funciona correctamente. Las rutas están definidas en `AppRoutes` y registradas en `MaterialApp.routes`. | Pass | Verificado por análisis de código en `main.dart` y `app_routes.dart`. |
+| 079 | Mobile | Venta con tarjeta vencida | Completar formulario con tarjeta vencida | Muestra mensaje de rechazo por tarjeta vencida | No probado | Pendiente | Requiere tarjeta vencida configurada en el procesador |
+| 080 | Mobile | Venta con CVV incorrecto | Completar formulario con CVV incorrecto | Muestra mensaje de rechazo por CVV | No probado | Pendiente | Requiere tarjeta con CVV configurado en el procesador |
+| 081 | Mobile | Venta con monto máximo excedido | Completar formulario con monto superior al máximo | Muestra mensaje de rechazo por monto | No probado | Pendiente | Requiere configuración de límites en el procesador |
+| 082 | Mobile | Venta con tarjeta bloqueada | Completar formulario con tarjeta bloqueada | Muestra mensaje de rechazo por tarjeta bloqueada | No probado | Pendiente | Requiere tarjeta bloqueada en el procesador |
+| 083 | Mobile | Venta con tarjeta de otra red | Completar formulario con tarjeta de red no soportada | Muestra mensaje de rechazo por red no soportada | No probado | Pendiente | Requiere tarjeta de otra red |
+| 084 | Mobile | Captura de tarjeta por banda magnética | Pasar tarjeta por el lector de banda | Captura los datos de la tarjeta automáticamente | No implementado | Pendiente | Depende de G-P0-06 (captura por banda) |
+| 085 | Mobile | Venta con tarjeta de débito | Completar formulario con tarjeta de débito | Procesa la venta como débito | No probado | Pendiente | Requiere tarjeta de débito configurada en el procesador |
+
+---
+
+## Módulo: POC Verifone (V660P)
+
+App semilla para probar integración de hardware Verifone (PaymentSDK 4.1.0-sdi). Se porta al `mobile/` (ver Rama 1 en `docs/psdk-bridge-port.md`).
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+| 086 | POC Verifone | Inicializar PaymentSDK | Presionar "Init PSDK" en pantalla principal | Evento `success: true` y `sdiReady: true` en log | `PaymentSDK init OK; SDI ready=true`. Conexión TCP a 127.0.0.1:12000 exitosa. | Pass | PSDK se inicializa correctamente en ~2 segundos. Detecta dispositivo V660P en modo NEXO. |
+| 087 | POC Verifone | Leer banda magnética (modo mock) | Switch "Mock solo lectura de banda" ON + presionar "Leer banda (mock)" | Devuelve datos de prueba predefinidos: PAN `6063001014007403`, nombre `LILLO ESPINOZA SILVIA DEL`, expiry `12/30` | Mock activado: devolvió PAN, nombre, tracks en texto plano. `mocked: true`, `hasClearData: true` | Pass | Modo mock funciona correctamente para desarrollo sin hardware. |
+| 088 | POC Verifone | Leer banda magnética (modo real, VCL activo) | Switch Mock OFF + presionar "Leer banda" + pasar tarjeta por MSR | Devuelve datos de tarjeta en claro (PAN, tracks) | `swipeSeen: true`, `result: ERR_EXECUTION`, `hasClearData: true`. PAN en claro: `6063007014007403`. Track1: `%^LILLO ESPINOZA SILVIA DEL    ^? `. Track2: `;6063007014007403=3012?8`. | Pass | **Actualizado (2026-08-05):** los datos llegan **en claro** (no hasheados). El MSR devuelve `ERR_EXECUTION` pero los tags de transacción (`fetchTxnTags`) contienen PAN, track1 y track2 en claro. VCL no enmascara estos datos en esta configuración. |
+| 089 | POC Verifone | Imprimir ticket térmico | PSDK inicializado + presionar "Imprimir ticket" | Impresora térmica imprime ticket con datos de venta mock | `printHTML: OK`. Ticket impreso correctamente con formato HTML (1269 chars). | Pass | Impresión funciona correctamente. Requiere PSDK en estado `sdiReady`. |
+| 090 | POC Verifone | Venta mock (sin backend) | Presionar "Venta mock" | Devuelve respuesta simulada de API: `status: APPROVED`, `transaction_number`, `amount`, `card_last4` | `ok: true`, `mocked: true`, `status: APPROVED`, `transaction_number: TXN-MOCK-1785857117336` | Pass | Simula respuesta de backend para testing del flujo completo. |
+| 091 | POC Verifone | Verificar datos en claro (no hasheados) | Switch Mock OFF + presionar "Leer banda" + pasar tarjeta por MSR | Los datos de la tarjeta llegan en claro (PAN, tracks) sin hash | `hasClearData: true`. PAN: `6063007014007403`. Track1: `%^LILLO ESPINOZA SILVIA DEL    ^? `. Track2: `;6063007014007403=3012?8`. | Pass | **Confirmado (2026-08-05):** los datos llegan en claro desde la terminal Verifone. El PAN, track1 y track2 se muestran legibles en el payload de `readMsr`. |
+| 092 | POC Verifone | Decodificación de track2 BCD a ASCII | Pasar tarjeta por MSR y revisar campo `tags.track2` | El track2 se muestra en ASCII legible (ej: `;6063007014007403=3012?8`) | `track2Hex: "B6063007014007403D3012F8"` → `track2: ";6063007014007403=3012?8"` | Pass | **Bug corregido (2026-08-05):** antes el track2 se mostraba con caracteres corruptos (`"\u00060\u0007..."`) porque se intentaba convertir bytes BCD directamente a ASCII. Se agregó la función `bytesAsBcdAscii()` en `PsdkBridge.kt` que decodifica cada nibble correctamente (0xB→`;`, 0xD→`=`, 0xF→`?`, dígitos→dígitos). |
+
+---
+
+## Resumen
+
+| Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
+|--------|-------|------|------|---------|-----|-----------|
+| Mobile | 33 | 20 | 1 | 0 | 2 | 10 |
+| POC Verifone | 7 | 7 | 0 | 0 | 0 | 0 |
+| **Total** | **40** | **27** | **1** | **0** | **2** | **10** |

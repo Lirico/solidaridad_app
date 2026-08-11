@@ -6,7 +6,15 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-11-08
 
-> ✅ **Último cambio:** Demo — solo la garrafa de 10 kg (producto 993) se
+> ✅ **Último cambio (Rama 1 — bridge PSDK):** se portó el bridge Verifone del
+> POC al mobile: `PsdkBridge.kt` + canales en `MainActivity.kt`, facade Dart
+> `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`, `.aar`
+> PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`, `minSdk=24` y dependencia
+> `.aar` en `build.gradle.kts`, permisos Verifone en `AndroidManifest.xml`.
+> Build debug OK. G-P0-06 → `partial` (falta conectar pantallas y gateway).
+>
+> ✅ **Último cambio previo:** Demo — solo la garrafa de 10 kg (producto 993) se
+
 > aprobaba; los demás productos (994–997) salían rechazados con código 06. Causa
 > raíz: el saldo en `sgas_usuario_cta` es **por producto** y los scripts de demo
 > (`03_fix_demo.sql`, `recarga.sql`) solo cargaban saldo para `prod_id='993'`.
@@ -91,7 +99,9 @@ Verifone (banda + térmica).
 | G-P0-03 | Token de venta no enlazado a sesión real | done | `SalesCubit.loadHistory()`, `sendIsoMessage()` y `fetchProducts()` reciben el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
-| G-P0-06 | Lectura de banda (Verifone) | open | Solo ingreso por teclado. Sin SDK/plugin/canal nativo MSR. Gateway DE22 fijo manual. |
+| G-P0-06 | Lectura de banda (Verifone) | partial | **Rama 1 (2026-11-08):** bridge PSDK portado del POC al mobile. `PsdkBridge.kt` + `MainActivity.kt` (canales `com.solidaridad.poc_verifone/psdk` y `psdk_events`) en `mobile/android/app/src/main/kotlin/`. Dart facade `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`. `.aar` PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`. `build.gradle.kts` con `minSdk=24` y dependencia `.aar`. `AndroidManifest.xml` con permisos Verifone. Build debug OK. **Pendiente:** conectar `WaitingForCardScreen` (Rama 2), navegación (Rama 3), gateway DE22 dinámico (Rama 4), API `entry_mode`/`track2` (Rama 5), mobile `registerSale` (Rama 6). |
+
+
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-08-08:** default de `dev-term` → `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (terminal real GOBIERNO del demo; `dev-term` no existe en `terminales` → código 89). Pendiente: lectura runtime desde config del device. |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |

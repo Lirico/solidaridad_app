@@ -13,12 +13,20 @@ App Flutter → API → Payment Gateway → Autorizador (authkig) → MySQL
 | Tarjeta | `6063007014007403` |
 | CVV | `878` |
 | Vencimiento (DE14) | `1228` |
-| Producto | `993` |
+| Producto | `993` (o `994`/`995`/`996`/`997`) |
 | `installation_id` / terminal | `05000001` |
 | Comercio del terminal | `012502` (GOBIERNO) |
 
 Usar siempre `6063007014007403`. No usar `4111111111111111`: cuelga el
 autorizador en `calcula_saldo_vivo()` (bug del C).
+
+> **Productos disponibles:** el saldo en `sgas_usuario_cta` es **por producto**.
+> Los scripts de demo (`03_fix_demo.sql` y `recarga.sql`) cargan saldo para los
+> 5 productos: `993` (Garrafa 10), `994` (Garrafa 15), `995` (Garrafa 30),
+> `996` (Tubo 45) y `997` (Granel). Cualquiera de ellos se aprueba. Si un
+> producto sale rechazado con código **06**, es porque su `prod_id` no tiene
+> saldo cargado (ver Troubleshooting).
+
 
 
 ## 2. Levantar el stack
@@ -98,7 +106,9 @@ Sin `--dart-define=INSTALLATION_ID=...`, el default de la app es `05000001`.
 | **89** | Terminal desconocida | Usar `05000001` |
 | **17** | Venta demasiado reciente | Cubierto por `03_fix_demo` (`venta_min_horas_ultima_venta=0`); si no, `make reset` |
 | **51** | Fondos insuficientes | `make -C payment_processor recarga` |
+| **06** | Producto sin saldo cargado (`sgas_usuario_cta` sin fila para ese `prod_id`) | `make -C payment_processor recarga` (recarga los 5 productos) o `make reset` |
 | **96** | DE62 / comprobante | Ya cubierto en gateway con `ticket_number` |
+
 
 ## Referencias
 

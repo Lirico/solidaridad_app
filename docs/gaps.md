@@ -4,9 +4,19 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-09-08
+Última revisión: 2026-11-08
 
-> ✅ **Último cambio:** Auth mobile — `change-password` no enviaba el Bearer
+> ✅ **Último cambio:** Demo — solo la garrafa de 10 kg (producto 993) se
+> aprobaba; los demás productos (994–997) salían rechazados con código 06. Causa
+> raíz: el saldo en `sgas_usuario_cta` es **por producto** y los scripts de demo
+> (`03_fix_demo.sql`, `recarga.sql`) solo cargaban saldo para `prod_id='993'`.
+> Sin fila para un producto, `valida_usuario_producto()` devuelve `TRASN_TYPE_UNK`
+> (6) → DE39 `"06"` → gateway `DECLINED`. Se agregó saldo para los 5 productos
+> (993–997) en ambas tarjetas de demo (`6063007014007403` y `6063007014007401`).
+> Ver G-P0-18.
+>
+> ✅ **Último cambio previo:** Auth mobile — `change-password` no enviaba el Bearer
+
 > token. El endpoint `POST /v1/auth/change-password` está protegido
 > (`get_current_user`); sin `Authorization: Bearer <token>` el backend devolvía
 > 401 y la contraseña nunca se actualizaba (seguía entrando con la vieja). Se
@@ -95,7 +105,8 @@ Verifone (banda + térmica).
 
 | G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases.md`. |
 
-| G-P0-18 | Transacción de demo siempre rechazada por comercio inválido en autorizador | done | **Fix (2026-08-08):** `utils/demo/03_fix_demo.sql` montado por compose como paso `03` del init de MySQL: terminal `05000001` → `cod_comercio='012502'`, saldo en tarjetas de demo, `venta_min_horas_ultima_venta=0`. Recarga posterior sin reset: `make -C payment_processor recarga` (`utils/demo/recarga.sql`). Ambos auxiliares quedan fuera de `docker/mysql`. Guía: `docs/demo-transaccion-aprobada.md`. |
+| G-P0-18 | Transacción de demo siempre rechazada por comercio inválido en autorizador | done | **Fix (2026-08-08):** `utils/demo/03_fix_demo.sql` montado por compose como paso `03` del init de MySQL: terminal `05000001` → `cod_comercio='012502'`, saldo en tarjetas de demo, `venta_min_horas_ultima_venta=0`. Recarga posterior sin reset: `make -C payment_processor recarga` (`utils/demo/recarga.sql`). Ambos auxiliares quedan fuera de `docker/mysql`. Guía: `docs/demo-transaccion-aprobada.md`. **2026-11-08:** el saldo en `sgas_usuario_cta` es por producto; ahora `03_fix_demo.sql` y `recarga.sql` cargan saldo para los 5 productos (993–997) en `6063007014007403` y `6063007014007401`, para que cualquier garrafa se apruebe (antes solo la de 10 kg, código 06). |
+
 
 
 ---

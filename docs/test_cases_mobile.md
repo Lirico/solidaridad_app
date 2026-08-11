@@ -104,11 +104,30 @@ Puente Verifone PaymentSDK portado del POC al `mobile/` (ver `docs/psdk-bridge-p
 
 ---
 
+## Módulo: Rama 4 — `entry_mode` en mobile (registerSale)
+
+La app mobile ahora envía `entry_mode` ("022" banda / "012" manual) y `track2`
+(si está disponible) al registrar la venta. Ver `docs/rama3-entry-mode.md` y
+`docs/gaps.md` (G-P0-06 y G-P1-06 → `done`).
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+| 111 | Rama 4 | Lectura por banda → `entry_mode` "022" | Pasar tarjeta por MSR en `WaitingForCardScreen` | `showReview` recibe `entryMode: '022'` y `track2` (de `tags['track2']` o `msr['track2']`) | No probado | Pendiente | Verificar en `sale_waiting_for_card_screen.dart`. La banda NO contiene CVV (se envía vacío). |
+| 112 | Rama 4 | Ingreso manual → `entry_mode` "012" | Completar formulario manual en `SaleManualCardScreen` | `showReview` recibe `entryMode: '012'` y sin `track2` | No probado | Pendiente | Verificar en `sale_manual_card_screen.dart`. |
+| 113 | Rama 4 | `registerSale` envía `entry_mode` en payload | Confirmar venta en `SaleReviewScreen` | `POST /v1/transactions` incluye `entry_mode` ("022" o "012") en el body | No probado | Pendiente | Verificar en `sales_repository.dart` (`bodyPayload['entry_mode']`). |
+| 114 | Rama 4 | `registerSale` envía `track2` solo si está disponible | Venta por banda con `track2` presente | `POST /v1/transactions` incluye `track2` en el body | No probado | Pendiente | Verificar en `sales_repository.dart`: `track2` solo se agrega si no es null/vacío. |
+
+---
+
 ## Resumen
+
 
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
 | Mobile | 33 | 20 | 1 | 0 | 2 | 10 |
 | POC Verifone | 7 | 7 | 0 | 0 | 0 | 0 |
 | Bridge PSDK (Rama 1) | 18 | 1 | 0 | 0 | 0 | 17 |
-| **Total** | **58** | **28** | **1** | **0** | **2** | **27** |
+| Rama 4 (entry_mode) | 4 | 0 | 0 | 0 | 0 | 4 |
+| **Total** | **62** | **28** | **1** | **0** | **2** | **31** |
+
+

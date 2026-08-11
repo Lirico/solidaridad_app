@@ -67,6 +67,7 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
 
       final String pan = (tags['pan'] ?? msr['panAscii'] ?? '') as String;
       final String expiryYyMm = (tags['expiry'] ?? '') as String;
+      final String track2 = (tags['track2'] ?? msr['track2'] ?? '') as String;
 
       if (pan.isEmpty) {
         _showError('No se pudo leer el número de tarjeta. Reintente.');
@@ -79,6 +80,8 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
       final String expirationDate = _yyMmToMmYy(expiryYyMm);
 
       // 4. Guardar los datos en el cubit y navegar a la revisión.
+      // La lectura fue por banda magnética: entry_mode "022" y se envía el
+      // track2 (DE35) en lugar del PAN + vencimiento.
       final cubit = context.read<SalesCubit>();
       final state = cubit.state;
 
@@ -89,6 +92,8 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
         cardNumber: pan,
         cvv: '',
         expirationDate: expirationDate,
+        entryMode: '022',
+        track2: track2.isNotEmpty ? track2 : null,
       );
 
       Navigator.pushNamed(context, AppRoutes.saleReview);

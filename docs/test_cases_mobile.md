@@ -1,12 +1,12 @@
 # Test Cases — Mobile (App Flutter)
 
-> **Última actualización:** 2026-08-05
+> **Última actualización:** 2026-11-08
 >
 > Archivo vivo de casos de prueba del módulo **Mobile** (app Flutter + integración de hardware Verifone). Se actualiza a medida que se documentan y ejecutan tests.
 >
 > Este archivo es parte de la separación de `docs/test_cases_index.md`. Ver el [índice](test_cases_index.md).
 >
-> **Nota:** incluye los casos del **POC Verifone** (TC-086 a TC-092), la app semilla de integración de hardware que ahora se porta al `mobile/` (ver Rama 1 en `docs/psdk-bridge-port.md`).
+> **Nota:** incluye los casos del **POC Verifone** (TC-086 a TC-092), la app semilla de integración de hardware que ahora se porta al `mobile/`, y los casos del **Bridge PSDK** (TC-093 a TC-110) portado en la Rama 1 (ver `docs/psdk-bridge-port.md`).
 
 ---
 
@@ -77,10 +77,38 @@ App semilla para probar integración de hardware Verifone (PaymentSDK 4.1.0-sdi)
 
 ---
 
+## Módulo: Bridge PSDK (Rama 1 — port al mobile)
+
+Puente Verifone PaymentSDK portado del POC al `mobile/` (ver `docs/psdk-bridge-port.md`). Cubre `PsdkBridge.kt` (Kotlin), `psdk_bridge.dart` (Dart) y `psdk_msr_mock.dart` (mock). La whitelist de BINs ya está incorporada en la app Verifone.
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+| 093 | Bridge PSDK | Inicializar PaymentSDK | Llamar `PsdkBridge.initialize()` | Evento `success: true` y `sdiReady: true` | No probado | Pendiente | Requiere terminal Verifone con whitelist. Verificar evento `SUCCESS` en `statusEvents`. |
+| 094 | Bridge PSDK | Inicializar dos veces (idempotencia) | Llamar `initialize()` dos veces seguidas | Segunda llamada responde `alreadyInitialized: true` sin romperse | No probado | Pendiente | El código Kotlin devuelve `alreadyInitialized: true` si `paymentSdk != null`. |
+| 095 | Bridge PSDK | Inicializar sin SDK disponible | Llamar `initialize()` sin hardware / SDK no disponible | Error `PSDK_INIT_FAILED` manejado | No probado | Pendiente | Verificar que el error se propaga por el MethodChannel sin crashear. |
+| 096 | Bridge PSDK | Leer banda magnética (éxito) | Pasar tarjeta por MSR con `readMsr(timeoutSec: 30)` | Devuelve PAN, nombre, track1, track2 y vencimiento en claro | No probado | Pendiente | Requiere terminal con whitelist. Verificar `ok: true`, `hasClearData: true`. |
+| 097 | Bridge PSDK | Leer banda con timeout | No pasar tarjeta, esperar el timeout | `timedOut: true` al cumplirse el timeout (30s por defecto) | No probado | Pendiente | Verificar que `readMsr` no se cuelga y responde con `timedOut: true`. |
+| 098 | Bridge PSDK | Leer banda sin inicializar | Llamar `readMsr` sin haber inicializado el SDK | Error `PSDK_NOT_READY` | No probado | Pendiente | El código Kotlin devuelve `PSDK_NOT_READY` si `sdiManager == null`. |
+| 099 | Bridge PSDK | Acotar timeout de lectura | Pasar `timeoutSec` fuera de rango (ej: 0 o 200) | El timeout se acota entre 1 y 128 segundos | No probado | Pendiente | El código Kotlin usa `coerceIn(1, 128)`. |
+| 100 | Bridge PSDK | Decodificar track2 BCD a ASCII | Track2 BCD `B6063007014007403D3012F8` | Se decodifica a `;6063007014007403=3012F8?` (sentinels correctos) | No probado | Pendiente | Lógica `bytesAsBcdAscii()` en `PsdkBridge.kt`. Test unitario recomendado. |
+| 101 | Bridge PSDK | Decodificar nibbles especiales del track2 | Track2 con nibbles 0xA, 0xC, 0xE | Se mapean a `:`, `<`, `>` respectivamente | No probado | Pendiente | Lógica `bcdNibbleToChar()` en `PsdkBridge.kt`. Test unitario recomendado. |
+| 102 | Bridge PSDK | Decodificar track2 vacío | Track2 null o vacío | Devuelve string vacío sin crashear | No probado | Pendiente | Lógica `bytesAsBcdAscii()` debe manejar null/empty. |
+| 103 | Bridge PSDK | Detectar datos ocultos (VCL/SRED) | Terminal oculta el PAN (todo `F` o todo `0`) | `hasClearData: false` y `ok: false` | No probado | Pendiente | Lógica `hasUsefulCleartext()` en `PsdkBridge.kt`. |
+| 104 | Bridge PSDK | Detectar datos reales | Terminal devuelve PAN/tracks en claro | `hasClearData: true` y `ok: true` | No probado | Pendiente | Lógica `hasUsefulCleartext()` en `PsdkBridge.kt`. |
+| 105 | Bridge PSDK | Mock devuelve mismo shape que SDK real | Llamar `PsdkMsrMock.readMsrSuccess()` | Devuelve `msr`, `tags`, `sale` con la misma forma que el SDK real | No probado | Pendiente | Verificar que el mock es intercambiable con el SDK real para desarrollo. |
+| 106 | Bridge PSDK | Mock saleFields mapeables a API | Revisar `PsdkMsrMock.saleFields` | `card_number`, `cvv`, `expiration_date`, `card_holder` correctos | No probado | Pendiente | Verificar que los campos se mapean a `POST /v1/transactions`. |
+| 107 | Bridge PSDK | Fachada Dart invoca canal correcto | Llamar cada método de `PsdkBridge` | Cada método invoca `com.solidaridad.poc_verifone/psdk` con los argumentos correctos | No probado | Pendiente | Verificar el contrato del MethodChannel entre Dart y Kotlin. |
+| 108 | Bridge PSDK | Stream de eventos parsea mapas | Recibir eventos de `statusEvents` | Los mapas de Kotlin se parsean correctamente a `Map<String, dynamic>` | No probado | Pendiente | Verificar `statusEvents` en `psdk_bridge.dart`. |
+| 109 | Bridge PSDK | Build debug con `.aar` y `minSdk=24` | Compilar `flutter build apk --debug` | Compila sin errores con `PaymentSDK-4.1.0-sdi.aar` y `minSdk=24` | Build debug OK | Pass | Verificado en Rama 1. `build.gradle.kts` con `minSdk = maxOf(flutter.minSdkVersion, 24)`. |
+| 110 | Bridge PSDK | Canales registrados en MainActivity | Iniciar la app en dispositivo | Los canales `psdk` y `psdk_events` responden (smoke test) | No probado | Pendiente | Verificar registro en `MainActivity.kt`. |
+
+---
+
 ## Resumen
 
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
 | Mobile | 33 | 20 | 1 | 0 | 2 | 10 |
 | POC Verifone | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **40** | **27** | **1** | **0** | **2** | **10** |
+| Bridge PSDK (Rama 1) | 18 | 1 | 0 | 0 | 0 | 17 |
+| **Total** | **58** | **28** | **1** | **0** | **2** | **27** |

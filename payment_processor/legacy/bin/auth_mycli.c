@@ -88,11 +88,19 @@ static int validaMontoVentaUltimaRecarga(MYSQL *con, char *card_number, char *co
     // venta_max_porcentaje_ultima_recarga se almacena como int con dos decimales, en porcentaje
     ratio_max = (double)val / 10000.0;
 
-    if (obtieneUltimaRecarga(con, card_number, codMoneda, &montoUltimaRecarga)) {
+    int ret_recarga = obtieneUltimaRecarga(con, card_number, codMoneda, &montoUltimaRecarga);
+    if (ret_recarga == -5) {
+        // No hay recarga previa registrada: no se puede aplicar la regla del
+        // porcentaje sobre la ultima recarga, por lo que la venta no se rechaza.
+        printf("validaMontoVentaUltimaRecarga() LOG sin recarga previa, se omite la validacion.\n");
+        return 0;
+    }
+    if (ret_recarga != 0) {
         return -1;
     }
 
     montoMaximo = montoUltimaRecarga * ratio_max;
+
     printf("validaMontoVentaUltimaRecarga() LOG MontoVenta=%f UltimaRecarga=%f Ratio=%f Max=%f\n",
            montoVenta, montoUltimaRecarga, ratio_max, montoMaximo);
 
@@ -3680,23 +3688,23 @@ char* getVencimiento(struct iso8583* iso)
 
 char* getCardNumber(struct iso8583* iso)
 {
-    char* cnum;
+    char* cnum = (char*) malloc(sizeof(char)*21);
+    memset(cnum, '\0', 21);
 
-    if (atoi(iso->posentrymode_22) == 12)
+    printf("PosEntryMode = %d\n", atoi(iso->posentrymode_22));
+    printf("PAN_2 = %s\n", iso->pan_2);
+    printf("TRACK2_35 = %s\n", iso->track2_35);
+
+    // Preferir el PAN (DE2) cuando venga presente. La banda magnética de
+    // algunas tarjetas de prueba devuelve un track2 (DE35) cuyo PAN no
+    // coincide con el registrado; en ese caso la app envía DE2 + DE14 y el
+    // autorizador debe usar el PAN explícito en lugar del track2.
+    if (strlen(iso->pan_2) > 0)
     {
-        printf("PosEntryMode = %d\n", atoi(iso->posentrymode_22));
-        printf("PAN_2 = %s\n", iso->pan_2);
-
-        cnum = (char*) malloc(sizeof(char)*21);
-        memset(cnum, '\0', 21);
         memcpy(cnum, iso->pan_2, 16);
     }
-
-    if (atoi(iso->posentrymode_22) == 22)
+    else
     {
-        printf("PosEntryMode = %d\n", atoi(iso->posentrymode_22));
-        cnum = (char*)malloc(sizeof(char)*21);
-        memset(cnum, '\0', 21);
         memcpy(cnum, iso->track2_35, 16);
     }
 
@@ -3826,7 +3834,6 @@ int obtieneUltimaRecarga(MYSQL* con, char* card_number, char* codMoneda, double*
     {
         printf("obtieneUltimaRecarga() ERROR: exec query.\n");
         free(sql);
-        mysql_close(con);
         return -3;
     }
     result = mysql_store_result(con);
@@ -3834,15 +3841,14 @@ int obtieneUltimaRecarga(MYSQL* con, char* card_number, char* codMoneda, double*
     {
         printf("obtieneUltimaRecarga() ERROR: store results.\n");
         free(sql);
-        mysql_close(con);
         return -3;
     }
     if (mysql_num_rows(result) != 1) {
         mysql_free_result(result);
         free(sql);
-        mysql_close(con);
         return -5;
     }
+
     row = mysql_fetch_row(result);
     *montoUltimaRecarga = strtod(row[0], NULL);
 

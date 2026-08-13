@@ -325,6 +325,49 @@ def test_invalid_cvv() -> None:
         )
 
 
+def test_band_magnetic_022_allows_empty_cvv() -> None:
+    """La banda magnética (entry_mode 022) no contiene CVV: se permite vacío."""
+    use_case, transactions, _, gateway = _build()
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="1.50",
+        card_number="6063007014007403",
+        cvv="",
+        entry_mode="022",
+        track2="6063007014007403=2912",
+    )
+    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    assert result.transaction.status == TransactionStatus.APPROVED
+    gateway.authorize.assert_called_once()
+    auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.entry_mode == "022"
+    assert auth_req.track2 == "6063007014007403=2912"
+    transactions.create_pending.assert_called_once()
+    transactions.update_result.assert_called_once()
+
+
+def test_manual_012_still_validates_cvv() -> None:
+    """El ingreso manual (entry_mode 012) sigue exigiendo CVV válido."""
+    from domain.exceptions import InvalidCvv
+
+    use_case, *_ = _build()
+    with pytest.raises(InvalidCvv):
+        use_case.execute(
+            user_id=1,
+            installation_id="inst-1",
+            idempotency_key="k1",
+            product="GARRAFA_10",
+            amount="1.50",
+            card_number="4111111111111111",
+            cvv="",
+            entry_mode="012",
+        )
+
+
+
 def test_empty_terminal_string() -> None:
     use_case, *_ = _build(installation_code="   ")
     with pytest.raises(MissingTerminalId):

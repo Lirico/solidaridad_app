@@ -177,6 +177,45 @@ def test_build_purchase_request_sets_fields() -> None:
     assert not bitmap_get(iso.bitmap, 42)
 
 
+def test_build_purchase_request_with_track2_keeps_pan() -> None:
+    """Con track2 presente, DE2 (PAN) y DE35 (track2) se envían juntos.
+
+    El autorizador prefiere el PAN explícito (DE2) cuando viene presente; el
+    track2 de algunas tarjetas de prueba trae un PAN que no coincide con el
+    registrado, por lo que el gateway debe enviar DE2 siempre (no reemplazarlo
+    por DE35).
+    """
+    settings = Settings()
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="6063007014007403",
+        terminal_id="TERM0001",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="2512",
+        entry_mode="022",
+        track2="460630070140074036301288",
+    )
+    iso = build_purchase_request(
+        cmd,
+        settings,
+        now=datetime(2026, 7, 16, 12, 15, 30),
+    )
+    assert iso.pan_2 == "6063007014007403"
+    assert iso.track2_35 == "460630070140074036301288"
+    assert iso.posentrymode_22 == "0022"
+    assert iso.dateexpire_14 == "2512"
+    assert bitmap_get(iso.bitmap, 2)
+    assert bitmap_get(iso.bitmap, 35)
+    assert bitmap_get(iso.bitmap, 14)
+
+    # Round-trip: ambos campos sobreviven al pack/unpack.
+    parsed = unpack_iso(pack_iso(iso))
+    assert parsed.pan_2 == "6063007014007403"
+    assert parsed.track2_35 == "460630070140074036301288"
+
+
 def test_build_void_request_sets_fields() -> None:
     settings = Settings()
     cmd = VoidCommand(

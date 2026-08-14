@@ -1,0 +1,75 @@
+# Test Cases — API (backend)
+
+> **Última actualización:** 2026-08-05
+>
+> Archivo vivo de casos de prueba del módulo **API**. Se actualiza a medida que se documentan y ejecutan tests.
+>
+> Este archivo es parte de la separación de `docs/test_cases_index.md`. Ver el [índice](test_cases_index.md).
+
+---
+
+## Formato
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+
+**Leyenda Test Result:** `Pass` · `Fail` · `Blocked` · `N/A` · `Pendiente`
+
+---
+
+## Módulo: API (backend)
+
+API pública del sistema. Endpoints accesibles desde la app mobile y herramientas HTTP.
+
+| Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
+|-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
+| 001 | API | Login exitoso | `POST /v1/auth/login` — `username: "testuser@test.com"`, `password: "Test1234!"`, `installation_id: "TERM001"` | Código 200. Devuelve `access_token`, `token_type: "bearer"`, `must_change_password: false` | `{"name":"Test User","email":"testuser@test.com","token":"eyJ...","must_change_password":false}` — 200 OK | Pass | |
+| 002 | API | Login con contraseña incorrecta | `POST /v1/auth/login` — `username: "testuser@test.com"`, `password: "wrongpass"`, `installation_id: "TERM001"` | Código 401. Mensaje: "Credenciales inválidas" | `{"message":"Credenciales inválidas"}` — 401 Unauthorized | Pass | |
+| 003 | API | Login con usuario inexistente | `POST /v1/auth/login` — `username: "noexiste@test.com"`, `password: "Test1234!"`, `installation_id: "TERM001"` | Código 401. Mensaje: "Credenciales inválidas" | `{"message":"Credenciales inválidas"}` — 401 Unauthorized | Pass | No revela si el usuario existe o no (mismo mensaje que TC-002) |
+| 004 | API | Login con password vacío | `POST /v1/auth/login` — `username: "testuser@test.com"`, `password: ""`, `installation_id: "TERM001"` | Código 400. Error de validación: password requerido | `{"message":"password: String should have at least 1 character"}` — 400 Bad Request | Pass | La API convierte errores de validación a 400, no 422 |
+| 005 | API | Login con `installation_id` vacío | `POST /v1/auth/login` — `username: "testuser@test.com"`, `password: "Test1234!"`, `installation_id: ""` | Código 400. Error de validación: installation_id requerido | `{"message":"installation_id: String should have at least 1 character"}` — 400 Bad Request | Pass | |
+| 006 | API | Login con `installation_id` > 8 caracteres | `POST /v1/auth/login` — `installation_id: "TERM001XX"` (9 chars) | Código 400. Error de validación: max 8 caracteres | `{"message":"installation_id: String should have at most 8 characters"}` — 400 Bad Request | Pass | |
+| 007 | API | Registro exitoso de nuevo usuario | `POST /v1/auth/register` — `name: "Test User"`, `email: "testuser@test.com"`, `password: "Test1234!"`, `installation_id: "TERM001"` | Código 201. Devuelve `access_token`, `must_change_password: true` (primer login) | `{"name":"Test User","email":"testuser@test.com","token":"eyJ...","must_change_password":true}` — 201 Created | Pass | `must_change_password` ahora es `true` porque es un usuario nuevo (primer login). Fix aplicado en `register_user.py`. **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 008 | API | Registro con email duplicado | `POST /v1/auth/register` — mismo email que usuario existente | Código 409. Mensaje: "El email ya está registrado" | `{"message":"El email ya está registrado"}` — 409 Conflict | Pass | **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 009 | API | Registro con contraseña débil (menos de 8 caracteres) | `POST /v1/auth/register` — `password: "Abc12!"` (7 chars) | Código 400. Mensaje: "La contraseña debe tener al menos 8 caracteres" | `{"message":"password: String should have at least 8 characters"}` — 400 Bad Request | Pass | **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 010 | API | Registro con contraseña débil (solo números) | `POST /v1/auth/register` — `password: "12345678"` | Código 400. Mensaje de error de política de contraseña | `{"name":"Test","email":"test5@test.com","token":"eyJ...","must_change_password":true}` — 201 Created | Fail | **La contraseña solo numérica fue aceptada.** La política solo valida longitud mínima, no complejidad. Ver hallazgo #8. **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 011 | API | Registro con email inválido | `POST /v1/auth/register` — `email: "invalido"` | Código 400. Error de validación: email inválido | `{"message":"email: value is not a valid email address: An email address must have an @-sign."}` — 400 Bad Request | Pass | **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 012 | API | Registro con nombre vacío | `POST /v1/auth/register` — `name: ""` | Código 400. Error de validación: nombre requerido | `{"message":"name: String should have at least 1 character"}` — 400 Bad Request | Pass | **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 013 | API | Registro con `installation_id` > 8 caracteres | `POST /v1/auth/register` — `installation_id: "TERM001XX"` (9 chars) | Código 400. Error de validación: max 8 caracteres | `{"message":"installation_id: String should have at most 8 characters"}` — 400 Bad Request | Pass | **El registro no se usará en producción — los usuarios son dados de alta por la empresa (vía Postman/central).** |
+| 014 | API | Cambio de contraseña exitoso | `POST /v1/auth/change-password` — `current_password: "Test1234!"`, `new_password: "Nueva4567!"` + Header `Authorization: Bearer <token>` | Código 200. Mensaje: "Contraseña actualizada correctamente" | `{"message":"Contraseña actualizada correctamente"}` — 200 OK | Pass | |
+| 015 | API | Cambio de contraseña con contraseña actual incorrecta | `POST /v1/auth/change-password` — `current_password: "wrongpass"`, `new_password: "Nueva4567!"` + Bearer token | Código 401. Mensaje: "Contraseña actual incorrecta" | `{"message":"Contraseña actual incorrecta"}` — 401 Unauthorized | Pass | |
+| 016 | API | Cambio de contraseña con nueva contraseña débil | `POST /v1/auth/change-password` — `current_password: "Nueva4567!"`, `new_password: "abc"` + Bearer token | Código 400. Mensaje: "La contraseña debe tener al menos 8 caracteres" | `{"message":"new_password: String should have at least 8 characters"}` — 400 Bad Request | Pass | |
+| 017 | API | Cambio de contraseña sin token | `POST /v1/auth/change-password` — `current_password: "Test1234!"`, `new_password: "Nueva4567!"` (sin header Authorization) | Código 401. Error: "Not authenticated" | `{"message":"Autenticación requerida"}` — 401 Unauthorized | Pass | |
+| 018 | API | Cambio de contraseña con misma contraseña | `POST /v1/auth/change-password` — `current_password: "Nueva4567!"`, `new_password: "Nueva4567!"` + Bearer token | Código 400. Mensaje: "La nueva contraseña debe ser distinta a la actual" | `{"message":"La nueva contraseña debe ser distinta a la actual"}` — 400 Bad Request | Pass | |
+| 019 | API | Obtener catálogo de productos | `GET /v1/products` | Código 200. Lista de productos de gas activos (ej: `GARRAFA_10`, `GARRAFA_15`, etc.) con `code` y `label` | `[{"code":"GARRAFA_10","label":"Garrafa 10 kg"},{"code":"GARRAFA_15","label":"Garrafa 15 kg"},{"code":"GARRAFA_30","label":"Garrafa 30 kg"},{"code":"TUBO_45","label":"Tubo 45 kg"},{"code":"GRANEL","label":"Granel"}]` — 200 OK | Pass | Endpoint público, 5 productos activos |
+| 020 | API | Health check / Ping | `GET /ping` | Código 200. `{"status": "ok"}` | `{"status":"ok"}` — 200 OK | Pass | Endpoint en `/ping` (no `/v1/ping`) |
+| 021 | API | Registrar venta exitosa | `POST /v1/transactions` — `product: "GARRAFA_10"`, `amount: "1500.00"`, `card_number: "6063007014007403"`, `cvv: "123"`, `expiration_date: "1228"` + Header `Idempotency-Key: "test-002"` + Bearer token | Código 201. Devuelve `status: "approved"`, `transaction_number`, `user_message`, `created_at` | `{"transaction_number":"OP-260730-0003","status":"FAILED","user_message":"No se pudo procesar el pago. Intente nuevamente.","created_at":"2026-07-30T19:50:57.447291Z"}` — 201 Created | Pass | La API crea la transacción correctamente. Status `FAILED` porque el gateway/procesador no están corriendo. La API delega correctamente. |
+| 022 | API | Registrar venta con CVV inválido (> 4 dígitos) | `POST /v1/transactions` — `cvv: "12345"` (5 dígitos) + Idempotency-Key + Bearer token | Código 400. Error de validación: CVV inválido | `{"message":"cvv: String should have at most 4 characters"}` — 400 Bad Request | Pass | |
+| 023 | API | Registrar venta con CVV inválido (< 3 dígitos) | `POST /v1/transactions` — `cvv: "12"` (2 dígitos) + Idempotency-Key + Bearer token | Código 400. Error de validación: CVV inválido | `{"message":"cvv: String should have at least 3 characters"}` — 400 Bad Request | Pass | |
+| 024 | API | Registrar venta con número de tarjeta inválido | `POST /v1/transactions` — `card_number: "1234"` (muy corto) + Idempotency-Key + Bearer token | Código 400. Mensaje: "Número de tarjeta inválido" | `{"message":"card_number: String should have at least 13 characters"}` — 400 Bad Request | Pass | |
+| 025 | API | Registrar venta con monto negativo | `POST /v1/transactions` — `amount: "-100.00"` + Idempotency-Key + Bearer token | Código 400. Mensaje: "Monto inválido" | `{"message":"Monto inválido"}` — 400 Bad Request | Pass | |
+| 026 | API | Registrar venta con monto cero | `POST /v1/transactions` — `amount: "0.00"` + Idempotency-Key + Bearer token | Código 400. Mensaje: "Monto inválido" | `{"message":"Monto inválido"}` — 400 Bad Request | Pass | |
+| 027 | API | Registrar venta con producto inexistente | `POST /v1/transactions` — `product: "PRODUCTO_INEXISTENTE"` + Idempotency-Key + Bearer token | Código 400. Mensaje: "Producto no soportado" | `{"message":"product: Input should be 'GARRAFA_10', 'GARRAFA_15', 'GARRAFA_30', 'TUBO_45' or 'GRANEL'"}` — 400 Bad Request | Pass | |
+| 028 | API | Registrar venta sin `Idempotency-Key` | `POST /v1/transactions` — sin header `Idempotency-Key` + Bearer token | Código 400. Mensaje: "Idempotency-Key es requerido" | `{"message":"Idempotency-Key es requerido"}` — 400 Bad Request | Pass | |
+| 029 | API | Registrar venta con `Idempotency-Key` repetida (mismo body) | `POST /v1/transactions` — misma `Idempotency-Key: "test-002"` que TC-021, mismo payload | Código 200. Mismo resultado que la original | `{"transaction_number":"OP-260730-0003","status":"FAILED","user_message":"No se pudo procesar el pago. Intente nuevamente.","created_at":"2026-07-30T19:50:57.447291Z"}` — 200 OK | Pass | Devuelve la misma transacción original. Idempotencia funciona correctamente. |
+| 030 | API | Registrar venta con `Idempotency-Key` repetida (distinto body) | `POST /v1/transactions` — misma `Idempotency-Key: "test-002"` pero con `amount: "2000.00"` | Código 409. Mensaje: "Idempotency-Key ya usada con otro request" | `{"message":"Idempotency-Key ya usada con otro request"}` — 409 Conflict | Pass | |
+| 031 | API | Registrar venta con `expiration_date` en formato incorrecto | `POST /v1/transactions` — `expiration_date: "12/28"` (contiene /) | Código 400. Error de validación de fecha | `{"message":"expiration_date: String should have at most 4 characters"}` — 400 Bad Request | Pass | El campo espera MMYY (4 caracteres máximo) |
+| 032 | API | Registrar venta sin token | `POST /v1/transactions` — sin header `Authorization` | Código 401. Error: "Not authenticated" | `{"message":"Autenticación requerida"}` — 401 Unauthorized | Pass | |
+| 033 | API | Registrar venta con terminal no configurada | `POST /v1/transactions` — usuario con `installation_id` sin terminal en el procesador | Código 400. Mensaje: "La instalación no tiene terminal configurada" | No probado | Pendiente | Requiere configurar el procesador |
+| 034 | API | Registrar venta con límite diario agotado | `POST /v1/transactions` — después de alcanzar el límite diario de operaciones | Código 400. Mensaje: "Se alcanzó el límite diario de operaciones" | No probado | Pendiente | Requiere muchas transacciones |
+| 035 | API | Listar transacciones | `GET /v1/transactions?limit=10&offset=0` + Bearer token | Código 200. Lista paginada de transacciones del terminal con `items` y `total` | `{"items":[{"transaction_number":"OP-260730-0003",...}],"total":1}` — 200 OK | Pass | |
+| 036 | API | Listar transacciones sin token | `GET /v1/transactions` — sin header `Authorization` | Código 401. Error: "Not authenticated" | `{"message":"Autenticación requerida"}` — 401 Unauthorized | Pass | |
+| 037 | API | Listar transacciones con límite inválido | `GET /v1/transactions?limit=0` + Bearer token | Código 400. Error de validación: limit debe ser >= 1 | `{"message":"limit: Input should be greater than or equal to 1"}` — 400 Bad Request | Pass | |
+| 038 | API | Listar transacciones con límite excedido | `GET /v1/transactions?limit=200` + Bearer token | Código 400. Error de validación: limit debe ser <= 100 | `{"message":"limit: Input should be less than or equal to 100"}` — 400 Bad Request | Pass | |
+| 039 | API | Listar transacciones con offset negativo | `GET /v1/transactions?offset=-1` + Bearer token | Código 400. Error de validación: offset debe ser >= 0 | `{"message":"offset: Input should be greater than or equal to 0"}` — 400 Bad Request | Pass | |
+| 040 | API | Obtener detalle de transacción | `GET /v1/transactions/{id}` + Bearer token | Código 200. Detalle completo: `transaction_number`, `product`, `amount`, `card_last4`, `status`, `user_message`, `created_at` | `{"detail":"Not Found"}` — 404 Not Found | N/A | **El endpoint no existe.** Solo están implementados `GET /v1/transactions` (listado) y `POST /v1/transactions` (crear). Ver hallazgo #9. |
+| 041 | API | Obtener detalle de transacción inexistente | `GET /v1/transactions/999999` + Bearer token | Código 404. Error: "Transaction not found" | `{"detail":"Not Found"}` — 404 Not Found | N/A | El endpoint no existe. Ver hallazgo #9. |
+| 042 | API | Obtener detalle de transacción sin token | `GET /v1/transactions/{id}` — sin header `Authorization` | Código 401. Error: "Not authenticated" | `{"detail":"Not Found"}` — 404 Not Found | N/A | El endpoint no existe. Ver hallazgo #9. |
+
+---
+
+## Resumen
+
+| Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
+|--------|-------|------|------|---------|-----|-----------|
+| API | 42 | 37 | 1 | 0 | 3 | 2 |

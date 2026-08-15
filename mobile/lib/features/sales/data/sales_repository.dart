@@ -106,8 +106,8 @@ class SalesRepository {
       final Map<String, dynamic> responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        final String status =
-            (responseData['status'] as String? ?? '').toUpperCase();
+        final String status = (responseData['status'] as String? ?? '')
+            .toUpperCase();
         final String message =
             responseData['user_message'] as String? ?? 'Operación procesada';
 
@@ -129,20 +129,20 @@ class SalesRepository {
       rethrow;
     } on TimeoutException {
       return const VoidResult.connectionFailure(
-        message: 'Tiempo de espera agotado con el procesador de pagos (Timeout). Reintente.',
+        message:
+            'Tiempo de espera agotado con el procesador de pagos (Timeout). Reintente.',
       );
     } on SocketException {
       return const VoidResult.connectionFailure(
-        message: 'No se pudo establecer conexión con el servidor. Verifique su red.',
+        message:
+            'No se pudo establecer conexión con el servidor. Verifique su red.',
       );
     } on HttpException {
       return const VoidResult.connectionFailure(
         message: 'Error en el protocolo de comunicación con la API.',
       );
     } catch (e) {
-      return VoidResult.declined(
-        message: 'Error inesperado: ${e.toString()}',
-      );
+      return VoidResult.declined(message: 'Error inesperado: ${e.toString()}');
     }
   }
 
@@ -190,6 +190,8 @@ class SalesRepository {
     required String cardNumber,
     required String cvv,
     required String expirationDate,
+    String entryMode = '012',
+    String? track2,
     required String token,
   }) async {
     final url = Uri.parse('$_baseUrl/transactions');
@@ -199,9 +201,13 @@ class SalesRepository {
       'amount': amount,
       'card_number': cardNumber.replaceAll(' ', ''),
       'cvv': cvv,
+      'entry_mode': entryMode,
     };
     if (expirationDate.isNotEmpty) {
       bodyPayload['expiration_date'] = expirationDate;
+    }
+    if (track2 != null && track2.isNotEmpty) {
+      bodyPayload['track2'] = track2;
     }
 
     final idempotencyKey = _generateIdempotencyKey();

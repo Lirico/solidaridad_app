@@ -104,11 +104,12 @@ class CreateTransaction:
         product: str,
         amount: str,
         card_number: str,
-        cvv: str,
+        cvv: str | None = None,
         expiration_date: str | None = None,
         entry_mode: str = "012",
         track2: str | None = None,
     ) -> CreateTransactionResult:
+
         if idempotency_key is None or not idempotency_key.strip():
             raise MissingIdempotencyKey()
         key = idempotency_key.strip()
@@ -116,8 +117,13 @@ class CreateTransaction:
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
         pan = _validate_pan(card_number)
-        _validate_cvv(cvv)
+        # La banda magnética (entry_mode 022) no contiene CVV: se omite la
+        # validación en ese modo. El gateway/procesador no usan CVV.
+        if entry_mode != "022":
+            _validate_cvv(cvv or "")
         card_last4 = pan[-4:]
+
+
         exp = expiration_date.strip() if expiration_date else None
         if exp == "":
             exp = None

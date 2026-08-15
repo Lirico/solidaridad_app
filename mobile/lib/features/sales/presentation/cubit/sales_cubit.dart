@@ -53,6 +53,8 @@ class SalesCubit extends Cubit<SalesState> {
     required String cardNumber,
     required String cvv,
     required String expirationDate,
+    String entryMode = '012',
+    String? track2,
   }) {
     emit(
       SalesReviewing(
@@ -62,6 +64,8 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: cardNumber,
         cvv: cvv,
         expirationDate: expirationDate,
+        entryMode: entryMode,
+        track2: track2,
         history: state.history,
       ),
     );
@@ -74,6 +78,8 @@ class SalesCubit extends Cubit<SalesState> {
     final currentCardNumber = state.cardNumber;
     final currentCvv = state.cvv;
     final currentExpirationDate = state.expirationDate;
+    final currentEntryMode = state.entryMode;
+    final currentTrack2 = state.track2;
 
     final currentHistory = List<OperationModel>.from(state.history);
 
@@ -85,6 +91,8 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: currentCardNumber,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
+        entryMode: currentEntryMode,
+        track2: currentTrack2,
         history: currentHistory,
       ),
     );
@@ -95,6 +103,8 @@ class SalesCubit extends Cubit<SalesState> {
       cardNumber: currentCardNumber,
       cvv: currentCvv,
       expirationDate: currentExpirationDate,
+      entryMode: currentEntryMode,
+      track2: currentTrack2,
       token: token,
     );
 

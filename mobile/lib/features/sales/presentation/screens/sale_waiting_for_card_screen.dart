@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
@@ -40,16 +42,30 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
       // 1. Inicializar el PaymentSDK (despierta el lector Verifone).
       await _psdk.initialize();
 
-      // 2. Esperar la lectura de banda (hasta 30 segundos).
+      // 2. Esperar a que el SDK quede listo (evento sdiReady) antes de leer.
+      //    initialize() es asíncrono: retorna de inmediato con sdiReady=false
+      //    y el SDK recién queda listo cuando llega handleStatus con SUCCESS.
+      final bool ready = await _waitForSdkReady(timeoutSec: 20);
+      if (!mounted) return;
+
+      if (!ready) {
+        _showError('No se pudo inicializar el lector de tarjetas. Reintente.');
+        return;
+      }
+
+      // 3. Esperar la lectura de banda (hasta 30 segundos).
       final result = await _psdk.readMsr(timeoutSec: 30);
 
       if (!mounted) return;
 
       // 3. Mapear los datos de la tarjeta.
-      final bool ok = result['ok'] == true;
+      // El bridge nativo setea `ok` solo cuando code == OK, pero en esta
+      // terminal la lectura devuelve ERR_EXECUTION con datos claros en `tags`
+      // (hasClearData == true). Por eso el éxito se determina por hasClearData.
+      final bool hasClearData = result['hasClearData'] == true;
       final bool timedOut = result['timedOut'] == true;
 
-      if (!ok || timedOut) {
+      if (!hasClearData || timedOut) {
         _showError(
           timedOut
               ? 'No se detectó ninguna tarjeta. Reintente.'
@@ -66,12 +82,19 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
           : {};
 
       final String pan = (tags['pan'] ?? msr['panAscii'] ?? '') as String;
-      final String expiryYyMm = (tags['expiry'] ?? '') as String;
+      final String track2 = (tags['track2'] ?? msr['track2'] ?? '') as String;
 
       if (pan.isEmpty) {
         _showError('No se pudo leer el número de tarjeta. Reintente.');
         return;
       }
+
+      // El vencimiento puede venir en tags['expiry'] (YYMM) o, si viene vacío,
+      // se extrae del track2 (formato ";PAN=EXPIRY?SERVICE" → "=3012").
+      final String expiryYyMm = _extractExpiryYyMm(
+        (tags['expiry'] ?? '') as String,
+        track2,
+      );
 
       // La banda magnética NO contiene CVV: se envía vacío.
       // El vencimiento viene en formato YYMM (ej. "3012") y showReview
@@ -79,6 +102,11 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
       final String expirationDate = _yyMmToMmYy(expiryYyMm);
 
       // 4. Guardar los datos en el cubit y navegar a la revisión.
+      // La lectura fue por banda magnética: entry_mode "022". Se envía el PAN
+      // (DE2) + vencimiento (DE14) en lugar del track2 (DE35), porque el track2
+      // que devuelve esta terminal trae un PAN que no coincide con el
+      // registrado (ej. "4606300701400740" en vez de "6063007014007403"). El
+      // autorizador usa el PAN explícito cuando viene presente.
       final cubit = context.read<SalesCubit>();
       final state = cubit.state;
 
@@ -89,6 +117,8 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
         cardNumber: pan,
         cvv: '',
         expirationDate: expirationDate,
+        entryMode: '022',
+        track2: null,
       );
 
       Navigator.pushNamed(context, AppRoutes.saleReview);
@@ -104,6 +134,50 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   String _yyMmToMmYy(String yyMm) {
     if (yyMm.length != 4) return yyMm;
     return yyMm.substring(2) + yyMm.substring(0, 2);
+  }
+
+  /// Devuelve el vencimiento en formato YYMM.
+  ///
+  /// Si [tagsExpiry] ya trae un valor (YYMM) se usa tal cual. Si viene vacío,
+  /// se extrae del [track2] cuyo formato es ";PAN=EXPIRY?SERVICE" (ej.
+  /// ";6063007014007403=3012?8" → "3012").
+  String _extractExpiryYyMm(String tagsExpiry, String track2) {
+    if (tagsExpiry.isNotEmpty) return tagsExpiry;
+
+    final int eq = track2.indexOf('=');
+    final int q = track2.indexOf('?', eq + 1);
+    if (eq >= 0 && q > eq) {
+      final String expiry = track2.substring(eq + 1, q);
+      if (expiry.length == 4) return expiry;
+    }
+    return '';
+  }
+
+  /// Espera hasta que el PaymentSDK emita el evento `sdiReady` (o `success`).
+  ///
+  /// `initialize()` es asíncrono: retorna de inmediato con `sdiReady=false` y
+  /// el SDK recién queda listo cuando llega `handleStatus` con SUCCESS. Este
+  /// método escucha [PsdkBridge.statusEvents] hasta que eso ocurra o se agote
+  /// [timeoutSec].
+  Future<bool> _waitForSdkReady({int timeoutSec = 20}) async {
+    final completer = Completer<bool>();
+    StreamSubscription<Map<String, dynamic>>? sub;
+
+    sub = _psdk.statusEvents.listen((event) {
+      final bool ready = event['sdiReady'] == true || event['success'] == true;
+      if (ready && !completer.isCompleted) {
+        completer.complete(true);
+      }
+    });
+
+    try {
+      return await completer.future.timeout(
+        Duration(seconds: timeoutSec),
+        onTimeout: () => false,
+      );
+    } finally {
+      await sub.cancel();
+    }
   }
 
   void _showError(String message) {

@@ -39,6 +39,7 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
         cardNumber: _cardNumberController.text,
         cvv: _cvvController.text,
         expirationDate: _expiryController.text.replaceAll('/', ''),
+        entryMode: '012',
       );
 
       Navigator.pushNamed(context, AppRoutes.saleReview);

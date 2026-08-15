@@ -17,10 +17,17 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
   OperationModel? _operation;
   PrintStatus _printStatus = PrintStatus.idle;
   String _printMessage = '';
+  bool _initialized = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // didChangeDependencies puede ejecutarse varias veces; solo inicializamos
+    // una vez. ModalRoute.of(context) no puede llamarse en initState() porque
+    // usa dependOnInheritedWidgetOfExactType, prohibido antes del montaje.
+    if (_initialized) return;
+    _initialized = true;
+
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is OperationModel) {
       _operation = args;

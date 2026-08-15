@@ -4,9 +4,19 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-13
+Última revisión: 2026-08-14
 
-> ✅ **Último cambio (2026-08-13):** venta por banda magnética (V660p) siempre
+> ✅ **Último cambio (2026-08-14):** impresión de ticket en la térmica del V660P.
+> Se implementó `ReceiptFormatter` (HTML térmico) en
+> `mobile/lib/features/sales/domain/receipt_formatter.dart` y la facade
+> `ReceiptPrinter` (inicializa el PSDK y llama a `PsdkBridge.printHtml`) en
+> `mobile/lib/features/sales/data/receipt_printer.dart`. La impresión es
+> **automática al aprobar** la venta (`sale_status_screen.dart`, con estado
+> imprimiendo/impreso/error + botón REIMPRIMIR) y se puede **reimprimir desde el
+> detalle del historial** (`sale_detail_screen.dart`, botón IMPRIMIR TICKET).
+> `flutter analyze` OK. Cierra G-P0-07. Pendiente: verificación física en V660P.
+
+> ✅ **Último cambio previo (2026-08-13):** venta por banda magnética (V660p) siempre
 > rechazada pese a tener saldo. **Hallazgo real:** el autorizador devolvía
 > código **14 "Tarjeta inválida"** (`TIT_DES_SUP`), NO "fondos insuficientes"
 > (51). El log de `authkig.log` mostraba `TRACK II DATA: 4606300701400740...`
@@ -142,7 +152,7 @@ Verifone (banda + térmica).
 
 
 
-| G-P0-07 | Impresión de ticket en térmica (Verifone) | open | Solo comprobante en UI (`SaleDetailTicket` / status). Sin API de impresora / SDK. |
+| G-P0-07 | Impresión de ticket en térmica (Verifone) | done | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. `flutter analyze` OK. Pendiente: verificación física en V660P. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-08-08:** default de `dev-term` → `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (terminal real GOBIERNO del demo; `dev-term` no existe en `terminales` → código 89). Pendiente: lectura runtime desde config del device. |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |

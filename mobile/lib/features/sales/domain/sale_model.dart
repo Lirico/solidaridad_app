@@ -1,5 +1,8 @@
 enum PaymentResult { approved, declined, connectionError, voided }
 
+/// Estado de la impresión del ticket en la pantalla de resultado.
+enum PrintStatus { idle, printing, printed, error }
+
 class OperationModel {
   final String id;
   final String productCode;

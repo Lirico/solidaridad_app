@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 import '../cubit/sales_state.dart';
 import '../widgets/sale_review_header.dart';
@@ -28,10 +29,20 @@ class SaleProcessingScreen extends StatelessWidget {
       // Use addPostFrameCallback to avoid building during build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
+        final operation = OperationModel(
+          id: salesState.operationNumber ?? 'OP-ERR',
+          productCode: salesState.productCode,
+          productLabel: salesState.productLabel,
+          amount: salesState.amount,
+          cardNumber: _maskCardNumber(salesState.cardNumber),
+          result: salesState.result,
+          date: DateTime.now(),
+          userMessage: salesState.errorMessage,
+        );
         Navigator.pushReplacementNamed(
           context,
           AppRoutes.saleStatus,
-          arguments: salesState.result,
+          arguments: operation,
         );
       });
     }

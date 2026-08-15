@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/formatters/amount_formatter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/sale_model.dart';
 
@@ -8,6 +9,10 @@ class SaleStatusContent extends StatelessWidget {
   final IconData statusIcon;
   final String statusTitle;
   final String statusSubtitle;
+  final OperationModel? operation;
+  final PrintStatus printStatus;
+  final String printMessage;
+  final VoidCallback? onRetryPrint;
   final VoidCallback onFinalize;
 
   const SaleStatusContent({
@@ -17,6 +22,10 @@ class SaleStatusContent extends StatelessWidget {
     required this.statusIcon,
     required this.statusTitle,
     required this.statusSubtitle,
+    this.operation,
+    this.printStatus = PrintStatus.idle,
+    this.printMessage = '',
+    this.onRetryPrint,
     required this.onFinalize,
   });
 
@@ -58,17 +67,24 @@ class SaleStatusContent extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _buildTicketRow('ID de terminal', 'TERM-00432'),
+              _buildTicketRow('Nro. Operación', operation?.id ?? '---'),
+              const Divider(height: 20),
+              _buildTicketRow('Producto', operation?.productLabel ?? '---'),
               const Divider(height: 20),
               _buildTicketRow(
-                'Nro. Operación',
-                result == PaymentResult.approved ? 'OP-987452' : '---',
+                'Monto',
+                operation != null ? formatAmount(operation!.amount) : '---',
               ),
+              const Divider(height: 20),
+              _buildTicketRow('Tarjeta', operation?.cardNumber ?? '---'),
               const Divider(height: 20),
               _buildTicketRow('Código de respuesta', _responseCode(result)),
             ],
           ),
         ),
+
+        const SizedBox(height: 16),
+        _buildPrintStatus(context),
 
         const Spacer(),
 
@@ -94,6 +110,71 @@ class SaleStatusContent extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildPrintStatus(BuildContext context) {
+    switch (printStatus) {
+      case PrintStatus.idle:
+        return const SizedBox.shrink();
+      case PrintStatus.printing:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Imprimiendo ticket...',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ],
+        );
+      case PrintStatus.printed:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.check_circle, color: Colors.green, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'Ticket impreso',
+              style: TextStyle(fontSize: 13, color: Colors.green),
+            ),
+          ],
+        );
+      case PrintStatus.error:
+        return Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    printMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13, color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+            if (onRetryPrint != null) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: onRetryPrint,
+                icon: const Icon(Icons.print, size: 18),
+                label: const Text('REIMPRIMIR'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primaryOrange,
+                ),
+              ),
+            ],
+          ],
+        );
+    }
   }
 
   String _responseCode(PaymentResult result) {

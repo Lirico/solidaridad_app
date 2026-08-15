@@ -1,17 +1,58 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../data/receipt_printer.dart';
 import '../../domain/sale_model.dart';
 import '../widgets/sale_review_header.dart';
 import '../widgets/sale_status_content.dart';
 
-class SaleStatusScreen extends StatelessWidget {
+class SaleStatusScreen extends StatefulWidget {
   const SaleStatusScreen({super.key});
 
   @override
+  State<SaleStatusScreen> createState() => _SaleStatusScreenState();
+}
+
+class _SaleStatusScreenState extends State<SaleStatusScreen> {
+  final ReceiptPrinter _printer = ReceiptPrinter();
+  OperationModel? _operation;
+  PrintStatus _printStatus = PrintStatus.idle;
+  String _printMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is OperationModel) {
+      _operation = args;
+      // Impresión automática al aprobar la venta.
+      if (args.result == PaymentResult.approved) {
+        _printTicket();
+      }
+    }
+  }
+
+  Future<void> _printTicket() async {
+    final operation = _operation;
+    if (operation == null) return;
+
+    setState(() {
+      _printStatus = PrintStatus.printing;
+      _printMessage = '';
+    });
+
+    final PrintResult result = await _printer.printTicket(operation);
+
+    if (!mounted) return;
+    setState(() {
+      _printStatus = result.ok ? PrintStatus.printed : PrintStatus.error;
+      _printMessage = result.message;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final PaymentResult result =
-        (ModalRoute.of(context)?.settings.arguments as PaymentResult?) ??
-        PaymentResult.approved;
+    final OperationModel? operation = _operation;
+    final PaymentResult result = operation?.result ?? PaymentResult.approved;
 
     final Color statusColor;
     final IconData statusIcon;
@@ -23,8 +64,7 @@ class SaleStatusScreen extends StatelessWidget {
         statusColor = const Color(0xFF2ECC71);
         statusIcon = Icons.check_circle_outline;
         statusTitle = '¡Transacción Aprobada!';
-        statusSubtitle =
-            'El pago fue autorizado correctamente.';
+        statusSubtitle = 'El pago fue autorizado correctamente.';
       case PaymentResult.declined:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
@@ -76,6 +116,12 @@ class SaleStatusScreen extends StatelessWidget {
                       statusIcon: statusIcon,
                       statusTitle: statusTitle,
                       statusSubtitle: statusSubtitle,
+                      operation: operation,
+                      printStatus: _printStatus,
+                      printMessage: _printMessage,
+                      onRetryPrint: result == PaymentResult.approved
+                          ? _printTicket
+                          : null,
                       onFinalize: () {
                         Navigator.pushNamedAndRemoveUntil(
                           context,

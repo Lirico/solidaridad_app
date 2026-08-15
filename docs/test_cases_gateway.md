@@ -1,6 +1,6 @@
 # Test Cases — Payment Gateway
 
-> **Última actualización:** 2026-08-05
+> **Última actualización:** 2026-11-08
 >
 > Archivo vivo de casos de prueba del módulo **Payment Gateway**. Se actualiza a medida que se documentan y ejecutan tests.
 >
@@ -30,7 +30,10 @@ Adaptador HTTP → ISO8583. Traduce las solicitudes de la API al formato del pro
 | 049 | Gateway | Autorizar con monto inválido | `POST /v1/authorize` — `amount_minor: 0` | Código 400. Mensaje: "Monto inválido" | `{"message":"amount_minor: Input should be greater than 0"}` — 400 Bad Request | Pass | |
 | 050 | Gateway | Autorizar con producto no soportado | `POST /v1/authorize` — `product_code: "INVALIDO"` | Código 400. Mensaje: "Producto no soportado" | `{"message":"product_code: Input should be '993', '994', '995', '996' or '997'"}` — 400 Bad Request | Pass | El gateway usa códigos de procesador (993-997), no nombres de producto |
 | 051 | Gateway | Timeout de conexión al procesador | Procesador detenido con `docker compose stop auth` | Código 502. Mensaje: "Procesador de pagos no disponible" | `{"message":"Procesador de pagos no disponible"}` — 502 Bad Gateway | Pass | El gateway detecta correctamente la caída del procesador y devuelve 502. |
-| 052 | Gateway | Autorizar con entry mode de banda (020) | `POST /v1/authorize` — `entry_mode: "020"` con datos de track | Código 200. `status: "approved"` | | | Pendiente de implementación de captura por banda (G-P0-06) |
+| 052 | Gateway | Autorizar con entry mode de banda (022) | `POST /v1/authorize` — `entry_mode: "022"`, `track2: "4111111111111111=30121000000000000000"` | Código 200. `status: "approved"`. El mensaje ISO usa DE35 (track2) en lugar de DE2 (PAN) + DE14 (expiry). DE22 = "022" | **Mock:** `{"status":"APPROVED","response_code":"00","user_message":"Aprobada","auth_id":"MOCK01","retrieval_reference":"000000000001"}` — 200 OK | Pass | Rama 3: banda magnética. El gateway usa DE35 (track2) y DE22="022". |
+| 053 | Gateway | Autorizar manual con entry mode default (012) | `POST /v1/authorize` — sin `entry_mode` ni `track2` | Código 200. El mensaje ISO usa DE2 (PAN) + DE14 (expiry). DE22 = "012" | `{"status":"APPROVED",...}` — 200 OK | Pass | Rama 3: manual. `entry_mode` default "012". Comportamiento retrocompatible. |
+| 054 | Gateway | Autorizar con `entry_mode` explícito manual (012) | `POST /v1/authorize` — `entry_mode: "012"`, sin `track2` | Código 200. DE22 = "012", DE2 + DE14 | `{"status":"APPROVED",...}` — 200 OK | Pass | Rama 3: manual explícito. |
+| 055 | Gateway | Autorizar con `track2` presente pero `entry_mode` manual (012) | `POST /v1/authorize` — `entry_mode: "012"`, `track2: "4111111111111111=3012..."` | Código 200. El gateway prioriza DE35 (track2) sobre DE2/DE14 cuando `track2` está presente, independientemente de `entry_mode` | `{"status":"APPROVED",...}` — 200 OK | Pass | Rama 3: la presencia de `track2` determina el uso de DE35. |
 
 ---
 
@@ -38,4 +41,4 @@ Adaptador HTTP → ISO8583. Traduce las solicitudes de la API al formato del pro
 
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
-| Payment Gateway | 7 | 6 | 0 | 0 | 0 | 1 |
+| Payment Gateway | 10 | 10 | 0 | 0 | 0 | 0 |

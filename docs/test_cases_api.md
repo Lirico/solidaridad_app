@@ -1,6 +1,6 @@
 # Test Cases — API (backend)
 
-> **Última actualización:** 2026-08-05
+> **Última actualización:** 2026-11-08
 >
 > Archivo vivo de casos de prueba del módulo **API**. Se actualiza a medida que se documentan y ejecutan tests.
 >
@@ -65,6 +65,10 @@ API pública del sistema. Endpoints accesibles desde la app mobile y herramienta
 | 040 | API | Obtener detalle de transacción | `GET /v1/transactions/{id}` + Bearer token | Código 200. Detalle completo: `transaction_number`, `product`, `amount`, `card_last4`, `status`, `user_message`, `created_at` | `{"detail":"Not Found"}` — 404 Not Found | N/A | **El endpoint no existe.** Solo están implementados `GET /v1/transactions` (listado) y `POST /v1/transactions` (crear). Ver hallazgo #9. |
 | 041 | API | Obtener detalle de transacción inexistente | `GET /v1/transactions/999999` + Bearer token | Código 404. Error: "Transaction not found" | `{"detail":"Not Found"}` — 404 Not Found | N/A | El endpoint no existe. Ver hallazgo #9. |
 | 042 | API | Obtener detalle de transacción sin token | `GET /v1/transactions/{id}` — sin header `Authorization` | Código 401. Error: "Not authenticated" | `{"detail":"Not Found"}` — 404 Not Found | N/A | El endpoint no existe. Ver hallazgo #9. |
+| 056 | API | Registrar venta con `entry_mode` default (012) | `POST /v1/transactions` — sin `entry_mode` ni `track2` + Idempotency-Key + Bearer token | Código 201. La API propaga `entry_mode: "012"` al gateway | `{"transaction_number":"OP-...","status":"...","user_message":"...","created_at":"..."}` — 201 Created | Pass | Rama 3: `entry_mode` default "012" (manual). Comportamiento retrocompatible. |
+| 057 | API | Registrar venta con `entry_mode` de banda (022) y `track2` | `POST /v1/transactions` — `entry_mode: "022"`, `track2: "4111111111111111=30121000000000000000"` + Idempotency-Key + Bearer token | Código 201. La API propaga `entry_mode: "022"` y `track2` al gateway | `{"transaction_number":"OP-...","status":"...","user_message":"...","created_at":"..."}` — 201 Created | Pass | Rama 3: banda magnética. La API envía `entry_mode` y `track2` al gateway. |
+| 058 | API | Registrar venta con `entry_mode` inválido (> 3 caracteres) | `POST /v1/transactions` — `entry_mode: "0123"` (4 chars) + Idempotency-Key + Bearer token | Código 400. Error de validación: max 3 caracteres | `{"message":"entry_mode: String should have at most 3 characters"}` — 400 Bad Request | Pass | Rama 3: validación de `entry_mode`. |
+| 059 | API | Registrar venta con `track2` inválido (> 37 caracteres) | `POST /v1/transactions` — `track2: "4111111111111111=3012100000000000000000000000000000000000000000"` (muy largo) + Idempotency-Key + Bearer token | Código 400. Error de validación: max 37 caracteres | `{"message":"track2: String should have at most 37 characters"}` — 400 Bad Request | Pass | Rama 3: validación de `track2`. |
 
 ---
 
@@ -72,4 +76,4 @@ API pública del sistema. Endpoints accesibles desde la app mobile y herramienta
 
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
-| API | 42 | 37 | 1 | 0 | 3 | 2 |
+| API | 46 | 41 | 1 | 0 | 3 | 2 |

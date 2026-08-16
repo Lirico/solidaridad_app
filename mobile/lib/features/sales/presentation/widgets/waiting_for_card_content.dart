@@ -5,11 +5,13 @@ import 'waiting_for_card_reader_graphic.dart';
 class WaitingForCardContent extends StatelessWidget {
   final VoidCallback? onCancelOperation;
   final VoidCallback? onChangePaymentMode;
+  final VoidCallback? onRetry;
 
   const WaitingForCardContent({
     super.key,
     this.onCancelOperation,
     this.onChangePaymentMode,
+    this.onRetry,
   });
 
   @override
@@ -196,8 +198,7 @@ class WaitingForCardContent extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed:
-                  onCancelOperation ?? () => Navigator.maybePop(context),
+              onPressed: onCancelOperation ?? () => Navigator.maybePop(context),
               child: const Text(
                 'CANCELAR OPERACIÓN',
                 style: TextStyle(
@@ -208,6 +209,28 @@ class WaitingForCardContent extends StatelessWidget {
               ),
             ),
           ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 12),
+            // Botón Reintentar (solo visible tras un error/timeout)
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryOrange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: onRetry,
+                child: const Text(
+                  'REINTENTAR',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

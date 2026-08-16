@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/sale_model.dart';
+import '../../domain/msr_card_data.dart';
 import '../../data/sales_repository.dart';
 import 'sales_state.dart';
 
@@ -66,6 +67,34 @@ class SalesCubit extends Cubit<SalesState> {
         expirationDate: expirationDate,
         entryMode: entryMode,
         track2: track2,
+        history: state.history,
+      ),
+    );
+  }
+
+  /// Prepara la pantalla de revisión a partir de una lectura de banda
+  /// magnética (MSR), sin pasar por el ingreso manual.
+  ///
+  /// La banda magnética NO contiene CVV: se envía vacío. El vencimiento viene
+  /// en formato YYMM (ej. "3012") y la API espera MMYY (ej. "1230"), por eso
+  /// se usa [MsrCardData.expiryMmYy].
+  ///
+  /// La lectura fue por banda magnética: entry_mode "022". Se envía el PAN
+  /// (DE2) + vencimiento (DE14) en lugar del track2 (DE35), porque el track2
+  /// que devuelve esta terminal trae un PAN que no coincide con el registrado
+  /// (ej. "4606300701400740" en vez de "6063007014007403"). El autorizador usa
+  /// el PAN explícito cuando viene presente.
+  void showReviewFromMsr(MsrCardData data) {
+    emit(
+      SalesReviewing(
+        productCode: state.productCode,
+        productLabel: state.productLabel,
+        amount: state.amount,
+        cardNumber: data.pan,
+        cvv: '',
+        expirationDate: data.expiryMmYy,
+        entryMode: '022',
+        track2: null,
         history: state.history,
       ),
     );

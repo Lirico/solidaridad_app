@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../psdk/psdk_bridge.dart';
+import '../../domain/msr_card_data.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/waiting_for_card_bottom_bar.dart';
 import '../widgets/waiting_for_card_content.dart';
@@ -20,6 +21,8 @@ class WaitingForCardScreen extends StatefulWidget {
 class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   final PsdkBridge _psdk = PsdkBridge();
   bool _reading = false;
+  String? _errorMessage;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -29,6 +32,10 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
 
   @override
   void dispose() {
+    _disposed = true;
+    // Cancelar la lectura en curso antes de apagar el SDK, para no hacer
+    // tearDown con un readMsr todavía activo.
+    _psdk.cancelReadMsr();
     _psdk.tearDown();
     super.dispose();
   }
@@ -36,7 +43,10 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   /// Inicializa el PSDK y luego espera la lectura de banda magnética.
   Future<void> _startReading() async {
     if (_reading) return;
-    setState(() => _reading = true);
+    setState(() {
+      _reading = true;
+      _errorMessage = null;
+    });
 
     try {
       // 1. Inicializar el PaymentSDK (despierta el lector Verifone).
@@ -46,7 +56,7 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
       //    initialize() es asíncrono: retorna de inmediato con sdiReady=false
       //    y el SDK recién queda listo cuando llega handleStatus con SUCCESS.
       final bool ready = await _waitForSdkReady(timeoutSec: 20);
-      if (!mounted) return;
+      if (!mounted || _disposed) return;
 
       if (!ready) {
         _showError('No se pudo inicializar el lector de tarjetas. Reintente.');
@@ -56,9 +66,8 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
       // 3. Esperar la lectura de banda (hasta 30 segundos).
       final result = await _psdk.readMsr(timeoutSec: 30);
 
-      if (!mounted) return;
+      if (!mounted || _disposed) return;
 
-      // 3. Mapear los datos de la tarjeta.
       // El bridge nativo setea `ok` solo cuando code == OK, pero en esta
       // terminal la lectura devuelve ERR_EXECUTION con datos claros en `tags`
       // (hasClearData == true). Por eso el éxito se determina por hasClearData.
@@ -74,83 +83,22 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
         return;
       }
 
-      final Map<String, dynamic> tags = result['tags'] is Map
-          ? Map<String, dynamic>.from(result['tags'])
-          : {};
-      final Map<String, dynamic> msr = result['msr'] is Map
-          ? Map<String, dynamic>.from(result['msr'])
-          : {};
-
-      final String pan = (tags['pan'] ?? msr['panAscii'] ?? '') as String;
-      final String track2 = (tags['track2'] ?? msr['track2'] ?? '') as String;
-
-      if (pan.isEmpty) {
+      // 4. Parsear los datos de la tarjeta en un modelo tipado.
+      final MsrCardData data = MsrCardData.fromBridge(result);
+      if (data.pan.isEmpty) {
         _showError('No se pudo leer el número de tarjeta. Reintente.');
         return;
       }
 
-      // El vencimiento puede venir en tags['expiry'] (YYMM) o, si viene vacío,
-      // se extrae del track2 (formato ";PAN=EXPIRY?SERVICE" → "=3012").
-      final String expiryYyMm = _extractExpiryYyMm(
-        (tags['expiry'] ?? '') as String,
-        track2,
-      );
-
-      // La banda magnética NO contiene CVV: se envía vacío.
-      // El vencimiento viene en formato YYMM (ej. "3012") y showReview
-      // espera MMYY (ej. "1230").
-      final String expirationDate = _yyMmToMmYy(expiryYyMm);
-
-      // 4. Guardar los datos en el cubit y navegar a la revisión.
-      // La lectura fue por banda magnética: entry_mode "022". Se envía el PAN
-      // (DE2) + vencimiento (DE14) en lugar del track2 (DE35), porque el track2
-      // que devuelve esta terminal trae un PAN que no coincide con el
-      // registrado (ej. "4606300701400740" en vez de "6063007014007403"). El
-      // autorizador usa el PAN explícito cuando viene presente.
-      final cubit = context.read<SalesCubit>();
-      final state = cubit.state;
-
-      cubit.showReview(
-        productCode: state.productCode,
-        productLabel: state.productLabel,
-        amount: state.amount,
-        cardNumber: pan,
-        cvv: '',
-        expirationDate: expirationDate,
-        entryMode: '022',
-        track2: null,
-      );
-
+      // 5. Guardar los datos en el cubit y navegar a la revisión.
+      context.read<SalesCubit>().showReviewFromMsr(data);
       Navigator.pushNamed(context, AppRoutes.saleReview);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || _disposed) return;
       _showError('Error al inicializar el lector de tarjetas. Reintente.');
     } finally {
-      if (mounted) setState(() => _reading = false);
+      if (mounted && !_disposed) setState(() => _reading = false);
     }
-  }
-
-  /// Convierte vencimiento de formato YYMM (ej. "3012") a MMYY (ej. "1230").
-  String _yyMmToMmYy(String yyMm) {
-    if (yyMm.length != 4) return yyMm;
-    return yyMm.substring(2) + yyMm.substring(0, 2);
-  }
-
-  /// Devuelve el vencimiento en formato YYMM.
-  ///
-  /// Si [tagsExpiry] ya trae un valor (YYMM) se usa tal cual. Si viene vacío,
-  /// se extrae del [track2] cuyo formato es ";PAN=EXPIRY?SERVICE" (ej.
-  /// ";6063007014007403=3012?8" → "3012").
-  String _extractExpiryYyMm(String tagsExpiry, String track2) {
-    if (tagsExpiry.isNotEmpty) return tagsExpiry;
-
-    final int eq = track2.indexOf('=');
-    final int q = track2.indexOf('?', eq + 1);
-    if (eq >= 0 && q > eq) {
-      final String expiry = track2.substring(eq + 1, q);
-      if (expiry.length == 4) return expiry;
-    }
-    return '';
   }
 
   /// Espera hasta que el PaymentSDK emita el evento `sdiReady` (o `success`).
@@ -181,6 +129,7 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   }
 
   void _showError(String message) {
+    setState(() => _errorMessage = message);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -188,6 +137,10 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  void _onBackPressed() {
+    Navigator.maybePop(context);
   }
 
   @override
@@ -210,14 +163,13 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
                 ),
               ),
               child: WaitingForCardContent(
-                onCancelOperation: () => Navigator.maybePop(context),
+                onCancelOperation: _onBackPressed,
+                onRetry: _errorMessage != null ? _startReading : null,
               ),
             ),
           ),
           // Botón Volver fijo en la parte inferior (fuera del contenedor blanco)
-          WaitingForCardBottomBar(
-            onBackPressed: () => Navigator.maybePop(context),
-          ),
+          WaitingForCardBottomBar(onBackPressed: _onBackPressed),
         ],
       ),
     );

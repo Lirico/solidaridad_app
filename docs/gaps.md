@@ -4,9 +4,27 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-13
+Última revisión: 2026-08-16
+
+> ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
+> `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
+> creó `mobile/lib/features/sales/domain/msr_card_data.dart` (`MsrCardData` con
+> `fromBridge`, `expiryYyMm`/`expiryMmYy`) y `SalesCubit.showReviewFromMsr()`;
+> la pantalla ya no parsea `tags`/`msr` ni convierte fechas. (2) **Reintento:**
+> botón "REINTENTAR" en `WaitingForCardContent` visible tras error/timeout que
+> vuelve a llamar a `_startReading()`. (3) **Cancelación de lectura:** se agregó
+> `cancelReadMsr` al bridge Dart (`psdk_bridge.dart`) y Kotlin
+> (`PsdkBridge.kt`, flag `readCancelled` que descarta el resultado del worker);
+> `dispose()` ahora cancela la lectura antes de `tearDown`. (4) **Mock lab:**
+> `PsdkBridge.readMsr` devuelve `PsdkMsrMock.readMsrSuccess` cuando se compila
+> con `--dart-define=USE_MSR_MOCK=true`. (5) **Enmascarado PAN en review:**
+> `sale_review_content.dart` muestra solo los últimos 4 dígitos. (6) **Logs
+> nativos sin datos sensibles:** `logPayload` en `PsdkBridge.kt` redacta
+> `pan*`, `track*`, `cardTokenHex`, `responseToString` y `rawResponseHex`
+> (`[REDACTED]`). Ver G-P0-06 / G-P1-02.
 
 > ✅ **Último cambio (2026-08-13):** venta por banda magnética (V660p) siempre
+
 > rechazada pese a tener saldo. **Hallazgo real:** el autorizador devolvía
 > código **14 "Tarjeta inválida"** (`TIT_DES_SUP`), NO "fondos insuficientes"
 > (51). El log de `authkig.log` mostraba `TRACK II DATA: 4606300701400740...`
@@ -166,7 +184,8 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. El endpoint `POST /v1/auth/register` se mantiene para que la empresa pueda registrar usuarios vía Postman. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. Mobile genera y envía `Idempotency-Key` (timestamp+random) en cada `POST /v1/transactions`. **Pendiente:** (1) reintentar con la misma clave ante timeout/error idempotente — la `SaleStatusScreen` solo tiene botón "FINALIZAR", no "Reintentar" (hallazgo #24); (2) manejar status 202 (ACCEPTED). Falta botón "Reintentar" en `sale_status_content.dart` que reenvíe con la misma `Idempotency-Key`. Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. Mobile genera y envía `Idempotency-Key` (timestamp+random) en cada `POST /v1/transactions`. **2026-08-16:** el reintento de **lectura MSR** ya está implementado — botón "REINTENTAR" en `WaitingForCardContent` que vuelve a llamar a `_startReading()` tras timeout/error. **Pendiente:** (1) reintentar el envío con la misma clave ante timeout/error idempotente — la `SaleStatusScreen` solo tiene botón "FINALIZAR", no "Reintentar" (hallazgo #24); (2) manejar status 202 (ACCEPTED). Falta botón "Reintentar" en `sale_status_content.dart` que reenvíe con la misma `Idempotency-Key`. Ver TC-069 en `docs/test_cases_index.md`. |
+
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | open | `SalesRepository.fetchProducts()` devuelve productos default hardcodeados ante cualquier excepción. `SalesRepository.fetchHistory()` devuelve lista vacía. Ningún repositorio muestra mensaje de error ni opción de reintentar al usuario. TC-062 y TC-072 esperaban "mensaje de error y opción de reintentar", pero la app usa fallback silencioso. Considerar agregar indicador visual cuando se usan datos fallback. Ver hallazgo #23 en `docs/test_cases_index.md`. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |

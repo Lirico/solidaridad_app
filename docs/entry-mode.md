@@ -31,10 +31,15 @@ El **Gateway** es el que arma el mensaje ISO (el "idioma" que entiende el
 procesador). Dentro de ese mensaje hay un campo llamado **DE22** que dice
 **cómo se leyó la tarjeta**:
 
-| Código DE22 | Qué significa |
+| Código DE22 (lógico) | Qué significa |
 |:-----------:|---------------|
 | `012` | Manual (se escribió el número a mano) |
 | `022` | Banda magnética (se pasó la tarjeta por el lector) |
+
+> ⚠️ **Lógico vs wire:** el `entry_mode` viaja como `"012"`/`"022"` en el request
+> (API → gateway). En el **mensaje ISO** (wire) el campo DE22 se rellena a 4
+> dígitos, así que en el wire es `0012` (manual) y `0022` (banda). No confundir
+> el valor lógico con el valor que se serializa en el mensaje.
 
 **El problema:** el gateway tenía el DE22 **fijo en `012`** (manual), sin importar
 cómo se leyó la tarjeta. Y además, cuando la tarjeta se lee por banda, los datos
@@ -106,14 +111,21 @@ Procesador (ISO 8583)
 - **Qué es:** el archivo que **arma el mensaje ISO** que se manda al procesador.
 - **Qué cambió:** ahora decide **qué campos usar según cómo se leyó la tarjeta**:
 
-| Caso | DE22 | Campos de tarjeta que usa |
+| Caso | DE22 (wire) | Campos de tarjeta que usa |
 |------|:----:|---------------------------|
-| **Banda** (viene `track2`) | `022` | **DE35** (track2 de la banda) — NO usa DE2 ni DE14 |
-| **Manual** (no viene `track2`) | `012` | **DE2** (número de tarjeta) + **DE14** (vencimiento) |
+| **Banda** (viene `track2`) | `0022` | **DE2** (PAN) + **DE14** (vencimiento) + **DE35** (track2 normalizado) |
+| **Manual** (no viene `track2`) | `0012` | **DE2** (número de tarjeta) + **DE14** (vencimiento) |
 
-> 💡 **Por qué:** cuando la tarjeta se lee por banda, el procesador espera el
-> **track2** (DE35), no el número de tarjeta + vencimiento (DE2 + DE14). Antes
-> el DE22 era fijo `012` desde la config; ahora sale del `entry_mode` que llega.
+> 💡 **Por qué:** el gateway **siempre envía DE2 (PAN) + DE14 (vencimiento)**. Si
+> además viene `track2` (banda), se envía **DE35** como campo adicional (no en
+> lugar de DE2): el autorizador prefiere el PAN explícito (DE2) cuando está
+> presente, porque el track2 de algunas tarjetas de prueba trae un PAN que no
+> coincide con el registrado. El DE22 sale del `entry_mode` que llega (antes era
+> fijo `012` desde la config).
+>
+> El `track2` se **normaliza** antes de armar DE35: se quitan los sentinels
+> (`;`/`?`) y el separador alternativo `D`, dejando el layout `PAN=EXPIRY` que
+> espera el autorizador C (`iso_common.c` / `auth_mycli.c`).
 
 ### 4. `application/payments/authorize_payment.py` — el "traductor"
 
@@ -157,27 +169,30 @@ Procesador (ISO 8583)
   pantalla). No se asume que la banda trae CVV.
 - **Persistencia:** la API **solo guarda `card_last4`** (los últimos 4 dígitos).
   Nunca guarda el PAN completo ni el track2 completo.
-- **Track2 (DE35):** para banda magnética, el gateway usa **DE35** en vez de
-  DE2 (PAN) + DE14 (vencimiento).
+- **Track2 (DE35):** para banda magnética, el gateway envía **DE35** (track2
+  normalizado) **además** de DE2 (PAN) + DE14 (vencimiento). Nunca reemplaza
+  DE2 por DE35: el autorizador prefiere el PAN explícito cuando está presente.
 
 ---
 
 ## ✅ Cómo se verificó que funcionó
 
-Se corrió el quality gate obligatorio en **ambos** paquetes (gateway y API):
+El quality gate obligatorio en **ambos** paquetes (gateway y API) es:
 
 ```bash
 # En payment-gateway/
 make check
-# Resultado: lint ✓ · typecheck ✓ · 54 tests ✓ · cobertura ≥ 90% ✓
 
 # En api/
 make check
-# Resultado: lint ✓ · typecheck ✓ · 115 tests ✓ · cobertura ≥ 90% ✓
 ```
 
-> El hecho de que pasen los tests y la cobertura confirma que el cambio no rompió
-> nada y que los casos nuevos (manual y banda) están cubiertos.
+> ⚠️ **No marcar como Pass sin pytest:** los números de tests y la cobertura
+> (≥ 90%) **no se asumen** — se confirman corriendo `make check` en cada paquete.
+> Este documento no declara un resultado de tests sin haber ejecutado el gate.
+> Los casos nuevos (manual `012`, banda `022` con/sin track2, normalización de
+> DE35 y validación de consistencia) están cubiertos por tests en
+> `payment-gateway/tests/test_iso_packer.py` y `api/tests/test_create_transaction.py`.
 
 ---
 

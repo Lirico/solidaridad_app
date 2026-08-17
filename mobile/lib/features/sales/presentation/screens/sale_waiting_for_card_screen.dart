@@ -20,6 +20,7 @@ class WaitingForCardScreen extends StatefulWidget {
 class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   final PsdkBridge _psdk = PsdkBridge();
   bool _reading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -33,10 +34,21 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
     super.dispose();
   }
 
+  /// Cancela la lectura en curso y limpia el estado de error para poder
+  /// reintentar. Se usa tanto para el botón "Reintentar" como para la
+  /// cancelación limpia al salir de la pantalla.
+  void _resetReading() {
+    _psdk.tearDown();
+    if (mounted) setState(() => _errorMessage = null);
+  }
+
   /// Inicializa el PSDK y luego espera la lectura de banda magnética.
   Future<void> _startReading() async {
     if (_reading) return;
-    setState(() => _reading = true);
+    setState(() {
+      _reading = true;
+      _errorMessage = null;
+    });
 
     try {
       // 1. Inicializar el PaymentSDK (despierta el lector Verifone).
@@ -49,7 +61,9 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
       if (!mounted) return;
 
       if (!ready) {
-        _showError('No se pudo inicializar el lector de tarjetas. Reintente.');
+        setState(() {
+          _errorMessage = 'No se pudo inicializar el lector de tarjetas.';
+        });
         return;
       }
 
@@ -66,11 +80,11 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
       final bool timedOut = result['timedOut'] == true;
 
       if (!hasClearData || timedOut) {
-        _showError(
-          timedOut
-              ? 'No se detectó ninguna tarjeta. Reintente.'
-              : 'No se pudo leer la tarjeta. Reintente.',
-        );
+        setState(() {
+          _errorMessage = timedOut
+              ? 'No se detectó ninguna tarjeta.'
+              : 'No se pudo leer la tarjeta.';
+        });
         return;
       }
 
@@ -140,16 +154,22 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   ///
   /// Si [tagsExpiry] ya trae un valor (YYMM) se usa tal cual. Si viene vacío,
   /// se extrae del [track2] cuyo formato es ";PAN=EXPIRY?SERVICE" (ej.
-  /// ";6063007014007403=3012?8" → "3012").
+  /// ";6063007014007403=3012?8" → "3012") o "PAN=EXPIRY" (sin `?`, ej.
+  /// "6063007014007403=3012" → "3012").
   String _extractExpiryYyMm(String tagsExpiry, String track2) {
     if (tagsExpiry.isNotEmpty) return tagsExpiry;
 
     final int eq = track2.indexOf('=');
+    if (eq < 0) return '';
+
+    // Si hay "?" (separador de servicio) el vencimiento va entre "=" y "?".
+    // Si no hay "?", el vencimiento son los 4 dígitos justo después de "=".
     final int q = track2.indexOf('?', eq + 1);
-    if (eq >= 0 && q > eq) {
-      final String expiry = track2.substring(eq + 1, q);
-      if (expiry.length == 4) return expiry;
-    }
+    final int end = q > eq ? q : eq + 5;
+    if (end <= eq + 1) return '';
+
+    final String expiry = track2.substring(eq + 1, end);
+    if (expiry.length == 4) return expiry;
     return '';
   }
 
@@ -159,7 +179,23 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   /// el SDK recién queda listo cuando llega `handleStatus` con SUCCESS. Este
   /// método escucha [PsdkBridge.statusEvents] hasta que eso ocurra o se agote
   /// [timeoutSec].
+  ///
+  /// Para evitar una race condition (el evento `sdiReady` puede haber llegado
+  /// antes de suscribirnos al stream), primero se consulta el estado actual con
+  /// [PsdkBridge.getStatus] y solo si aún no está listo se escucha el stream.
   Future<bool> _waitForSdkReady({int timeoutSec = 20}) async {
+    // 1. Chequear el estado actual: si el SDK ya quedó listo (el evento pudo
+    //    haber pasado antes de suscribirnos), no hace falta esperar el stream.
+    try {
+      final Map<String, dynamic> status = await _psdk.getStatus();
+      final bool alreadyReady =
+          status['sdiReady'] == true || status['initialized'] == true;
+      if (alreadyReady) return true;
+    } catch (_) {
+      // Si getStatus falla, seguimos y esperamos el stream.
+    }
+
+    // 2. Si aún no está listo, escuchar el stream hasta que llegue el evento.
     final completer = Completer<bool>();
     StreamSubscription<Map<String, dynamic>>? sub;
 
@@ -210,16 +246,23 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
                 ),
               ),
               child: WaitingForCardContent(
-                onCancelOperation: () => Navigator.maybePop(context),
+                errorMessage: _errorMessage,
+                onRetry: _errorMessage != null ? _startReading : null,
+                onCancelOperation: _cancelAndPop,
               ),
             ),
           ),
           // Botón Volver fijo en la parte inferior (fuera del contenedor blanco)
-          WaitingForCardBottomBar(
-            onBackPressed: () => Navigator.maybePop(context),
-          ),
+          WaitingForCardBottomBar(onBackPressed: _cancelAndPop),
         ],
       ),
     );
+  }
+
+  /// Cancela la lectura en curso (tearDown del PSDK) y sale de la pantalla.
+  /// Evita dejar el lector colgado esperando una tarjeta en segundo plano.
+  void _cancelAndPop() {
+    _resetReading();
+    Navigator.maybePop(context);
   }
 }

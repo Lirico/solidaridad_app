@@ -37,9 +37,10 @@ procesador). Dentro de ese mensaje hay un campo llamado **DE22** que dice
 | `022` | Banda magnética (se pasó la tarjeta por el lector) |
 
 **El problema:** el gateway tenía el DE22 **fijo en `012`** (manual), sin importar
-cómo se leyó la tarjeta. Y además, cuando la tarjeta se lee por banda, los datos
-que se mandan son distintos (se manda el **track2** de la banda, no el número de
-tarjeta + vencimiento).
+cómo se leyó la tarjeta. Y además, cuando la tarjeta se lee por banda, el DE22
+debe ser `022` y los datos de la tarjeta se mandan como **PAN (DE2) + vencimiento
+(DE14)**, no como track2 (DE35).
+
 
 **Objetivo de la Rama 3:** que el gateway y la API sepan distinguir entre manual
 y banda, y armen el mensaje ISO correcto en cada caso.
@@ -108,12 +109,16 @@ Procesador (ISO 8583)
 
 | Caso | DE22 | Campos de tarjeta que usa |
 |------|:----:|---------------------------|
-| **Banda** (viene `track2`) | `022` | **DE35** (track2 de la banda) — NO usa DE2 ni DE14 |
+| **Banda** (viene `track2`) | `022` | **DE2** (PAN) + **DE14** (vencimiento) — DE35 opcional, nunca reemplaza a DE2 |
 | **Manual** (no viene `track2`) | `012` | **DE2** (número de tarjeta) + **DE14** (vencimiento) |
 
-> 💡 **Por qué:** cuando la tarjeta se lee por banda, el procesador espera el
-> **track2** (DE35), no el número de tarjeta + vencimiento (DE2 + DE14). Antes
-> el DE22 era fijo `012` desde la config; ahora sale del `entry_mode` que llega.
+> 💡 **Por qué:** el gateway **siempre envía DE2 (PAN) + DE14 (vencimiento)**,
+> sin importar el modo. Si la app manda `track2`, se envía DE35 **además** (no en
+> lugar de DE2): el autorizador prefiere el PAN explícito (DE2) cuando está
+> presente, porque el track2 de algunas tarjetas de prueba trae un PAN que no
+> coincide con el registrado. El DE22 sale del `entry_mode` que llega (`012`
+> manual, `022` banda).
+
 
 ### 4. `application/payments/authorize_payment.py` — el "traductor"
 
@@ -157,8 +162,11 @@ Procesador (ISO 8583)
   pantalla). No se asume que la banda trae CVV.
 - **Persistencia:** la API **solo guarda `card_last4`** (los últimos 4 dígitos).
   Nunca guarda el PAN completo ni el track2 completo.
-- **Track2 (DE35):** para banda magnética, el gateway usa **DE35** en vez de
-  DE2 (PAN) + DE14 (vencimiento).
+- **Track2 (DE35):** el gateway **siempre usa DE2 (PAN) + DE14 (vencimiento)**,
+  incluso para banda magnética. El track2 (DE35) es opcional y, si llega, se
+  envía **además** de DE2, nunca en su lugar: el autorizador prefiere el PAN
+  explícito (DE2) cuando está presente.
+
 
 ---
 

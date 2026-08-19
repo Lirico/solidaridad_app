@@ -5,13 +5,15 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../psdk/psdk_bridge.dart';
 import '../config/api_config.dart';
 
 /// Identificador físico del terminal (Verifone), configurado en el device.
 ///
-/// Se puede inyectar en build con `--dart-define=LOGICAL_DEVICE_ID=...`. En un
-/// terminal real este valor debería leerse del device (p. ej. serial del
-/// Verifone); el define es el mecanismo de configuración por ahora.
+/// Se puede inyectar en build con `--dart-define=LOGICAL_DEVICE_ID=...`. Es el
+/// **fallback** de lab: cuando no hay hardware Verifone conectado (o el bridge
+/// no puede leer el device), se usa este valor. En un terminal real, el
+/// `logical_device_id` se lee del hardware vía [PsdkBridge.getDeviceInfo].
 const String kLogicalDeviceId = String.fromEnvironment(
   'LOGICAL_DEVICE_ID',
   defaultValue: 'V660P-DEMO-0001',
@@ -27,13 +29,46 @@ const String kInstallationIdPrefKey = 'installation_id';
 /// mockeado/hardcodeado en la app: se obtiene del backend vía
 /// `POST /v1/terminals/resolve`, que mapea el `logical_device_id` físico del
 /// terminal al `installation_id` provisionado en la central.
+///
+/// El `logical_device_id` se lee del hardware Verifone vía
+/// [PsdkBridge.getDeviceInfo] (campo `logicalDeviceId`). Si no hay hardware
+/// disponible (lab/emulador) o el bridge falla, se cae al define
+/// [kLogicalDeviceId] como respaldo.
 class TerminalProvisioner {
-  TerminalProvisioner({http.Client? httpClient, String? baseUrl})
+  TerminalProvisioner({http.Client? httpClient, String? baseUrl, this._psdk})
     : _httpClient = httpClient ?? http.Client(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   final http.Client _httpClient;
   final String _baseUrl;
+  final PsdkBridge? _psdk;
+
+  /// Obtiene el `logical_device_id` del terminal.
+  ///
+  /// Prioriza la lectura real del hardware vía [PsdkBridge]: primero
+  /// [PsdkBridge.initialize] (el SDK debe estar creado para que
+  /// `getDeviceInfo` devuelva datos) y luego [PsdkBridge.getDeviceInfo]
+  /// (campo `logicalDeviceId`). Si no hay bridge, no hay hardware, o la lectura
+  /// falla, devuelve el define [kLogicalDeviceId] como respaldo de lab.
+  Future<String> _resolveLogicalDeviceId() async {
+    final psdk = _psdk;
+    if (psdk != null) {
+      try {
+        await psdk.initialize().timeout(const Duration(seconds: 5));
+        final info = await psdk.getDeviceInfo().timeout(
+          const Duration(seconds: 5),
+        );
+        final ok = info['ok'] == true;
+        final deviceId = info['logicalDeviceId'];
+        if (ok && deviceId is String && deviceId.trim().isNotEmpty) {
+          return deviceId.trim();
+        }
+      } catch (_) {
+        // Bridge no disponible, timeout o error de canal: caer al define de lab.
+      }
+    }
+    return kLogicalDeviceId;
+  }
 
   /// Llama al backend para resolver el `installation_id` a partir del
   /// `logical_device_id` y lo persiste en SharedPreferences.
@@ -47,13 +82,14 @@ class TerminalProvisioner {
       return cached;
     }
 
+    final logicalDeviceId = await _resolveLogicalDeviceId();
     final url = Uri.parse('$_baseUrl/terminals/resolve');
     try {
       final response = await _httpClient
           .post(
             url,
             headers: {HttpHeaders.contentTypeHeader: 'application/json'},
-            body: jsonEncode({'logical_device_id': kLogicalDeviceId}),
+            body: jsonEncode({'logical_device_id': logicalDeviceId}),
           )
           .timeout(const Duration(seconds: 10));
 

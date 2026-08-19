@@ -8,6 +8,10 @@ from presentation.schemas.auth import (
     MessageResponse,
     RegisterRequest,
 )
+from presentation.schemas.terminals import (
+    ResolveTerminalRequest,
+    ResolveTerminalResponse,
+)
 
 __all__ = [
     "AuthTokenResponse",
@@ -16,4 +20,6 @@ __all__ = [
     "LoginRequest",
     "MessageResponse",
     "RegisterRequest",
+    "ResolveTerminalRequest",
+    "ResolveTerminalResponse",
 ]

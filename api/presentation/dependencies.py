@@ -16,10 +16,14 @@ from application.auth.token_service import TokenService
 from application.payments.create_transaction import CreateTransaction
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
+from application.terminals.resolve_terminal import ResolveTerminal
 from config import Settings, get_settings
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.terminal_device_repository import (
+    TerminalDeviceRepository,
+)
 from persistence.repositories.transaction_repository import TransactionRepository
 from persistence.repositories.user_repository import UserRepository
 
@@ -77,6 +81,14 @@ def get_change_password(
     return ChangePassword(
         session=db,
         users=UserRepository(db),
+    )
+
+
+def get_resolve_terminal(
+    db: Annotated[Session, Depends(get_db)],
+) -> ResolveTerminal:
+    return ResolveTerminal(
+        devices=TerminalDeviceRepository(db),
     )
 
 

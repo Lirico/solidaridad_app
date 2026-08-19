@@ -91,7 +91,6 @@ def _build(
     return use_case, transactions, installations, gateway
 
 
-
 def test_create_approves() -> None:
     use_case, transactions, _, gateway = _build()
     result = use_case.execute(
@@ -420,7 +419,6 @@ def test_unsupported_entry_mode_rejected() -> None:
             cvv="123",
             entry_mode="999",
         )
-
 
 
 def test_empty_terminal_string() -> None:

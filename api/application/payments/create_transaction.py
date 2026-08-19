@@ -99,9 +99,7 @@ def _validate_entry_mode(entry_mode: str, track2: str | None) -> None:
             "Modo banda (022) requiere track2 o vencimiento de la tarjeta"
         )
     if entry_mode == "012" and track2:
-        raise InvalidEntryMode(
-            "Modo manual (012) no debe incluir track2"
-        )
+        raise InvalidEntryMode("Modo manual (012) no debe incluir track2")
 
 
 class CreateTransaction:
@@ -145,7 +143,6 @@ class CreateTransaction:
         if entry_mode != "022":
             _validate_cvv(cvv or "")
         card_last4 = pan[-4:]
-
 
         exp = expiration_date.strip() if expiration_date else None
         if exp == "":

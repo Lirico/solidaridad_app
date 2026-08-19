@@ -42,9 +42,7 @@ router = APIRouter()
             "content": {
                 "application/json": {
                     "example": {
-                        "message": (
-                            "La contraseña debe tener al menos 8 caracteres"
-                        )
+                        "message": ("La contraseña debe tener al menos 8 caracteres")
                     }
                 }
             },
@@ -105,9 +103,7 @@ def register(
         status.HTTP_401_UNAUTHORIZED: {
             "description": "Invalid credentials",
             "content": {
-                "application/json": {
-                    "example": {"message": "Credenciales inválidas"}
-                }
+                "application/json": {"example": {"message": "Credenciales inválidas"}}
             },
         },
     },
@@ -145,9 +141,7 @@ def login(
             "content": {
                 "application/json": {
                     "example": {
-                        "message": (
-                            "La nueva contraseña debe ser distinta a la actual"
-                        )
+                        "message": ("La nueva contraseña debe ser distinta a la actual")
                     }
                 }
             },

@@ -204,8 +204,12 @@ class TransactionRepository:
         )
         rows = list(self._session.scalars(stmt).all())
 
-        count_stmt = select(func.count()).select_from(TransactionModel).where(
-            TransactionModel.terminal_id == terminal_id,
+        count_stmt = (
+            select(func.count())
+            .select_from(TransactionModel)
+            .where(
+                TransactionModel.terminal_id == terminal_id,
+            )
         )
         total = self._session.scalar(count_stmt) or 0
 

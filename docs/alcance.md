@@ -56,7 +56,13 @@ impresión de ticket.
   `logical_device_id` físico del terminal y recibe el `installation_id`
   provisionado en la central, que persiste en `SharedPreferences` y se envía en
   login/register (viaja en el token JWT; la transacción usa el `installation_id`
-  del token, no del body).
+  del token, no del body). El `logical_device_id` se lee del hardware Verifone
+  vía el bridge PSDK: `TerminalProvisioner` inicializa el SDK
+  (`PsdkBridge.initialize()`) y luego `PsdkBridge.getDeviceInfo()` (campo
+  `logicalDeviceId`); si no hay hardware o el init/lectura falla, se cae al
+  define `kLogicalDeviceId` (`--dart-define=LOGICAL_DEVICE_ID`, default
+  `V660P-DEMO-0001`) como respaldo de lab.
+
 
 - Pantalla inicial simple orientada a la venta.
 - Flujo de venta de gas:

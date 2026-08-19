@@ -6,19 +6,20 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-19
 
-> ✅ **Último cambio (2026-08-19):** terminal id real (no mockeado) en la
-> request. Se agregó el endpoint `POST /v1/terminals/resolve` en la API que
-> mapea el `logical_device_id` físico del terminal al `installation_id`
-> provisionado en la central (tabla `terminal_devices`, migración
-> `20260819_0007`, seed local). En mobile, `TerminalProvisioner`
-> (`mobile/lib/core/terminal/terminal_provisioner.dart`) resuelve el
-> `installation_id` real vía ese endpoint en el arranque (`main.dart`) y lo
-> persiste en `SharedPreferences`; `AuthRepository._resolveInstallationId()` ya
-> no usa el default mockeado `05000001` sino el valor provisionado, que se
-> envía en login/register y viaja en el token JWT (la transacción usa el
-> `installation_id` del token, no del body). `flutter analyze` OK y tests de
-> `TerminalProvisioner` en `mobile/test/terminal_provisioner_test.dart`. Cierra
+> ✅ **Último cambio (2026-08-19):** lectura real del serial Verifone en
+> `TerminalProvisioner`. El `logical_device_id` ya no es solo el define de lab:
+> `TerminalProvisioner._resolveLogicalDeviceId()` ahora inicializa el SDK
+> (`PsdkBridge.initialize()`, con timeout de 5s) y luego lee el hardware vía
+> `PsdkBridge.getDeviceInfo()` (campo `logicalDeviceId`). Si no hay bridge, no
+> hay hardware, el init falla o la lectura devuelve `ok: false`, se cae al
+> define `kLogicalDeviceId` (`--dart-define=LOGICAL_DEVICE_ID`, default
+> `V660P-DEMO-0001`) como respaldo de lab. Se corrigió el lint
+> `prefer_initializing_formals` (constructor usa `this._psdk`). Tests en
+> `mobile/test/terminal_provisioner_test.dart` cubren: lectura real vía bridge,
+> fallback cuando `getDeviceInfo` devuelve `ok: false`, y fallback cuando
+> `initialize()` devuelve `ok: false`. `flutter analyze` OK y tests OK. Ver
 > G-P0-08.
+
 
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
 
@@ -190,7 +191,8 @@ Verifone (banda + térmica).
 
 
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | done | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. **2026-08-15:** fix de crash en `SaleStatusScreen` — `ModalRoute.of(context)` se llamaba en `initState()` (prohibido: usa `dependOnInheritedWidgetOfExactType`); se movió la lectura de argumentos y el disparo de impresión a `didChangeDependencies()` con flag `_initialized`. `flutter analyze` OK. Pendiente: verificación física en V660P. |
-| G-P0-08 | `installation_id` desde config de terminal | done | **2026-08-19:** el `installation_id` ya NO es un valor mockeado/hardcodeado. Se agregó el endpoint `POST /v1/terminals/resolve` en la API que mapea el `logical_device_id` físico del terminal al `installation_id` provisionado en la central (tabla `terminal_devices`, migración `20260819_0007`, seed local). En mobile, `TerminalProvisioner` (`mobile/lib/core/terminal/terminal_provisioner.dart`) resuelve el `installation_id` real vía ese endpoint en el arranque (`main.dart`) y lo persiste en `SharedPreferences`; `AuthRepository._resolveInstallationId()` ya no usa el default `05000001` sino el valor provisionado, que se envía en login/register y viaja en el token JWT (la transacción usa el `installation_id` del token, no del body). `flutter analyze` OK y tests de `TerminalProvisioner` en `mobile/test/terminal_provisioner_test.dart`. |
+| G-P0-08 | `installation_id` desde config de terminal | done | **2026-08-19:** el `installation_id` ya NO es un valor mockeado/hardcodeado. Se agregó el endpoint `POST /v1/terminals/resolve` en la API que mapea el `logical_device_id` físico del terminal al `installation_id` provisionado en la central (tabla `terminal_devices`, migración `20260819_0007`, seed local). En mobile, `TerminalProvisioner` (`mobile/lib/core/terminal/terminal_provisioner.dart`) resuelve el `installation_id` real vía ese endpoint en el arranque (`main.dart`) y lo persiste en `SharedPreferences`; `AuthRepository._resolveInstallationId()` ya no usa el default `05000001` sino el valor provisionado, que se envía en login/register y viaja en el token JWT (la transacción usa el `installation_id` del token, no del body). **Lectura real del serial:** `TerminalProvisioner._resolveLogicalDeviceId()` inicializa el SDK (`PsdkBridge.initialize()`, timeout 5s) y lee el hardware vía `PsdkBridge.getDeviceInfo()` (campo `logicalDeviceId`); si no hay hardware/init falla/`ok: false`, cae al define `kLogicalDeviceId` (`--dart-define=LOGICAL_DEVICE_ID`, default `V660P-DEMO-0001`). `flutter analyze` OK y tests de `TerminalProvisioner` en `mobile/test/terminal_provisioner_test.dart`. |
+
 
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |

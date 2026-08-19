@@ -4,9 +4,24 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-16
+Última revisión: 2026-08-19
+
+> ✅ **Último cambio (2026-08-19):** terminal id real (no mockeado) en la
+> request. Se agregó el endpoint `POST /v1/terminals/resolve` en la API que
+> mapea el `logical_device_id` físico del terminal al `installation_id`
+> provisionado en la central (tabla `terminal_devices`, migración
+> `20260819_0007`, seed local). En mobile, `TerminalProvisioner`
+> (`mobile/lib/core/terminal/terminal_provisioner.dart`) resuelve el
+> `installation_id` real vía ese endpoint en el arranque (`main.dart`) y lo
+> persiste en `SharedPreferences`; `AuthRepository._resolveInstallationId()` ya
+> no usa el default mockeado `05000001` sino el valor provisionado, que se
+> envía en login/register y viaja en el token JWT (la transacción usa el
+> `installation_id` del token, no del body). `flutter analyze` OK y tests de
+> `TerminalProvisioner` en `mobile/test/terminal_provisioner_test.dart`. Cierra
+> G-P0-08.
 
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
+
 > `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
 > creó `mobile/lib/features/sales/domain/msr_card_data.dart` (`MsrCardData` con
 > `fromBridge`, `expiryYyMm`/`expiryMmYy`) y `SalesCubit.showReviewFromMsr()`;
@@ -175,7 +190,8 @@ Verifone (banda + térmica).
 
 
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | done | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. **2026-08-15:** fix de crash en `SaleStatusScreen` — `ModalRoute.of(context)` se llamaba en `initState()` (prohibido: usa `dependOnInheritedWidgetOfExactType`); se movió la lectura de argumentos y el disparo de impresión a `didChangeDependencies()` con flag `_initialized`. `flutter analyze` OK. Pendiente: verificación física en V660P. |
-| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-08-08:** default de `dev-term` → `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (terminal real GOBIERNO del demo; `dev-term` no existe en `terminales` → código 89). Pendiente: lectura runtime desde config del device. |
+| G-P0-08 | `installation_id` desde config de terminal | done | **2026-08-19:** el `installation_id` ya NO es un valor mockeado/hardcodeado. Se agregó el endpoint `POST /v1/terminals/resolve` en la API que mapea el `logical_device_id` físico del terminal al `installation_id` provisionado en la central (tabla `terminal_devices`, migración `20260819_0007`, seed local). En mobile, `TerminalProvisioner` (`mobile/lib/core/terminal/terminal_provisioner.dart`) resuelve el `installation_id` real vía ese endpoint en el arranque (`main.dart`) y lo persiste en `SharedPreferences`; `AuthRepository._resolveInstallationId()` ya no usa el default `05000001` sino el valor provisionado, que se envía en login/register y viaja en el token JWT (la transacción usa el `installation_id` del token, no del body). `flutter analyze` OK y tests de `TerminalProvisioner` en `mobile/test/terminal_provisioner_test.dart`. |
+
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases_index.md`. |
@@ -245,7 +261,8 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
-| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
+| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados. **2026-08-19:** wiring desde device resuelto — `POST /v1/terminals/resolve` mapea `logical_device_id` → `installation_id` provisionado (tabla `terminal_devices`); `TerminalProvisioner` en mobile lo resuelve en el arranque y lo persiste en `SharedPreferences`; login/register lo envían y viaja en el token JWT. Ver G-P0-08. |
+
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |
 | Status screen con 3 estados (aprobado/rechazado/error conexión POSNET) | `PaymentResult` enum + `connectionError` flag en `SaleResponse`; naranja para pérdida de conectividad POSNET |

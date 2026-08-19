@@ -50,6 +50,14 @@ impresión de ticket.
 - Login de usuario y cambio de contraseña.
 - Identificador de terminal (`installation_id` / terminal id, 8 caracteres)
   configurado en el dispositivo; el operador no lo inventa por operación.
+  **2026-08-19:** el `installation_id` ya no es un valor mockeado/hardcodeado
+  en la app. En el arranque, `TerminalProvisioner` (`mobile/lib/core/terminal/
+  terminal_provisioner.dart`) llama a `POST /v1/terminals/resolve` enviando el
+  `logical_device_id` físico del terminal y recibe el `installation_id`
+  provisionado en la central, que persiste en `SharedPreferences` y se envía en
+  login/register (viaja en el token JWT; la transacción usa el `installation_id`
+  del token, no del body).
+
 - Pantalla inicial simple orientada a la venta.
 - Flujo de venta de gas:
   - selección de producto/especie (catálogo de gas);
@@ -84,6 +92,11 @@ claridad operativa.
   empresa registre usuarios vía Postman/central.
 - Terminal origen: el `installation_id` del login es el terminal id que se
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
+  **2026-08-19:** se agregó `POST /v1/terminals/resolve` que mapea el
+  `logical_device_id` físico del terminal al `installation_id` provisionado en
+  la central (tabla `terminal_devices`, migración `20260819_0007`, seed local).
+  La app lo llama en el arranque para obtener el terminal id real (no mockeado).
+
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).
 - Endpoint de anulación de venta aprobada:
   `POST /v1/transactions/{transaction_number}/void`, con reingreso de tarjeta

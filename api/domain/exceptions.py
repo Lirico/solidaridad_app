@@ -72,6 +72,13 @@ class InvalidCvv(DomainError):
         super().__init__(message)
 
 
+class InvalidEntryMode(DomainError):
+    """Raised when entry_mode is not "012"/"022" or is inconsistent with track2."""
+
+    def __init__(self, message: str = "Modo de entrada inválido") -> None:
+        super().__init__(message)
+
+
 class MissingIdempotencyKey(DomainError):
     """Raised when Idempotency-Key header is absent."""
 

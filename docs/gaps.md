@@ -6,6 +6,23 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-16
 
+> ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
+> `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
+> creó `mobile/lib/features/sales/domain/msr_card_data.dart` (`MsrCardData` con
+> `fromBridge`, `expiryYyMm`/`expiryMmYy`) y `SalesCubit.showReviewFromMsr()`;
+> la pantalla ya no parsea `tags`/`msr` ni convierte fechas. (2) **Reintento:**
+> botón "REINTENTAR" en `WaitingForCardContent` visible tras error/timeout que
+> vuelve a llamar a `_startReading()`. (3) **Cancelación de lectura:** se agregó
+> `cancelReadMsr` al bridge Dart (`psdk_bridge.dart`) y Kotlin
+> (`PsdkBridge.kt`, flag `readCancelled` que descarta el resultado del worker);
+> `dispose()` ahora cancela la lectura antes de `tearDown`. (4) **Mock lab:**
+> `PsdkBridge.readMsr` devuelve `PsdkMsrMock.readMsrSuccess` cuando se compila
+> con `--dart-define=USE_MSR_MOCK=true`. (5) **Enmascarado PAN en review:**
+> `sale_review_content.dart` muestra solo los últimos 4 dígitos. (6) **Logs
+> nativos sin datos sensibles:** `logPayload` en `PsdkBridge.kt` redacta
+> `pan*`, `track*`, `cardTokenHex`, `responseToString` y `rawResponseHex`
+> (`[REDACTED]`). Ver G-P0-06 / G-P1-02.
+
 > ✅ **Último cambio (2026-08-16):** validación de consistencia de `entry_mode` +
 > normalización de track2 (DE35). La API ahora valida que `entry_mode` sea solo
 > `"012"` (manual) o `"022"` (banda): `022` sin track2 ni vencimiento → 400
@@ -20,17 +37,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > pytest). `make check` OK en gateway (58 tests, cobertura 98.83%) y API (121
 > tests, cobertura 95.11%). Ver G-P1-06.
 
-> ✅ **Último cambio previo (2026-08-14):** impresión de ticket en la térmica del V660P.
-> Se implementó `ReceiptFormatter` (HTML térmico) en
-> `mobile/lib/features/sales/domain/receipt_formatter.dart` y la facade
-> `ReceiptPrinter` (inicializa el PSDK y llama a `PsdkBridge.printHtml`) en
-> `mobile/lib/features/sales/data/receipt_printer.dart`. La impresión es
-> **automática al aprobar** la venta (`sale_status_screen.dart`, con estado
-> imprimiendo/impreso/error + botón REIMPRIMIR) y se puede **reimprimir desde el
-> detalle del historial** (`sale_detail_screen.dart`, botón IMPRIMIR TICKET).
-> `flutter analyze` OK. Cierra G-P0-07. Pendiente: verificación física en V660P.
+> ✅ **Último cambio (2026-08-13):** venta por banda magnética (V660p) siempre
 
-> ✅ **Último cambio previo (2026-08-13):** venta por banda magnética (V660p) siempre
 > rechazada pese a tener saldo. **Hallazgo real:** el autorizador devolvía
 > código **14 "Tarjeta inválida"** (`TIT_DES_SUP`), NO "fondos insuficientes"
 > (51). El log de `authkig.log` mostraba `TRACK II DATA: 4606300701400740...`
@@ -161,7 +169,7 @@ Verifone (banda + térmica).
 | G-P0-03 | Token de venta no enlazado a sesión real | done | `SalesCubit.loadHistory()`, `sendIsoMessage()` y `fetchProducts()` reciben el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
-| G-P0-06 | Lectura de banda (Verifone) | done | **Rama 1 (2026-11-08):** bridge PSDK portado del POC al mobile. `PsdkBridge.kt` + `MainActivity.kt` (canales `com.solidaridad.poc_verifone/psdk` y `psdk_events`) en `mobile/android/app/src/main/kotlin/`. Dart facade `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`. `.aar` PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`. `build.gradle.kts` con `minSdk=24` y dependencia `.aar`. `AndroidManifest.xml` con permisos Verifone. Build debug OK. **Rama 2 (2026-11-08):** `WaitingForCardScreen` como `StatefulWidget` conectado al PSDK (`initialize()` + `readMsr(timeoutSec: 30)`), mapea PAN/vencimiento a `showReview`. **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022") + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `flutter analyze` OK. **Rama 5 (2026-11-08):** fix de CVV para banda — la banda no contiene CVV, pero la API rechazaba `cvv: ''` (schema `min_length=3` → 422 y `_validate_cvv` → 400), por lo que la venta por banda fallaba antes de persistir (no aparecía en historial) aunque la tarjeta tuviera saldo. `cvv` ahora es opcional en `CreateTransactionRequest` y la validación se omite para `entry_mode='022'`. Tests en `test_create_transaction.py` y `test_transactions_http.py`; `make check` OK (118 tests, cobertura 95%). **Contrato definitivo (2026-08-13):** banda = PAN (DE2) + vencimiento (DE14), **sin DE35**. El gateway siempre envía DE2 + DE14 y agrega DE35 solo si llega track2 (nunca en lugar de DE2). Ver G-P0-15. |
+| G-P0-06 | Lectura de banda (Verifone) | done | **Rama 1 (2026-11-08):** bridge PSDK portado del POC al mobile. `PsdkBridge.kt` + `MainActivity.kt` (canales `com.solidaridad.poc_verifone/psdk` y `psdk_events`) en `mobile/android/app/src/main/kotlin/`. Dart facade `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`. `.aar` PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`. `build.gradle.kts` con `minSdk=24` y dependencia `.aar`. `AndroidManifest.xml` con permisos Verifone. Build debug OK. **Rama 2 (2026-11-08):** `WaitingForCardScreen` como `StatefulWidget` conectado al PSDK (`initialize()` + `readMsr(timeoutSec: 30)`), mapea PAN/vencimiento a `showReview`. **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `flutter analyze` OK. **Rama 5 (2026-11-08):** fix de CVV para banda — la banda no contiene CVV, pero la API rechazaba `cvv: ''` (schema `min_length=3` → 422 y `_validate_cvv` → 400), por lo que la venta por banda fallaba antes de persistir (no aparecía en historial) aunque la tarjeta tuviera saldo. `cvv` ahora es opcional en `CreateTransactionRequest` y la validación se omite para `entry_mode='022'`. Tests en `test_create_transaction.py` y `test_transactions_http.py`; `make check` OK (118 tests, cobertura 95%). |
 
 
 
@@ -190,7 +198,8 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. El endpoint `POST /v1/auth/register` se mantiene para que la empresa pueda registrar usuarios vía Postman. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. Mobile genera y envía `Idempotency-Key` (timestamp+random) en cada `POST /v1/transactions`. **Pendiente:** (1) reintentar con la misma clave ante timeout/error idempotente — la `SaleStatusScreen` solo tiene botón "FINALIZAR", no "Reintentar" (hallazgo #24); (2) manejar status 202 (ACCEPTED). Falta botón "Reintentar" en `sale_status_content.dart` que reenvíe con la misma `Idempotency-Key`. Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. Mobile genera y envía `Idempotency-Key` (timestamp+random) en cada `POST /v1/transactions`. **2026-08-16:** el reintento de **lectura MSR** ya está implementado — botón "REINTENTAR" en `WaitingForCardContent` que vuelve a llamar a `_startReading()` tras timeout/error. **Pendiente:** (1) reintentar el envío con la misma clave ante timeout/error idempotente — la `SaleStatusScreen` solo tiene botón "FINALIZAR", no "Reintentar" (hallazgo #24); (2) manejar status 202 (ACCEPTED). Falta botón "Reintentar" en `sale_status_content.dart` que reenvíe con la misma `Idempotency-Key`. Ver TC-069 en `docs/test_cases_index.md`. |
+
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | open | `SalesRepository.fetchProducts()` devuelve productos default hardcodeados ante cualquier excepción. `SalesRepository.fetchHistory()` devuelve lista vacía. Ningún repositorio muestra mensaje de error ni opción de reintentar al usuario. TC-062 y TC-072 esperaban "mensaje de error y opción de reintentar", pero la app usa fallback silencioso. Considerar agregar indicador visual cuando se usan datos fallback. Ver hallazgo #23 en `docs/test_cases_index.md`. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |

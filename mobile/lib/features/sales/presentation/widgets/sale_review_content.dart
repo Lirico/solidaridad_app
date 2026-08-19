@@ -32,6 +32,14 @@ class SaleReviewContent extends StatelessWidget {
     return value.toString();
   }
 
+  /// Enmascara el número de tarjeta mostrando solo los últimos 4 dígitos,
+  /// para no exponer el PAN completo en la pantalla de revisión.
+  String _maskCardNumber(String cardNumber) {
+    final digits = cardNumber.replaceAll(' ', '');
+    if (digits.length < 4) return '•••• •••• •••• 4321';
+    return '•••• •••• •••• ${digits.substring(digits.length - 4)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -64,8 +72,9 @@ class SaleReviewContent extends StatelessWidget {
           label: 'Número de Tarjeta',
           value: state.cardNumber.isEmpty
               ? '•••• •••• •••• 4321'
-              : state.cardNumber,
+              : _maskCardNumber(state.cardNumber),
         ),
+
         const SizedBox(height: 56),
 
         SizedBox(

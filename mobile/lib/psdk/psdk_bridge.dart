@@ -2,11 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import 'psdk_msr_mock.dart';
+
+/// Habilita el mock de lectura MSR para lab sin hardware.
+///
+/// Se activa compilando con `--dart-define=USE_MSR_MOCK=true`. Cuando está
+/// activo, [PsdkBridge.readMsr] devuelve datos de prueba en lugar de invocar
+/// el canal nativo.
+const bool kUseMsrMock = bool.fromEnvironment('USE_MSR_MOCK');
+
 /// Dart facade for the Android Verifone PaymentSDK bridge.
 ///
 /// Channel contract (Android):
 /// - methods: `initialize`, `tearDown`, `getStatus`, `getDeviceInfo`,
-///   `readMsr`, `printHtml`
+///   `readMsr`, `cancelReadMsr`, `printHtml`
 /// - events: status maps from `CommerceListenerAdapter.handleStatus`
 class PsdkBridge {
   PsdkBridge({MethodChannel? methodChannel, EventChannel? eventChannel})
@@ -58,11 +67,29 @@ class PsdkBridge {
   ///
   /// Returns unmasked POC fields under `msr` (direct SDK response) and `tags`
   /// (`fetchTxnTags`, often clearer when the terminal obfuscates `msr`).
+  ///
+  /// When [kUseMsrMock] is true (lab sin hardware), devuelve datos de prueba
+  /// con la misma forma que el bridge nativo en lugar de invocar el canal.
   Future<Map<String, dynamic>> readMsr({int timeoutSec = 30}) async {
+    if (kUseMsrMock) {
+      return PsdkMsrMock.readMsrSuccess(timeoutSec: timeoutSec);
+    }
     final result = await _methods.invokeMethod<dynamic>(
       'readMsr',
       <String, dynamic>{'timeoutSec': timeoutSec},
     );
+    return _asStringKeyMap(result);
+  }
+
+  /// Cancela una lectura MSR en curso (si el SDK nativo lo permite).
+  ///
+  /// Debe llamarse antes de [tearDown] cuando hay un [readMsr] pendiente, para
+  /// no apagar el SDK con la lectura todavía activa.
+  Future<Map<String, dynamic>> cancelReadMsr() async {
+    if (kUseMsrMock) {
+      return <String, dynamic>{'ok': true, 'mocked': true};
+    }
+    final result = await _methods.invokeMethod<dynamic>('cancelReadMsr');
     return _asStringKeyMap(result);
   }
 

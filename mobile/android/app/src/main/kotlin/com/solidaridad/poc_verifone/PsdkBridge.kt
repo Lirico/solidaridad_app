@@ -51,6 +51,8 @@ class PsdkBridge(private val appContext: Context) :
     private var lastStatus: Map<String, Any?>? = null
     private var initialized = false
     private var eventSink: EventChannel.EventSink? = null
+    private var readCancelled = false
+
 
     private val commerceListener = object : CommerceListenerAdapter() {
         override fun handleStatus(status: Status) {
@@ -80,7 +82,9 @@ class PsdkBridge(private val appContext: Context) :
                 val timeoutSec = (call.argument<Int>("timeoutSec") ?: 30).coerceIn(1, 128)
                 readMsr(timeoutSec, result)
             }
+            "cancelReadMsr" -> cancelReadMsr(result)
             "printHtml" -> {
+
                 val html = call.argument<String>("html")
                 if (html.isNullOrBlank()) {
                     result.error("PSDK_BAD_ARGS", "html is required", null)
@@ -194,6 +198,21 @@ class PsdkBridge(private val appContext: Context) :
      * Blocks on a worker thread until swipe or timeout.
      * Returns MSR response fields plus txn tags (often clearer when VCL obfuscates the direct fields).
      */
+    /**
+     * Cancela una lectura MSR en curso.
+     *
+     * El SDK de Verifone no expone una cancelación síncrona de `msr.read`, así
+     * que esto marca un flag que el worker de [readMsr] consulta al terminar:
+     * si la lectura fue cancelada, no se postea el resultado al canal (evitando
+     * que Dart navegue o toque el contexto desmontado). Debe llamarse antes de
+     * [tearDown] para no apagar el SDK con la lectura todavía activa.
+     */
+    private fun cancelReadMsr(result: MethodChannel.Result) {
+        readCancelled = true
+        Log.i(TAG, "MSR read cancellation requested")
+        result.success(mapOf("ok" to true, "cancelled" to true))
+    }
+
     private fun readMsr(timeoutSec: Int, result: MethodChannel.Result) {
         val sdi = sdiManager
         if (sdi == null) {
@@ -201,6 +220,7 @@ class PsdkBridge(private val appContext: Context) :
             return
         }
 
+        readCancelled = false
         worker.execute {
             try {
                 Log.i(TAG, "MSR read starting (timeoutSec=$timeoutSec). Swipe the card.")
@@ -208,6 +228,11 @@ class PsdkBridge(private val appContext: Context) :
 
                 val response = sdi.msr.read(timeoutSec.toByte())
                 val code = response.result
+                if (readCancelled) {
+                    Log.i(TAG, "MSR read cancelled; discarding result")
+                    return@execute
+                }
+
                 val pan = response.pan
                 val msrMap = mapOf(
                     "result" to code.name,
@@ -392,17 +417,43 @@ class PsdkBridge(private val appContext: Context) :
         }
     }
 
-    /** Dump full POC payload to logcat (filter: adb logcat -s PsdkBridge). */
+    /**
+     * Dump del payload a logcat (filter: adb logcat -s PsdkBridge), con los
+     * campos sensibles (PAN, tracks, token) enmascarados para no exponer datos
+     * de tarjeta en claro en los logs.
+     */
     private fun logPayload(label: String, payload: Map<String, Any?>) {
         try {
-            val json = gson.toJson(payload)
+            val json = gson.toJson(redactSensitive(payload))
             Log.i(TAG, "===== $label BEGIN =====")
             json.lineSequence().forEach { line -> Log.i(TAG, line) }
             Log.i(TAG, "===== $label END =====")
         } catch (e: Exception) {
-            Log.i(TAG, "===== $label ===== $payload")
+            Log.i(TAG, "===== $label ===== [redacted]")
         }
     }
+
+    /** Devuelve una copia del payload con los campos sensibles enmascarados. */
+    private fun redactSensitive(value: Any?): Any? {
+        return when (value) {
+            is Map<*, *> -> value.entries.associate { (k, v) ->
+                val key = k.toString()
+                val redacted = if (key in SENSITIVE_KEYS) "[REDACTED]" else redactSensitive(v)
+                key to redacted
+            }
+            is List<*> -> value.map { redactSensitive(it) }
+            else -> value
+        }
+    }
+
+    private companion object {
+        val SENSITIVE_KEYS = setOf(
+            "pan", "panHex", "panAscii", "panLength",
+            "track1", "track2", "track1Hex", "track2Hex",
+            "cardTokenHex", "responseToString", "rawResponseHex",
+        )
+    }
+
 
     private fun bytesAsHex(bytes: ByteArray?): String {
         if (bytes == null || bytes.isEmpty()) return ""

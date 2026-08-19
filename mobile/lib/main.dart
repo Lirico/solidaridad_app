@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
+import 'core/terminal/terminal_provisioner.dart';
 import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -25,9 +26,17 @@ import 'features/history/presentation/screens/void_result_screen.dart';
 import 'core/widgets/loading_screen.dart';
 import 'core/widgets/splash_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Resuelve y persiste el `installation_id` real del terminal (no mockeado)
+  // antes de arrancar la UI, para que login y ventas usen el terminal id
+  // provisionado por el backend.
+  final provisioner = TerminalProvisioner();
+  await provisioner.resolve();
+
   final salesRepository = SalesRepository();
-  final authRepository = AuthRepository();
+  final authRepository = AuthRepository(provisioner: provisioner);
 
   runApp(
     MultiBlocProvider(

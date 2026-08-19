@@ -174,6 +174,8 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: currentCardNumber,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
+        entryMode: currentEntryMode,
+        track2: currentTrack2,
         history: currentHistory,
         result: paymentResult,
         operationNumber: paymentResult == PaymentResult.approved

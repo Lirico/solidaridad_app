@@ -45,7 +45,7 @@ def build_purchase_request(
         iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
         bits.append(14)
     if command.track2:
-        iso.track2_35 = command.track2
+        iso.track2_35 = _normalize_track2(command.track2)
         bits.append(35)
     set_present(iso, *bits)
     return iso
@@ -99,3 +99,32 @@ def _pad_digits(value: str, width: int) -> str:
 def _numeric_ticket(value: str) -> str:
     digits = "".join(c for c in value if c.isdigit())
     return digits or "0"
+
+
+def _normalize_track2(track2: str) -> str:
+    """Normaliza el track2 (DE35) al layout que espera el autorizador C.
+
+    La terminal puede entregar el track2 con sentinels y separadores de
+    servicio (p. ej. ";PAN=EXPIRY?SERVICE" o "PAN=EXPIRY"). El autorizador
+    (iso_common.c / auth_mycli.c) espera el layout "PAN=EXPIRY":
+      - PAN en las primeras 16 posiciones,
+      - "=" como separador (posición 16),
+      - vencimiento en las posiciones 17-20.
+
+    Esta función:
+      - elimina los sentinels de inicio/fin (";" y "?"),
+      - reemplaza el separador alternativo "D" por "=",
+      - recorta cualquier dato de servicio posterior al vencimiento.
+    """
+    cleaned = track2.strip()
+    if cleaned.startswith(";"):
+        cleaned = cleaned[1:]
+    if cleaned.endswith("?"):
+        cleaned = cleaned[:-1]
+    cleaned = cleaned.replace("D", "=")
+    # Quedarse solo con PAN=EXPIRY (hasta el vencimiento, 4 dígitos tras "=").
+    if "=" in cleaned:
+        pan, _, rest = cleaned.partition("=")
+        expiry = "".join(c for c in rest if c.isdigit())[:4]
+        return f"{pan}={expiry}"
+    return cleaned

@@ -107,7 +107,23 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   /// el SDK recién queda listo cuando llega `handleStatus` con SUCCESS. Este
   /// método escucha [PsdkBridge.statusEvents] hasta que eso ocurra o se agote
   /// [timeoutSec].
+  ///
+  /// Para evitar una race condition (el evento `sdiReady` puede haber llegado
+  /// antes de suscribirnos al stream), primero se consulta el estado actual con
+  /// [PsdkBridge.getStatus] y solo si aún no está listo se escucha el stream.
   Future<bool> _waitForSdkReady({int timeoutSec = 20}) async {
+    // 1. Chequear el estado actual: si el SDK ya quedó listo (el evento pudo
+    //    haber pasado antes de suscribirnos), no hace falta esperar el stream.
+    try {
+      final Map<String, dynamic> status = await _psdk.getStatus();
+      final bool alreadyReady =
+          status['sdiReady'] == true || status['initialized'] == true;
+      if (alreadyReady) return true;
+    } catch (_) {
+      // Si getStatus falla, seguimos y esperamos el stream.
+    }
+
+    // 2. Si aún no está listo, escuchar el stream hasta que llegue el evento.
     final completer = Completer<bool>();
     StreamSubscription<Map<String, dynamic>>? sub;
 
@@ -163,8 +179,9 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
                 ),
               ),
               child: WaitingForCardContent(
-                onCancelOperation: _onBackPressed,
+                errorMessage: _errorMessage,
                 onRetry: _errorMessage != null ? _startReading : null,
+                onCancelOperation: _onBackPressed,
               ),
             ),
           ),

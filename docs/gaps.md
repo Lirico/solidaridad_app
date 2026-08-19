@@ -23,6 +23,20 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > `pan*`, `track*`, `cardTokenHex`, `responseToString` y `rawResponseHex`
 > (`[REDACTED]`). Ver G-P0-06 / G-P1-02.
 
+> ✅ **Último cambio (2026-08-16):** validación de consistencia de `entry_mode` +
+> normalización de track2 (DE35). La API ahora valida que `entry_mode` sea solo
+> `"012"` (manual) o `"022"` (banda): `022` sin track2 ni vencimiento → 400
+> (`InvalidEntryMode`), `012` con track2 → 400, y cualquier otro valor → 400.
+> El gateway normaliza el track2 antes de armar DE35: quita sentinels (`;`/`?`)
+> y el separador alternativo `D`, dejando el layout `PAN=EXPIRY` que espera el
+> autorizador C (`iso_common.c` / `auth_mycli.c`). Se agregaron tests de
+> `build_purchase_request` (manual `012` sin track2, banda `022` con track2
+> normalizado y banda `022` sin track2) y de validación de consistencia en
+> `test_create_transaction.py`. Se alineó `docs/entry-mode.md` (DE22 lógico
+> `022` vs wire `0022`; DE2 siempre + DE35 opcional; no marcar TC como Pass sin
+> pytest). `make check` OK en gateway (58 tests, cobertura 98.83%) y API (121
+> tests, cobertura 95.11%). Ver G-P1-06.
+
 > ✅ **Último cambio (2026-08-14):** impresión de ticket en la térmica del V660P.
 > Se implementó `ReceiptFormatter` (HTML térmico) en
 > `mobile/lib/features/sales/domain/receipt_formatter.dart` y la facade

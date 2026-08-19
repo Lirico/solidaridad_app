@@ -5,12 +5,14 @@ import 'waiting_for_card_reader_graphic.dart';
 class WaitingForCardContent extends StatelessWidget {
   final VoidCallback? onCancelOperation;
   final VoidCallback? onChangePaymentMode;
+  final String? errorMessage;
   final VoidCallback? onRetry;
 
   const WaitingForCardContent({
     super.key,
     this.onCancelOperation,
     this.onChangePaymentMode,
+    this.errorMessage,
     this.onRetry,
   });
 
@@ -147,8 +149,67 @@ class WaitingForCardContent extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
+          // Mensaje de error + botón Reintentar (cuando la lectura falla o
+          // expira el timeout). Permite reintentar sin salir de la pantalla.
+          if (errorMessage != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFDECEA),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2.0),
+                    child: Icon(
+                      Icons.error_outline,
+                      color: AppColors.primaryOrange,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryOrange,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: onRetry,
+                child: const Text(
+                  'REINTENTAR',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+
           // Gráfico central: Lector de tarjetas y mano
           const WaitingForCardReaderGraphic(),
+
           const SizedBox(height: 48),
 
           // Banner de información
@@ -209,28 +270,6 @@ class WaitingForCardContent extends StatelessWidget {
               ),
             ),
           ),
-          if (onRetry != null) ...[
-            const SizedBox(height: 12),
-            // Botón Reintentar (solo visible tras un error/timeout)
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: onRetry,
-                child: const Text(
-                  'REINTENTAR',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

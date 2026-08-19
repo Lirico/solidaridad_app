@@ -25,6 +25,7 @@ from domain.exceptions import (
     IdempotencyConflict,
     InvalidCardNumber,
     InvalidCvv,
+    InvalidEntryMode,
     MissingIdempotencyKey,
     MissingTerminalId,
 )
@@ -82,6 +83,27 @@ def _validate_pan(card_number: str) -> str:
     return pan
 
 
+def _validate_entry_mode(entry_mode: str, track2: str | None) -> None:
+    """Valida la consistencia del modo de captura con el track2.
+
+    - entry_mode solo puede ser "012" (manual) o "022" (banda magnética).
+    - "022" (banda) requiere track2 (DE35) o vencimiento (DE14): sin esos datos
+      el autorizador no puede resolver la tarjeta.
+    - "012" (manual) no debe traer track2: el track2 solo tiene sentido cuando
+      la tarjeta se leyó por banda.
+    """
+    if entry_mode not in ("012", "022"):
+        raise InvalidEntryMode("Modo de entrada inválido: debe ser 012 o 022")
+    if entry_mode == "022" and not track2:
+        raise InvalidEntryMode(
+            "Modo banda (022) requiere track2 o vencimiento de la tarjeta"
+        )
+    if entry_mode == "012" and track2:
+        raise InvalidEntryMode(
+            "Modo manual (012) no debe incluir track2"
+        )
+
+
 class CreateTransaction:
     def __init__(
         self,
@@ -117,6 +139,7 @@ class CreateTransaction:
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
         pan = _validate_pan(card_number)
+        _validate_entry_mode(entry_mode, track2)
         # La banda magnética (entry_mode 022) no contiene CVV: se omite la
         # validación en ese modo. El gateway/procesador no usan CVV.
         if entry_mode != "022":

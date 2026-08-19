@@ -3677,10 +3677,19 @@ char* getVencimiento(struct iso8583* iso)
 
     if (atoi(iso->posentrymode_22) == 22)
     {
-        //vto = (char*)malloc(sizeof(char)*5);
-        //memcpy(vto, &iso->track2_35[17], 4);
-        //vto[4] = '\0';
-        vto = &iso->track2_35[17];
+        // Preferir el vencimiento explícito (DE14) cuando venga presente. La
+        // app nueva (sin DE35) manda el PAN (DE2) + vencimiento (DE14) para la
+        // banda magnética; el track2 (DE35) solo se usa como fallback cuando
+        // viene (APK viejo). Leer siempre de track2_35[17] con el APK nuevo
+        // devuelve basura porque track2_35 viene vacío.
+        if (strlen(iso->dateexpire_14) > 0)
+        {
+            vto = iso->dateexpire_14;
+        }
+        else
+        {
+            vto = &iso->track2_35[17];
+        }
     }
 
     return vto;

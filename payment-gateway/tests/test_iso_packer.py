@@ -216,6 +216,102 @@ def test_build_purchase_request_with_track2_keeps_pan() -> None:
     assert parsed.track2_35 == "460630070140074036301288"
 
 
+def test_build_purchase_request_manual_012_no_track2() -> None:
+    """Ingreso manual (012): DE2 + DE14, sin DE35, DE22 = 0012."""
+    settings = Settings()
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="4111111111111111",
+        terminal_id="TERM0001",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="2912",
+        entry_mode="012",
+    )
+    iso = build_purchase_request(
+        cmd,
+        settings,
+        now=datetime(2026, 7, 16, 12, 15, 30),
+    )
+    assert iso.pan_2 == "4111111111111111"
+    assert iso.dateexpire_14 == "2912"
+    assert iso.posentrymode_22 == "0012"
+    assert iso.track2_35 == ""
+    assert bitmap_get(iso.bitmap, 2)
+    assert bitmap_get(iso.bitmap, 14)
+    assert not bitmap_get(iso.bitmap, 35)
+
+
+def test_build_purchase_request_band_022_normalizes_track2() -> None:
+    """Banda (022): el track2 con sentinels se normaliza a PAN=EXPIRY.
+
+    La terminal puede entregar ";PAN=EXPIRY?SERVICE"; el autorizador C espera
+    el layout "PAN=EXPIRY" (PAN en 16 posiciones, "=" en la 16, vencimiento en
+    las 17-20). El gateway normaliza antes de armar DE35.
+    """
+    settings = Settings()
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="6063007014007403",
+        terminal_id="TERM0001",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="2512",
+        entry_mode="022",
+        track2=";6063007014007403=2512?1234567890",
+    )
+    iso = build_purchase_request(
+        cmd,
+        settings,
+        now=datetime(2026, 7, 16, 12, 15, 30),
+    )
+    assert iso.pan_2 == "6063007014007403"
+    assert iso.track2_35 == "6063007014007403=2512"
+    assert iso.posentrymode_22 == "0022"
+    assert iso.dateexpire_14 == "2512"
+    assert bitmap_get(iso.bitmap, 2)
+    assert bitmap_get(iso.bitmap, 35)
+    assert bitmap_get(iso.bitmap, 14)
+
+    # Round-trip: DE35 es BCD numérico en el wire, por lo que el separador "="
+    # (posición 16) se codifica como un dígito y no sobrevive como "=". El
+    # autorizador C ignora la posición 16 (lee PAN en 0-15 y vencimiento en
+    # 17-20), así que el layout funcional PAN(16)+sep+EXPIRY(4) se preserva.
+    parsed = unpack_iso(pack_iso(iso))
+    assert len(parsed.track2_35) == 21
+    assert parsed.track2_35[:16] == "6063007014007403"
+    assert parsed.track2_35[17:21] == "2512"
+
+
+def test_build_purchase_request_band_022_without_track2() -> None:
+    """Banda (022) sin track2: DE2 + DE14, sin DE35."""
+    settings = Settings()
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="6063007014007403",
+        terminal_id="TERM0001",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="2512",
+        entry_mode="022",
+    )
+    iso = build_purchase_request(
+        cmd,
+        settings,
+        now=datetime(2026, 7, 16, 12, 15, 30),
+    )
+    assert iso.pan_2 == "6063007014007403"
+    assert iso.dateexpire_14 == "2512"
+    assert iso.posentrymode_22 == "0022"
+    assert iso.track2_35 == ""
+    assert bitmap_get(iso.bitmap, 2)
+    assert bitmap_get(iso.bitmap, 14)
+    assert not bitmap_get(iso.bitmap, 35)
+
+
 def test_build_void_request_sets_fields() -> None:
     settings = Settings()
     cmd = VoidCommand(

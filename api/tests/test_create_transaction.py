@@ -367,6 +367,61 @@ def test_manual_012_still_validates_cvv() -> None:
         )
 
 
+def test_band_022_without_track2_rejected() -> None:
+    """Banda (022) sin track2 ni vencimiento: inconsistente, se rechaza."""
+    from domain.exceptions import InvalidEntryMode
+
+    use_case, *_ = _build()
+    with pytest.raises(InvalidEntryMode):
+        use_case.execute(
+            user_id=1,
+            installation_id="inst-1",
+            idempotency_key="k1",
+            product="GARRAFA_10",
+            amount="1.50",
+            card_number="6063007014007403",
+            cvv="",
+            entry_mode="022",
+        )
+
+
+def test_manual_012_with_track2_rejected() -> None:
+    """Manual (012) con track2: inconsistente, se rechaza."""
+    from domain.exceptions import InvalidEntryMode
+
+    use_case, *_ = _build()
+    with pytest.raises(InvalidEntryMode):
+        use_case.execute(
+            user_id=1,
+            installation_id="inst-1",
+            idempotency_key="k1",
+            product="GARRAFA_10",
+            amount="1.50",
+            card_number="4111111111111111",
+            cvv="123",
+            entry_mode="012",
+            track2="4111111111111111=2912",
+        )
+
+
+def test_unsupported_entry_mode_rejected() -> None:
+    """entry_mode distinto de 012/022 se rechaza."""
+    from domain.exceptions import InvalidEntryMode
+
+    use_case, *_ = _build()
+    with pytest.raises(InvalidEntryMode):
+        use_case.execute(
+            user_id=1,
+            installation_id="inst-1",
+            idempotency_key="k1",
+            product="GARRAFA_10",
+            amount="1.50",
+            card_number="4111111111111111",
+            cvv="123",
+            entry_mode="999",
+        )
+
+
 
 def test_empty_terminal_string() -> None:
     use_case, *_ = _build(installation_code="   ")

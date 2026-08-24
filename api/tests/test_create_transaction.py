@@ -384,6 +384,33 @@ def test_band_022_without_track2_rejected() -> None:
         )
 
 
+def test_band_022_without_track2_with_expiry_accepted() -> None:
+    """Banda (022) sin track2 pero CON vencimiento: el flujo MSR del V660P envía
+    PAN + vencimiento sin track2 (el track2 de esa terminal trae un PAN que no
+    coincide con el registrado). Con vencimiento presente no debe rechazarse."""
+    use_case, transactions, _, gateway = _build()
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="1.50",
+        card_number="6063007014007403",
+        cvv="",
+        entry_mode="022",
+        expiration_date="3012",
+    )
+    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    assert result.transaction.status == TransactionStatus.APPROVED
+    gateway.authorize.assert_called_once()
+    auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.entry_mode == "022"
+    assert auth_req.track2 is None
+    assert auth_req.expiration_date == "3012"
+    transactions.create_pending.assert_called_once()
+    transactions.update_result.assert_called_once()
+
+
 def test_manual_012_with_track2_rejected() -> None:
     """Manual (012) con track2: inconsistente, se rechaza."""
     from domain.exceptions import InvalidEntryMode

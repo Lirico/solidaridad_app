@@ -76,7 +76,11 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
         statusTitle = 'Transacción Rechazada';
-        statusSubtitle = 'La terminal reportó un error en la autorización.';
+        // Mostrar el motivo real (user_message del procesador/API) cuando viene;
+        // el texto fijo queda solo como respaldo.
+        statusSubtitle = (operation?.userMessage?.isNotEmpty ?? false)
+            ? operation!.userMessage!
+            : 'La terminal reportó un error en la autorización.';
       case PaymentResult.connectionError:
         statusColor = const Color(0xFFFF8C00);
         statusIcon = Icons.wifi_off_outlined;

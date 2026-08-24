@@ -173,6 +173,10 @@ Procesador (ISO 8583)
 - **Track2 (DE35):** para banda magnética, el gateway envía **DE35** (track2
   normalizado) **además** de DE2 (PAN) + DE14 (vencimiento). Nunca reemplaza
   DE2 por DE35: el autorizador prefiere el PAN explícito cuando está presente.
+- **Validación de la API (022):** la API acepta `entry_mode='022'` con `track2`
+  **o** `expiration_date` (DE14): el flujo MSR del V660P envía PAN + vencimiento
+  sin track2 (el track2 de esa terminal trae un PAN que no coincide con el
+  registrado). Solo rechaza `022` cuando faltan ambos. (2026-08-24.)
 
 ---
 

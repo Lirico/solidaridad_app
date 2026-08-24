@@ -41,6 +41,12 @@ class PsdkBridge(private val appContext: Context) :
         private const val TAG_TRACK2 = 0x57L
         private const val TAG_PAN = 0x5AL
         private const val TAG_EXPIRY = 0x5F24L
+
+        private val SENSITIVE_KEYS = setOf(
+            "pan", "panHex", "panAscii", "panLength",
+            "track1", "track2", "track1Hex", "track2Hex",
+            "cardTokenHex", "responseToString", "rawResponseHex",
+        )
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -445,15 +451,6 @@ class PsdkBridge(private val appContext: Context) :
             else -> value
         }
     }
-
-    private companion object {
-        val SENSITIVE_KEYS = setOf(
-            "pan", "panHex", "panAscii", "panLength",
-            "track1", "track2", "track1Hex", "track2Hex",
-            "cardTokenHex", "responseToString", "rawResponseHex",
-        )
-    }
-
 
     private fun bytesAsHex(bytes: ByteArray?): String {
         if (bytes == null || bytes.isEmpty()) return ""

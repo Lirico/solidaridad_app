@@ -4,9 +4,82 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-17
+Última revisión: 2026-08-24
+
+> ✅ **Último cambio (2026-08-24):** fix del rechazo por "Pago rechazado" en la
+> venta por banda (V660P). El pago ya pasaba la validación y llegaba al
+> procesador, pero el autorizador lo rechazaba con código **17 = `CUP_DUP`**
+> ("cupón duplicado"). Causa raíz: la API enviaba en DE62 (`numero_comprobante`)
+> el **sufijo del `transaction_number`** (`000000NN`), un contador diario que se
+> **repite entre reintentos del mismo día / fechas seed**. El autorizador
+> detecta duplicados en `sgas_cup` por ese `numero_comprobante` (además de
+> vencimiento, importe, id_operación y tarjeta) y al reintentar encontraba el
+> cupón ya anotado → rechazo 17. Fix: el `processor_ticket` (DE62) ahora se arma
+> con el **STAN de la transacción** (único por reintento, `secrets.randbelow`).
+> La anulación no se rompe: `original_ticket` en DE37 sigue saliendo de
+> `tx.processor_ticket` (= STAN) y `getLoteIdFromCUP` (VERIFONE) lo correlaciona
+> por `numero_comprobante`. El `transaction_number` (clave pública legible) se
+> mantiene igual. Tests actualizados (`test_create_approves` verifica
+> `ticket_number == stan`; fixture de void con `processor_ticket=stan`).
+> `make check` OK en API (ruff ✓, mypy ✓, tests ✓). Ver fila G-P1-11.
+
+> ✅ **Último cambio (2026-08-24):** fix de UI en la pantalla de resultado del
+> cobro (venta aprobada / anulación). En el V660P la pantalla mostraba el error
+> de Flutter "Bottom overflowed by 79 pixels" (rectángulo amarillo/negro de
+> debug): el contenido vertical (ícono, ticket, botón) no cabía en la altura y
+> se cortaba por abajo. Se corrigió **compactando el layout sin usar scroll** (el
+> scroll es mala UX en una terminal POS que se opera por touch): header naranja
+> de 180→120px, se quitó el `Transform.translate(0,-20)` que empujaba el borde
+> fuera de los límites, ícono 100→64, espaciados/paddings del panel y del botón
+> reducidos, y títulos con `maxLines`+elipsis. Se aplicó a `SaleStatusScreen`
+> (venta) y `VoidResultScreen` (anulación), que comparten el patrón. Todo queda
+> en una sola vista fija. `flutter analyze` OK y tests OK. Ver fila G-P1-13.
+
+> ✅ **Último cambio (2026-08-24):** fix de validación de CVV en el ingreso manual
+> (ya no aprueba con CVV incorrecto). El gateway no enviaba el campo DE55 (CVV)
+> del mensaje ISO 8583 al procesador (y la API tampoco lo reenviaba al gateway),
+> por lo que el autorizador nunca lo validaba y aprobaba con cualquier CVV. Fix:
+> la API propaga el `cvv` al gateway **solo en modo manual (012)** y el gateway
+> lo manda en **DE55**; la banda (022) no lleva CVV y sigue sin validar (DE55
+> ausente → `valida_cvv flag apagado`). El procesador compara contra
+> `sgas_usuario.cvv_actual` (878 para la tarjeta demo) y rechaza con `CVV_ERROR`
+> (5) si difiere. Verificado end-to-end: manual CVV 878 → APPROVED, manual CVV
+> 999 → DECLINED, banda 022 → APPROVED. Tests nuevos en API y gateway. `make
+> check` OK (API 95.34%, gateway 98.85%). Ver fila G-P1-12.
+
+> ✅ **Último cambio (2026-08-24):** fix de venta por banda magnética (V660P)
+> rechazada con "Transacción Rechazada. La terminal reportó un error en la
+> autorización." Causa raíz: `_validate_entry_mode()` en la API rechazaba
+> `entry_mode='022'` sin `track2` AUNQUE viniera el vencimiento (DE14), pese a
+> que su propio contrato dice "requiere track2 o vencimiento". El flujo MSR del
+> V660P (G-P0-15) envía PAN + vencimiento sin track2 a propósito (el track2 de
+> esa terminal trae un PAN que no coincide con el registrado), así que la venta
+> por banda terminaba en HTTP 400 `InvalidEntryMode` y la app mostraba
+> "Transacción Rechazada" aunque la tarjeta tuviera saldo. Fix: la validación
+> ahora recibe `expiration_date` y solo rechaza el modo banda cuando faltan
+> track2 Y vencimiento; se movió la normalización de `exp` antes de la llamada.
+> Test nuevo `test_band_022_without_track2_with_expiry_accepted`. `make check`
+> OK en API (ruff ✓, mypy ✓, 121 tests, cobertura 95.50%). La
+> `SaleStatusScreen` del mobile ahora muestra el `user_message` real del
+> rechazo en vez del texto fijo. Ver G-P0-15 / G-P1-06.
+
+> ✅ **Último cambio (2026-08-19):** lectura real del serial Verifone en
+> `TerminalProvisioner`. El `logical_device_id` ya no es solo el define de lab:
+> `TerminalProvisioner._resolveLogicalDeviceId()` ahora inicializa el SDK
+> (`PsdkBridge.initialize()`, con timeout de 5s) y luego lee el hardware vía
+> `PsdkBridge.getDeviceInfo()` (campo `logicalDeviceId`). Si no hay bridge, no
+> hay hardware, el init falla o la lectura devuelve `ok: false`, se cae al
+> define `kLogicalDeviceId` (`--dart-define=LOGICAL_DEVICE_ID`, default
+> `V660P-DEMO-0001`) como respaldo de lab. Se corrigió el lint
+> `prefer_initializing_formals` (constructor usa `this._psdk`). Tests en
+> `mobile/test/terminal_provisioner_test.dart` cubren: lectura real vía bridge,
+> fallback cuando `getDeviceInfo` devuelve `ok: false`, y fallback cuando
+> `initialize()` devuelve `ok: false`. `flutter analyze` OK y tests OK. Ver
+> G-P0-08.
+
 
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
+
 > `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
 > creó `mobile/lib/features/sales/domain/msr_card_data.dart` (`MsrCardData` con
 > `fromBridge`, `expiryYyMm`/`expiryMmYy`) y `SalesCubit.showReviewFromMsr()`;
@@ -184,7 +257,9 @@ Verifone (banda + térmica).
 
 
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | done | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. **2026-08-15:** fix de crash en `SaleStatusScreen` — `ModalRoute.of(context)` se llamaba en `initState()` (prohibido: usa `dependOnInheritedWidgetOfExactType`); se movió la lectura de argumentos y el disparo de impresión a `didChangeDependencies()` con flag `_initialized`. `flutter analyze` OK. Pendiente: verificación física en V660P. |
-| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-08-08:** default de `dev-term` → `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (terminal real GOBIERNO del demo; `dev-term` no existe en `terminales` → código 89). Pendiente: lectura runtime desde config del device. |
+| G-P0-08 | `installation_id` desde config de terminal | done | **2026-08-19:** el `installation_id` ya NO es un valor mockeado/hardcodeado. Se agregó el endpoint `POST /v1/terminals/resolve` en la API que mapea el `logical_device_id` físico del terminal al `installation_id` provisionado en la central (tabla `terminal_devices`, migración `20260819_0007`, seed local). En mobile, `TerminalProvisioner` (`mobile/lib/core/terminal/terminal_provisioner.dart`) resuelve el `installation_id` real vía ese endpoint en el arranque (`main.dart`) y lo persiste en `SharedPreferences`; `AuthRepository._resolveInstallationId()` ya no usa el default `05000001` sino el valor provisionado, que se envía en login/register y viaja en el token JWT (la transacción usa el `installation_id` del token, no del body). **Lectura real del serial:** `TerminalProvisioner._resolveLogicalDeviceId()` inicializa el SDK (`PsdkBridge.initialize()`, timeout 5s) y lee el hardware vía `PsdkBridge.getDeviceInfo()` (campo `logicalDeviceId`); si no hay hardware/init falla/`ok: false`, cae al define `kLogicalDeviceId` (`--dart-define=LOGICAL_DEVICE_ID`, default `V660P-DEMO-0001`). `flutter analyze` OK y tests de `TerminalProvisioner` en `mobile/test/terminal_provisioner_test.dart`. |
+
+
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases_index.md`. |
@@ -192,7 +267,7 @@ Verifone (banda + térmica).
 | G-P0-12 | Endpoint de detalle de transacción no implementado | open | `GET /v1/transactions/{id}` no existe. Solo hay listado (`GET /v1/transactions`) y creación (`POST /v1/transactions`). La app mobile podría necesitarlo para mostrar detalle desde el historial. Ver hallazgo #9 en `docs/test_cases_index.md`. |
 | G-P0-13 | Tests automatizados del gateway fallan por código 96 | done | **Fix aplicado (2026-08-04):** los tests `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock` ahora fuerzan el `MockIsoProcessor` vía `dependency_overrides` en `payment-gateway/tests/test_authorize_http.py`, haciéndolos deterministas independientemente del `.env` local (`ISO_TRANSPORT=tcp`). `make check` pasa: lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓. Ver hallazgo #20 en `docs/test_cases_index.md`. |
 | G-P0-14 | Procesador no setea DE39 (código de respuesta) en varios escenarios | open | El procesador C solo setea `respcode_39` en algunos casos (ej: código 05 para TRANS_DENY). En otros escenarios (monto $100, terminal inválida, tarjeta sin saldo, tarjeta vencida) el DE39 queda vacío. El gateway interpreta DE39 vacío como código 96 (`response_mapper.py` línea 22: `code = (iso.respcode_39 or "").strip() or "96"`). Esto causa que el gateway devuelva `FAILED` en lugar de `DECLINED` con el código correcto. Requiere fix en `auth_thread.c` para asegurar que DE39 siempre tenga un código de respuesta válido. |
-| G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | **2026-08-13 (corrección de diagnóstico):** el rechazo por banda magnética en V660p NO era "fondos insuficientes" (51) sino código **14 "Tarjeta inválida"** (`TIT_DES_SUP`). El log `authkig.log` mostraba `TRACK II DATA: 4606300701400740...` (banda) mientras la pantalla leía el PAN correcto `6063007014007403`: el track2 (DE35) de esta terminal trae un PAN distinto al registrado y `getCardNumber()` copiaba los primeros 16 chars del track2 para `entry_mode='022'`, por lo que `valida_usuario_existe()` no encontraba la tarjeta → 14. **Fix en 3 capas:** (1) `getCardNumber()` prefiere DE2 (PAN) cuando viene presente y usa track2 solo si no hay DE2 (`auth_mycli.c`); (2) `WaitingForCardScreen` envía PAN + vencimiento con `entry_mode='022'` y ya no manda track2; (3) **gateway `build_purchase_request` ahora SIEMPRE envía DE2 (PAN) + DE14 y agrega DE35 (track2) solo si viene, en lugar de enviar DE35 EN LUGAR de DE2** (`payment-gateway/infrastructure/iso/message_builder.py`). El punto (3) es el que faltaba: con el APK viejo (que sí manda track2) el gateway descartaba DE2 y el autorizador caía al track2 → 14. Verificado con curl al gateway enviando `track2` (simula APK viejo): `{"status":"APPROVED","response_code":"00",...}` y log con `PRIMARY ACCOUNT NUMBER: 6063007014007403` + `TRACK II DATA: 4606300701400740...` + `RESPONSE CODE: 00` + `FIELD 63: MONTO A PAGAR BENEFICIARIO 400.00` (llegó a `venta_cupon()`). `make check` OK en gateway (55 tests, cobertura 98.96%). Ver hallazgo #21 en `docs/test_cases_index.md`. |
+| G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | **2026-08-13 (corrección de diagnóstico):** el rechazo por banda magnética en V660p NO era "fondos insuficientes" (51) sino código **14 "Tarjeta inválida"** (`TIT_DES_SUP`). El log `authkig.log` mostraba `TRACK II DATA: 4606300701400740...` (banda) mientras la pantalla leía el PAN correcto `6063007014007403`: el track2 (DE35) de esta terminal trae un PAN distinto al registrado y `getCardNumber()` copiaba los primeros 16 chars del track2 para `entry_mode='022'`, por lo que `valida_usuario_existe()` no encontraba la tarjeta → 14. **Fix en 3 capas:** (1) `getCardNumber()` prefiere DE2 (PAN) cuando viene presente y usa track2 solo si no hay DE2 (`auth_mycli.c`); (2) `WaitingForCardScreen` envía PAN + vencimiento con `entry_mode='022'` y ya no manda track2; (3) **gateway `build_purchase_request` ahora SIEMPRE envía DE2 (PAN) + DE14 y agrega DE35 (track2) solo si viene, en lugar de enviar DE35 EN LUGAR de DE2** (`payment-gateway/infrastructure/iso/message_builder.py`). El punto (3) es el que faltaba: con el APK viejo (que sí manda track2) el gateway descartaba DE2 y el autorizador caía al track2 → 14. Verificado con curl al gateway enviando `track2` (simula APK viejo): `{"status":"APPROVED","response_code":"00",...}` y log con `PRIMARY ACCOUNT NUMBER: 6063007014007403` + `TRACK II DATA: 4606300701400740...` + `RESPONSE CODE: 00` + `FIELD 63: MONTO A PAGAR BENEFICIARIO 400.00` (llegó a `venta_cupon()`). `make check` OK en gateway (55 tests, cobertura 98.96%). Ver hallazgo #21 en `docs/test_cases_index.md`. **2026-08-24 (corrección):** la validación de consistencia de G-P1-06 rompió este flujo: rechazaba `022` sin `track2` aunque viniera el vencimiento. Corregido en `_validate_entry_mode` (recibe `expiration_date`; solo rechaza si faltan track2 Y vencimiento). Ver "Último cambio" 2026-08-24. |
 
 | G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases_index.md`. |
 
@@ -213,12 +288,16 @@ Verifone (banda + térmica).
 | G-P1-07 | Fallback silencioso en errores de red de mobile | open | `SalesRepository.fetchProducts()` devuelve productos default hardcodeados ante cualquier excepción. `SalesRepository.fetchHistory()` devuelve lista vacía. Ningún repositorio muestra mensaje de error ni opción de reintentar al usuario. TC-062 y TC-072 esperaban "mensaje de error y opción de reintentar", pero la app usa fallback silencioso. Considerar agregar indicador visual cuando se usan datos fallback. Ver hallazgo #23 en `docs/test_cases_index.md`. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
 | G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
-| G-P1-06 | Entry mode ISO acorde al modo de captura | done | **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `WaitingForCardScreen` pasa `entry_mode: '022'` + `track2`; `SaleManualCardScreen` pasa `entry_mode: '012'`. `flutter analyze` OK. **Rama 5 (2026-11-08):** la banda no contiene CVV; la API ahora acepta `cvv` vacío para `entry_mode='022'` (schema `cvv` opcional + validación condicional en `create_transaction.py`). El gateway/procesador no usan CVV. `make check` OK (118 tests, cobertura 95%). |
+| G-P1-06 | Entry mode ISO acorde al modo de captura | done | **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `WaitingForCardScreen` pasa `entry_mode: '022'` + `track2`; `SaleManualCardScreen` pasa `entry_mode: '012'`. `flutter analyze` OK. **Rama 5 (2026-11-08):** la banda no contiene CVV; la API ahora acepta `cvv` vacío para `entry_mode='022'` (schema `cvv` opcional + validación condicional en `create_transaction.py`). El gateway/procesador no usan CVV. `make check` OK (118 tests, cobertura 95%). **2026-08-24 (corrección):** la validación de consistencia `entry_mode`/`track2` agregada en esta rama rechazaba la banda sin `track2` aunque viniera el vencimiento (DE14), rompiendo el flujo MSR del V660P (G-P0-15). `_validate_entry_mode` ahora recibe `expiration_date` y solo rechaza `022` cuando faltan track2 Y vencimiento. Test `test_band_022_without_track2_with_expiry_accepted`. |
 
 
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
+| G-P1-11 | Ticket ISO único por reintento (DE62) | done | **2026-08-24:** el artículo por banda devolvía "Pago rechazado" (código 17 `CUP_DUP`). La causa era que el `processor_ticket` (DE62) se armaba con el sufijo del `transaction_number` (contador diario `000000NN`), repetido entre reintentos/fechas. Se cambió a que DE62 use el **STAN** (único por transacción). `original_ticket` (DE37) de la anulación sigue saliendo de `tx.processor_ticket` y `getLoteIdFromCUP` (VERIFONE) lo correlaciona por `numero_comprobante`, por lo que la anulación no se rompe. Ver "Último cambio" 2026-08-24. |
+| G-P1-12 | El ingreso manual no validaba el CVV (aprobaba con cualquier CVV) | done | **2026-08-24:** la API no reenviaba el `cvv` al gateway y el gateway no enviaba el campo **DE55** (CVV) del mensaje ISO 8583 al procesador, por lo que `valida_cvv()` del autorizador no se ejecutaba (DE55 ausente → `TRANS_OK`) y una tarjeta con CVV incorrecto se aprobaba igual. Fix: la API propaga el `cvv` a `AuthorizeRequest` solo en modo manual (012); el gateway lo manda en DE55 (`cvv_55`); banda (022) no lo envía (no trae CVV). El autorizador compara contra `sgas_usuario.cvv_actual` y devuelve `CVV_ERROR` (5) si difiere. Verificado end-to-end (manual 878 → APPROVED, manual 999 → DECLINED, banda → APPROVED). Tests nuevos en API y gateway. Ver "Último cambio" 2026-08-24 (CVV). |
+| G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
+
 
 ---
 
@@ -254,7 +333,8 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
-| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
+| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados. **2026-08-19:** wiring desde device resuelto — `POST /v1/terminals/resolve` mapea `logical_device_id` → `installation_id` provisionado (tabla `terminal_devices`); `TerminalProvisioner` en mobile lo resuelve en el arranque y lo persiste en `SharedPreferences`; login/register lo envían y viaja en el token JWT. Ver G-P0-08. |
+
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |
 | Status screen con 3 estados (aprobado/rechazado/error conexión POSNET) | `PaymentResult` enum + `connectionError` flag en `SaleResponse`; naranja para pérdida de conectividad POSNET |

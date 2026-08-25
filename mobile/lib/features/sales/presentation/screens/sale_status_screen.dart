@@ -76,7 +76,11 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
         statusTitle = 'Transacción Rechazada';
-        statusSubtitle = 'La terminal reportó un error en la autorización.';
+        // Mostrar el motivo real (user_message del procesador/API) cuando viene;
+        // el texto fijo queda solo como respaldo.
+        statusSubtitle = (operation?.userMessage?.isNotEmpty ?? false)
+            ? operation!.userMessage!
+            : 'La terminal reportó un error en la autorización.';
       case PaymentResult.connectionError:
         statusColor = const Color(0xFFFF8C00);
         statusIcon = Icons.wifi_off_outlined;
@@ -99,44 +103,41 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             // Sin botón de volver: la acción de salida es FINALIZAR
             const SaleReviewHeader(title: 'Resultado del Cobro'),
             Expanded(
-              child: Transform.translate(
-                offset: const Offset(0, -20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.shade300,
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: SaleStatusContent(
-                      result: result,
-                      statusColor: statusColor,
-                      statusIcon: statusIcon,
-                      statusTitle: statusTitle,
-                      statusSubtitle: statusSubtitle,
-                      operation: operation,
-                      printStatus: _printStatus,
-                      printMessage: _printMessage,
-                      onRetryPrint: result == PaymentResult.approved
-                          ? _printTicket
-                          : null,
-                      onFinalize: () {
-                        Navigator.pushNamedAndRemoveUntil(
-                          context,
-                          AppRoutes.saleForm,
-                          (route) => false,
-                        );
-                      },
-                    ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.shade300,
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: SaleStatusContent(
+                    result: result,
+                    statusColor: statusColor,
+                    statusIcon: statusIcon,
+                    statusTitle: statusTitle,
+                    statusSubtitle: statusSubtitle,
+                    operation: operation,
+                    printStatus: _printStatus,
+                    printMessage: _printMessage,
+                    onRetryPrint: result == PaymentResult.approved
+                        ? _printTicket
+                        : null,
+                    onFinalize: () {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRoutes.saleForm,
+                        (route) => false,
+                      );
+                    },
                   ),
                 ),
               ),

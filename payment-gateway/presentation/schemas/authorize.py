@@ -14,6 +14,8 @@ class AuthorizeRequest(BaseModel):
     expiration_date: str | None = Field(default=None, max_length=4)
     entry_mode: str = Field(default="012", max_length=3)
     track2: str | None = Field(default=None, max_length=37)
+    # CVV opcional (modo manual 012). La banda (022) no lo trae.
+    cvv: str | None = Field(default=None, max_length=4)
 
 
 class VoidRequest(BaseModel):

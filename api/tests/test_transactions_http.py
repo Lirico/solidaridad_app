@@ -192,7 +192,6 @@ def test_create_transaction_band_magnetic_empty_cvv() -> None:
     assert kwargs["track2"] == "6063007014007403=2912"
 
 
-
 def test_create_transaction_domain_400() -> None:
     use_case = MagicMock(spec=CreateTransaction)
     use_case.execute.side_effect = InvalidCardNumber()

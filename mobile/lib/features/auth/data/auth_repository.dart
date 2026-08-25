@@ -3,35 +3,34 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
+import '../../../core/terminal/terminal_provisioner.dart';
 import '../domain/auth_model.dart';
-
-/// Simple in-memory installation ID generator.
-///
-/// In a production app this would be persisted (e.g. SharedPreferences).
-String _resolveInstallationId() {
-  // Use a compile-time constant or fall back to the default terminal id.
-  // NOTE: 05000001 is a real terminal (GOBIERNO) used for the local demo,
-  // not a throwaway dev-only value.
-  const fromDefine = String.fromEnvironment(
-    'INSTALLATION_ID',
-    defaultValue: '05000001',
-  );
-  return fromDefine;
-}
 
 class AuthRepository {
   final http.Client _httpClient;
   final String _baseUrl;
+  final TerminalProvisioner _provisioner;
 
-  AuthRepository({http.Client? httpClient, String? baseUrl})
-    : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+  AuthRepository({
+    http.Client? httpClient,
+    String? baseUrl,
+    TerminalProvisioner? provisioner,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _baseUrl = baseUrl ?? ApiConfig.baseUrl,
+       _provisioner = provisioner ?? TerminalProvisioner();
+
+  /// Devuelve el `installation_id` real del terminal (resuelto y persistido
+  /// por el backend), o `null` si aún no se provisionó.
+  Future<String?> _resolveInstallationId() async {
+    return _provisioner.getInstallationId();
+  }
 
   Future<AuthResponse> login({
     required String usernameOrEmail,
     required String password,
   }) async {
     final url = Uri.parse('$_baseUrl/auth/login');
+    final installationId = await _resolveInstallationId();
 
     try {
       final response = await _httpClient
@@ -41,7 +40,7 @@ class AuthRepository {
             body: jsonEncode({
               'username': usernameOrEmail,
               'password': password,
-              'installation_id': _resolveInstallationId(),
+              'installation_id': installationId,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -91,6 +90,7 @@ class AuthRepository {
     required String password,
   }) async {
     final url = Uri.parse('$_baseUrl/auth/register');
+    final installationId = await _resolveInstallationId();
 
     try {
       final response = await _httpClient
@@ -101,7 +101,7 @@ class AuthRepository {
               'name': name,
               'email': email,
               'password': password,
-              'installation_id': _resolveInstallationId(),
+              'installation_id': installationId,
             }),
           )
           .timeout(const Duration(seconds: 15));

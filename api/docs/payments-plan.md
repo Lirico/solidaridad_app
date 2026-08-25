@@ -12,7 +12,8 @@ procesador autoriza.
 | Ruta anulación | `POST /v1/transactions/{transaction_number}/void` |
 | Producto | Enum legible en el client; API mapea a `993`–`997` |
 | Identidad | PK técnico `BIGINT IDENTITY`; clave pública `transaction_number` (`OP-YYMMDD-NNNNNNNN`) |
-| Ticket ISO (DE62) | Sufijo numérico de `transaction_number` (`NNNNNNNN`), persistido como `processor_ticket` |
+| Ticket ISO (DE62) | STAN de la transacción (único por reintento), persistido como `processor_ticket`. Desde 2026-08-24. Histórico: era el sufijo de `transaction_number` y provocaba rechazos 17 (cupón duplicado) al reintentar |
+| CVV (DE55) | La API reenvía el `cvv` al gateway SOLO en modo manual (012); el gateway lo manda en DE55 y el autorizador lo compara contra `cvv_actual`. La banda (022) no trae CVV → no se envía ni se valida. Desde 2026-08-24 (ver G-P1-12) |
 | Idempotencia | Header requerido `Idempotency-Key` (scope user en venta; scope void en anulación) |
 | PCI | No persistir PAN ni CVV; solo `card_last4`; anulación exige reingreso de tarjeta |
 | Gateway | `POST /v1/authorize` / `POST /v1/void` |

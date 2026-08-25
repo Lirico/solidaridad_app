@@ -109,6 +109,16 @@ class MissingTerminalId(DomainError):
         super().__init__(message)
 
 
+class TerminalNotProvisioned(DomainError):
+    """Raised when a hardware logical_device_id has no terminal mapping."""
+
+    def __init__(
+        self,
+        message: str = "La terminal no está provisionada",
+    ) -> None:
+        super().__init__(message)
+
+
 class TransactionNotFound(DomainError):
     """Raised when a transaction_number does not exist for the terminal."""
 

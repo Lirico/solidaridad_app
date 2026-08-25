@@ -91,7 +91,6 @@ def _build(
     return use_case, transactions, installations, gateway
 
 
-
 def test_create_approves() -> None:
     use_case, transactions, _, gateway = _build()
     result = use_case.execute(
@@ -107,10 +106,14 @@ def test_create_approves() -> None:
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
     auth_req = gateway.authorize.call_args.args[0]
-    assert auth_req.ticket_number == "00000001"
+    assert auth_req.ticket_number == auth_req.stan
+    assert len(auth_req.ticket_number) == 6 and auth_req.ticket_number.isdigit()
+    # Ingreso manual (012) con CVV: se reenvía al gateway para su validación.
+    assert auth_req.cvv == "123"
     transactions.create_pending.assert_called_once()
     create_kwargs = transactions.create_pending.call_args.kwargs
-    assert create_kwargs["processor_ticket"] == "00000001"
+    assert create_kwargs["processor_ticket"] == create_kwargs["stan"]
+    assert create_kwargs["processor_ticket"] == auth_req.ticket_number
     transactions.update_result.assert_called_once()
 
 
@@ -385,6 +388,35 @@ def test_band_022_without_track2_rejected() -> None:
         )
 
 
+def test_band_022_without_track2_with_expiry_accepted() -> None:
+    """Banda (022) sin track2 pero CON vencimiento: el flujo MSR del V660P envía
+    PAN + vencimiento sin track2 (el track2 de esa terminal trae un PAN que no
+    coincide con el registrado). Con vencimiento presente no debe rechazarse."""
+    use_case, transactions, _, gateway = _build()
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="1.50",
+        card_number="6063007014007403",
+        cvv="",
+        entry_mode="022",
+        expiration_date="3012",
+    )
+    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    assert result.transaction.status == TransactionStatus.APPROVED
+    gateway.authorize.assert_called_once()
+    auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.entry_mode == "022"
+    assert auth_req.track2 is None
+    assert auth_req.expiration_date == "3012"
+    # Banda (022) no trae CVV: no se manda al gateway (None).
+    assert auth_req.cvv is None
+    transactions.create_pending.assert_called_once()
+    transactions.update_result.assert_called_once()
+
+
 def test_manual_012_with_track2_rejected() -> None:
     """Manual (012) con track2: inconsistente, se rechaza."""
     from domain.exceptions import InvalidEntryMode
@@ -420,7 +452,6 @@ def test_unsupported_entry_mode_rejected() -> None:
             cvv="123",
             entry_mode="999",
         )
-
 
 
 def test_empty_terminal_string() -> None:

@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from config import get_settings
 from persistence.database import SessionLocal
-from persistence.models import Installation, User
+from persistence.models import Installation, TerminalDevice, User
 
 
 class DemoUser(TypedDict):
@@ -40,6 +40,8 @@ DEMO_USERS: list[DemoUser] = [
 
 DEMO_INSTALLATION_ID = "05000001"
 DEMO_INSTALLATION_PLATFORM = "local"
+DEMO_LOGICAL_DEVICE_ID = "V660P-DEMO-0001"
+
 
 password_hasher = PasswordHash.recommended()
 
@@ -94,6 +96,22 @@ def seed() -> None:
                 f"Installation {DEMO_INSTALLATION_ID} already exists "
                 "— updated last_seen_at"
             )
+
+        terminal = session.scalar(
+            select(TerminalDevice).where(
+                TerminalDevice.logical_device_id == DEMO_LOGICAL_DEVICE_ID
+            )
+        )
+        if terminal is None:
+            session.add(
+                TerminalDevice(
+                    logical_device_id=DEMO_LOGICAL_DEVICE_ID,
+                    installation_id=DEMO_INSTALLATION_ID,
+                )
+            )
+            print(f"Created terminal device {DEMO_LOGICAL_DEVICE_ID}")
+        else:
+            print(f"Terminal device {DEMO_LOGICAL_DEVICE_ID} already exists — skipped")
 
         session.commit()
 

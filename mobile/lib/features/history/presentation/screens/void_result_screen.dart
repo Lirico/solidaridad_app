@@ -48,37 +48,34 @@ class VoidResultScreen extends StatelessWidget {
           children: [
             const SaleReviewHeader(title: 'Resultado de la Anulación'),
             Expanded(
-              child: Transform.translate(
-                offset: const Offset(0, -20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.shade300,
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: SaleStatusContent(
-                      result: PaymentResult.voided,
-                      statusColor: statusColor,
-                      statusIcon: statusIcon,
-                      statusTitle: statusTitle,
-                      statusSubtitle: statusSubtitle,
-                      onFinalize: () {
-                        Navigator.popUntil(
-                          context,
-                          (route) => route.settings.name == AppRoutes.salesHistory,
-                        );
-                      },
-                    ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.shade300,
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: SaleStatusContent(
+                    result: PaymentResult.voided,
+                    statusColor: statusColor,
+                    statusIcon: statusIcon,
+                    statusTitle: statusTitle,
+                    statusSubtitle: statusSubtitle,
+                    onFinalize: () {
+                      Navigator.popUntil(
+                        context,
+                        (route) => route.settings.name == AppRoutes.salesHistory,
+                      );
+                    },
                   ),
                 ),
               ),

@@ -11,6 +11,7 @@ from domain.exceptions import (
     DomainError,
     InvalidAmount,
     InvalidCardNumber,
+    InvalidCvv,
     InvalidStan,
     InvalidTerminalId,
     InvalidTicket,
@@ -71,12 +72,14 @@ def authorize(
         expiration_date=body.expiration_date,
         entry_mode=body.entry_mode,
         track2=body.track2,
+        cvv=body.cvv,
     )
     try:
         result = use_case.execute(command)
     except (
         InvalidAmount,
         InvalidCardNumber,
+        InvalidCvv,
         InvalidStan,
         InvalidTerminalId,
         InvalidTicket,

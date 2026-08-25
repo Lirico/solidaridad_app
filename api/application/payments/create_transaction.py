@@ -34,10 +34,7 @@ from domain.product import Product, parse_product, processor_product_code
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.installation_repository import InstallationRepository
-from persistence.repositories.transaction_repository import (
-    TransactionRepository,
-    ticket_from_transaction_number,
-)
+from persistence.repositories.transaction_repository import TransactionRepository
 
 
 class CreateTransactionHttpStatus(IntEnum):
@@ -83,25 +80,29 @@ def _validate_pan(card_number: str) -> str:
     return pan
 
 
-def _validate_entry_mode(entry_mode: str, track2: str | None) -> None:
-    """Valida la consistencia del modo de captura con el track2.
+def _validate_entry_mode(
+    entry_mode: str,
+    track2: str | None,
+    expiration_date: str | None,
+) -> None:
+    """Valida la consistencia del modo de captura con track2 y vencimiento.
 
     - entry_mode solo puede ser "012" (manual) o "022" (banda magnética).
     - "022" (banda) requiere track2 (DE35) o vencimiento (DE14): sin esos datos
-      el autorizador no puede resolver la tarjeta.
+      el autorizador no puede resolver la tarjeta. El flujo MSR del V660P envía
+      PAN + vencimiento sin track2 (el track2 de esa terminal trae un PAN que no
+      coincide con el registrado), así que el vencimiento presente alcanza.
     - "012" (manual) no debe traer track2: el track2 solo tiene sentido cuando
       la tarjeta se leyó por banda.
     """
     if entry_mode not in ("012", "022"):
         raise InvalidEntryMode("Modo de entrada inválido: debe ser 012 o 022")
-    if entry_mode == "022" and not track2:
+    if entry_mode == "022" and not track2 and not expiration_date:
         raise InvalidEntryMode(
             "Modo banda (022) requiere track2 o vencimiento de la tarjeta"
         )
     if entry_mode == "012" and track2:
-        raise InvalidEntryMode(
-            "Modo manual (012) no debe incluir track2"
-        )
+        raise InvalidEntryMode("Modo manual (012) no debe incluir track2")
 
 
 class CreateTransaction:
@@ -139,17 +140,16 @@ class CreateTransaction:
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
         pan = _validate_pan(card_number)
-        _validate_entry_mode(entry_mode, track2)
+        exp = expiration_date.strip() if expiration_date else None
+        if exp == "":
+            exp = None
+        _validate_entry_mode(entry_mode, track2, exp)
         # La banda magnética (entry_mode 022) no contiene CVV: se omite la
         # validación en ese modo. El gateway/procesador no usan CVV.
         if entry_mode != "022":
             _validate_cvv(cvv or "")
         card_last4 = pan[-4:]
 
-
-        exp = expiration_date.strip() if expiration_date else None
-        if exp == "":
-            exp = None
         fingerprint = _fingerprint(
             product=parsed_product,
             amount_minor=money.amount_minor,
@@ -173,8 +173,13 @@ class CreateTransaction:
 
         business_date = datetime.now(UTC).date()
         transaction_number = self._transactions.next_transaction_number(business_date)
-        processor_ticket = ticket_from_transaction_number(transaction_number)
         stan = f"{secrets.randbelow(1_000_000):06d}"
+        # El processor_ticket (DE62 / numero_comprobante del autorizador) se arma
+        # con el STAN para garantizar unicidad entre reintentos. Antes era el
+        # sufijo del transaction_number (contador diario 000000NN) que se repetía
+        # entre reintentos/fechas y el autorizador lo rechazaba como cupón
+        # duplicado (código 17 CUP_DUP). El STAN es único por transacción.
+        processor_ticket = stan
         proc_code = processor_product_code(parsed_product)
 
         try:
@@ -215,6 +220,9 @@ class CreateTransaction:
                 expiration_date=exp,
                 entry_mode=entry_mode,
                 track2=track2,
+                # El CVV se reenvía al gateway solo en el modo manual (012); en
+                # banda (022) la tarjeta no trae CVV y se omite (None).
+                cvv=(cvv.strip() if (entry_mode != "022" and cvv) else None),
             )
         )
         final = self._apply_gateway_result(pending.id, gateway_result)

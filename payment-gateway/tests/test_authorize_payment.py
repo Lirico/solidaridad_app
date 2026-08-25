@@ -126,3 +126,46 @@ def test_authorize_normalizes_stan_and_terminal() -> None:
     assert processor.last.stan == "000042"
     assert processor.last.terminal_id == "T1      "
     assert processor.last.ticket_number == "00000042"
+
+
+def test_authorize_propagates_valid_cvv() -> None:
+    """El CVV válido se normaliza y viaja en el comando al procesador."""
+    class CapturingProcessor:
+        last: AuthorizeCommand | None = None
+
+        def authorize(self, command: AuthorizeCommand) -> AuthorizationResult:
+            self.last = command
+            return AuthorizationResult(
+                status=AuthorizationStatus.APPROVED,
+                response_code="00",
+                user_message="ok",
+            )
+
+        def void(self, command: object) -> AuthorizationResult:
+            raise AssertionError("void should not be called")
+
+    processor = CapturingProcessor()
+    uc = AuthorizePayment(processor)
+    uc.execute(_cmd(cvv="878"))
+    assert processor.last is not None
+    assert processor.last.cvv == "878"
+
+
+def test_authorize_allows_missing_cvv() -> None:
+    """Banda (022) / manual sin CVV: cvv es None y no se valida."""
+    uc = AuthorizePayment(MockIsoProcessor())
+    result = uc.execute(_cmd(entry_mode="022"))
+    assert result.status == AuthorizationStatus.APPROVED
+
+
+def test_authorize_rejects_bad_cvv() -> None:
+    """CVV no numérico o de longitud inválida se rechaza."""
+    from domain.exceptions import InvalidCvv
+
+    uc = AuthorizePayment(MockIsoProcessor())
+    for bad in ("abc", "12", "12345"):
+        try:
+            uc.execute(_cmd(cvv=bad))
+            raise AssertionError(f"expected InvalidCvv for cvv={bad!r}")
+        except InvalidCvv:
+            pass

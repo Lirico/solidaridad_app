@@ -5,6 +5,7 @@ from domain.authorization import AuthorizationResult, AuthorizeCommand
 from domain.exceptions import (
     InvalidAmount,
     InvalidCardNumber,
+    InvalidCvv,
     InvalidStan,
     InvalidTerminalId,
     InvalidTicket,
@@ -31,6 +32,14 @@ class AuthorizePayment:
         ticket = "".join(c for c in command.ticket_number.strip() if c.isdigit())
         if not ticket:
             raise InvalidTicket()
+        # El CVV es opcional (banda 022 no lo trae). Si viene, debe ser numérico
+        # de 3 o 4 dígitos; de lo contrario es un error de entrada.
+        cvv = None
+        if command.cvv is not None:
+            cleaned = command.cvv.strip()
+            if not cleaned.isdigit() or len(cleaned) not in (3, 4):
+                raise InvalidCvv()
+            cvv = cleaned
 
         normalized = AuthorizeCommand(
             product_code=command.product_code,
@@ -42,5 +51,6 @@ class AuthorizePayment:
             expiration_date=command.expiration_date,
             entry_mode=command.entry_mode,
             track2=command.track2,
+            cvv=cvv,
         )
         return self._processor.authorize(normalized)

@@ -18,7 +18,13 @@ from persistence.models.transaction_status_event import TransactionStatusEvent
 
 
 def ticket_from_transaction_number(transaction_number: str) -> str:
-    """Extract numeric DE62 ticket from OP-YYMMDD-NNNNNNNN."""
+    """Extract numeric DE62 ticket from OP-YYMMDD-NNNNNNNN (legacy fallback).
+
+    Desde 2026-08-24 el `processor_ticket` que se manda en DE62 es el STAN de la
+    transacción (único por reintento), no el sufijo del `transaction_number`.
+    Esta función queda solo como respaldo para filas históricas sin ticket
+    persistido (p. ej. al anular una venta vieja).
+    """
     return transaction_number.rsplit("-", 1)[-1]
 
 
@@ -204,8 +210,12 @@ class TransactionRepository:
         )
         rows = list(self._session.scalars(stmt).all())
 
-        count_stmt = select(func.count()).select_from(TransactionModel).where(
-            TransactionModel.terminal_id == terminal_id,
+        count_stmt = (
+            select(func.count())
+            .select_from(TransactionModel)
+            .where(
+                TransactionModel.terminal_id == terminal_id,
+            )
         )
         total = self._session.scalar(count_stmt) or 0
 

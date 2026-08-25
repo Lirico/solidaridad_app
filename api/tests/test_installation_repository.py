@@ -20,9 +20,7 @@ def test_get_by_installation_id_returns_business_key_match() -> None:
     session = MagicMock()
     session.scalar.return_value = _installation_row()
 
-    installation = InstallationRepository(session).get_by_installation_id(
-        "05000001"
-    )
+    installation = InstallationRepository(session).get_by_installation_id("05000001")
 
     assert installation is not None
     assert installation.id == 10
@@ -33,9 +31,7 @@ def test_get_by_installation_id_returns_none_when_missing() -> None:
     session = MagicMock()
     session.scalar.return_value = None
 
-    assert (
-        InstallationRepository(session).get_by_installation_id("99999999") is None
-    )
+    assert InstallationRepository(session).get_by_installation_id("99999999") is None
 
 
 def test_upsert_creates_installation_with_functional_key() -> None:

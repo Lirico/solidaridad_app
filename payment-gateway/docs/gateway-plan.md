@@ -27,6 +27,12 @@ lo arma con el **STAN** de la transacción (único por reintento) para evitar qu
 el autorizador lo considere cupón duplicado (código 17 `CUP_DUP`). Histórico:
 era el sufijo numérico de `transaction_number` (no el STAN).
 
+El **CVV** (campo `cvv`, opcional) se envía en **DE55** cuando el modo de entrada
+es manual (012 / `entry_mode` "012"). En banda (022) no viaja, porque esa
+tarjeta no lo trae y el autorizador no debe validarlo. El autorizador compara
+DE55 contra `sgas_usuario.cvv_actual` y rechaza con `CVV_ERROR` si no coincide.
+Desde 2026-08-24.
+
 ### `POST /v1/void` (anulación)
 
 ```json

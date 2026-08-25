@@ -23,6 +23,18 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > `ticket_number == stan`; fixture de void con `processor_ticket=stan`).
 > `make check` OK en API (ruff ✓, mypy ✓, tests ✓). Ver fila G-P1-11.
 
+> ✅ **Último cambio (2026-08-24):** fix de validación de CVV en el ingreso manual
+> (ya no aprueba con CVV incorrecto). El gateway no enviaba el campo DE55 (CVV)
+> del mensaje ISO 8583 al procesador (y la API tampoco lo reenviaba al gateway),
+> por lo que el autorizador nunca lo validaba y aprobaba con cualquier CVV. Fix:
+> la API propaga el `cvv` al gateway **solo en modo manual (012)** y el gateway
+> lo manda en **DE55**; la banda (022) no lleva CVV y sigue sin validar (DE55
+> ausente → `valida_cvv flag apagado`). El procesador compara contra
+> `sgas_usuario.cvv_actual` (878 para la tarjeta demo) y rechaza con `CVV_ERROR`
+> (5) si difiere. Verificado end-to-end: manual CVV 878 → APPROVED, manual CVV
+> 999 → DECLINED, banda 022 → APPROVED. Tests nuevos en API y gateway. `make
+> check` OK (API 95.34%, gateway 98.85%). Ver fila G-P1-12.
+
 > ✅ **Último cambio (2026-08-24):** fix de venta por banda magnética (V660P)
 > rechazada con "Transacción Rechazada. La terminal reportó un error en la
 > autorización." Causa raíz: `_validate_entry_mode()` en la API rechazaba
@@ -271,6 +283,7 @@ Verifone (banda + térmica).
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 | G-P1-11 | Ticket ISO único por reintento (DE62) | done | **2026-08-24:** el artículo por banda devolvía "Pago rechazado" (código 17 `CUP_DUP`). La causa era que el `processor_ticket` (DE62) se armaba con el sufijo del `transaction_number` (contador diario `000000NN`), repetido entre reintentos/fechas. Se cambió a que DE62 use el **STAN** (único por transacción). `original_ticket` (DE37) de la anulación sigue saliendo de `tx.processor_ticket` y `getLoteIdFromCUP` (VERIFONE) lo correlaciona por `numero_comprobante`, por lo que la anulación no se rompe. Ver "Último cambio" 2026-08-24. |
+| G-P1-12 | El ingreso manual no validaba el CVV (aprobaba con cualquier CVV) | done | **2026-08-24:** la API no reenviaba el `cvv` al gateway y el gateway no enviaba el campo **DE55** (CVV) del mensaje ISO 8583 al procesador, por lo que `valida_cvv()` del autorizador no se ejecutaba (DE55 ausente → `TRANS_OK`) y una tarjeta con CVV incorrecto se aprobaba igual. Fix: la API propaga el `cvv` a `AuthorizeRequest` solo en modo manual (012); el gateway lo manda en DE55 (`cvv_55`); banda (022) no lo envía (no trae CVV). El autorizador compara contra `sgas_usuario.cvv_actual` y devuelve `CVV_ERROR` (5) si difiere. Verificado end-to-end (manual 878 → APPROVED, manual 999 → DECLINED, banda → APPROVED). Tests nuevos en API y gateway. Ver "Último cambio" 2026-08-24 (CVV). |
 
 ---
 

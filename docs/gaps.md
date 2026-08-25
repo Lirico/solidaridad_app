@@ -23,6 +23,18 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > `ticket_number == stan`; fixture de void con `processor_ticket=stan`).
 > `make check` OK en API (ruff ✓, mypy ✓, tests ✓). Ver fila G-P1-11.
 
+> ✅ **Último cambio (2026-08-24):** fix de UI en la pantalla de resultado del
+> cobro (venta aprobada / anulación). En el V660P la pantalla mostraba el error
+> de Flutter "Bottom overflowed by 79 pixels" (rectángulo amarillo/negro de
+> debug): el contenido vertical (ícono, ticket, botón) no cabía en la altura y
+> se cortaba por abajo. Se corrigió **compactando el layout sin usar scroll** (el
+> scroll es mala UX en una terminal POS que se opera por touch): header naranja
+> de 180→120px, se quitó el `Transform.translate(0,-20)` que empujaba el borde
+> fuera de los límites, ícono 100→64, espaciados/paddings del panel y del botón
+> reducidos, y títulos con `maxLines`+elipsis. Se aplicó a `SaleStatusScreen`
+> (venta) y `VoidResultScreen` (anulación), que comparten el patrón. Todo queda
+> en una sola vista fija. `flutter analyze` OK y tests OK. Ver fila G-P1-13.
+
 > ✅ **Último cambio (2026-08-24):** fix de validación de CVV en el ingreso manual
 > (ya no aprueba con CVV incorrecto). El gateway no enviaba el campo DE55 (CVV)
 > del mensaje ISO 8583 al procesador (y la API tampoco lo reenviaba al gateway),
@@ -284,6 +296,8 @@ Verifone (banda + térmica).
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 | G-P1-11 | Ticket ISO único por reintento (DE62) | done | **2026-08-24:** el artículo por banda devolvía "Pago rechazado" (código 17 `CUP_DUP`). La causa era que el `processor_ticket` (DE62) se armaba con el sufijo del `transaction_number` (contador diario `000000NN`), repetido entre reintentos/fechas. Se cambió a que DE62 use el **STAN** (único por transacción). `original_ticket` (DE37) de la anulación sigue saliendo de `tx.processor_ticket` y `getLoteIdFromCUP` (VERIFONE) lo correlaciona por `numero_comprobante`, por lo que la anulación no se rompe. Ver "Último cambio" 2026-08-24. |
 | G-P1-12 | El ingreso manual no validaba el CVV (aprobaba con cualquier CVV) | done | **2026-08-24:** la API no reenviaba el `cvv` al gateway y el gateway no enviaba el campo **DE55** (CVV) del mensaje ISO 8583 al procesador, por lo que `valida_cvv()` del autorizador no se ejecutaba (DE55 ausente → `TRANS_OK`) y una tarjeta con CVV incorrecto se aprobaba igual. Fix: la API propaga el `cvv` a `AuthorizeRequest` solo en modo manual (012); el gateway lo manda en DE55 (`cvv_55`); banda (022) no lo envía (no trae CVV). El autorizador compara contra `sgas_usuario.cvv_actual` y devuelve `CVV_ERROR` (5) si difiere. Verificado end-to-end (manual 878 → APPROVED, manual 999 → DECLINED, banda → APPROVED). Tests nuevos en API y gateway. Ver "Último cambio" 2026-08-24 (CVV). |
+| G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
+
 
 ---
 

@@ -43,6 +43,8 @@ class HttpPaymentGateway:
             payload["expiration_date"] = request.expiration_date
         if request.track2 is not None:
             payload["track2"] = request.track2
+        if request.cvv is not None:
+            payload["cvv"] = request.cvv
         return self._post("/v1/authorize", payload)
 
     def void(self, request: VoidRequest) -> AuthorizeResult:

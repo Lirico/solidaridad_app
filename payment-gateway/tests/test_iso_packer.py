@@ -310,6 +310,61 @@ def test_build_purchase_request_band_022_without_track2() -> None:
     assert bitmap_get(iso.bitmap, 2)
     assert bitmap_get(iso.bitmap, 14)
     assert not bitmap_get(iso.bitmap, 35)
+    # Banda (022) no trae CVV: DE55 no debe estar presente.
+    assert iso.cvv_55 == ""
+    assert not bitmap_get(iso.bitmap, 55)
+
+
+def test_build_purchase_request_manual_012_with_cvv_sets_de55() -> None:
+    """Manual (012) con CVV: DE55 presente con el CVV, para que el autorizador
+    lo valide contra cvv_actual (rechaza CVV_ERROR si no coincide)."""
+    settings = Settings()
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="6063007014007403",
+        terminal_id="TERM0001",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="2512",
+        entry_mode="012",
+        cvv="878",
+    )
+    iso = build_purchase_request(
+        cmd,
+        settings,
+        now=datetime(2026, 7, 16, 12, 15, 30),
+    )
+    assert iso.cvv_55 == "878"
+    assert bitmap_get(iso.bitmap, 55)
+    assert iso.posentrymode_22 == "0012"
+
+    # Round-trip: DE55 sobrevive al pack/unpack.
+    parsed = unpack_iso(pack_iso(iso))
+    assert parsed.cvv_55 == "878"
+    assert bitmap_get(parsed.bitmap, 55)
+
+
+def test_build_purchase_request_manual_012_without_cvv_no_de55() -> None:
+    """Manual (012) sin CVV: no se manda DE55 (el autorizador no lo valida)."""
+    settings = Settings()
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="6063007014007403",
+        terminal_id="TERM0001",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="2512",
+        entry_mode="012",
+    )
+    iso = build_purchase_request(
+        cmd,
+        settings,
+        now=datetime(2026, 7, 16, 12, 15, 30),
+    )
+    assert iso.cvv_55 == ""
+    assert not bitmap_get(iso.bitmap, 55)
 
 
 def test_build_void_request_sets_fields() -> None:

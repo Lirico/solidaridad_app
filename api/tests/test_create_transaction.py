@@ -108,6 +108,8 @@ def test_create_approves() -> None:
     auth_req = gateway.authorize.call_args.args[0]
     assert auth_req.ticket_number == auth_req.stan
     assert len(auth_req.ticket_number) == 6 and auth_req.ticket_number.isdigit()
+    # Ingreso manual (012) con CVV: se reenvía al gateway para su validación.
+    assert auth_req.cvv == "123"
     transactions.create_pending.assert_called_once()
     create_kwargs = transactions.create_pending.call_args.kwargs
     assert create_kwargs["processor_ticket"] == create_kwargs["stan"]
@@ -409,6 +411,8 @@ def test_band_022_without_track2_with_expiry_accepted() -> None:
     assert auth_req.entry_mode == "022"
     assert auth_req.track2 is None
     assert auth_req.expiration_date == "3012"
+    # Banda (022) no trae CVV: no se manda al gateway (None).
+    assert auth_req.cvv is None
     transactions.create_pending.assert_called_once()
     transactions.update_result.assert_called_once()
 

@@ -21,6 +21,8 @@ class AuthorizeCommand:
     expiration_date: str | None = None
     entry_mode: str = "012"
     track2: str | None = None
+    # CVV solo para modo manual (012); banda (022) no lo trae y llega None.
+    cvv: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -18,6 +18,14 @@ class InvalidCardNumber(DomainError):
         super().__init__(message)
 
 
+class InvalidCvv(DomainError):
+    def __init__(
+        self,
+        message: str = "CVV inválido",
+    ) -> None:
+        super().__init__(message)
+
+
 class InvalidTerminalId(DomainError):
     def __init__(self, message: str = "terminal_id es requerido") -> None:
         super().__init__(message)

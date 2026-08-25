@@ -23,6 +23,9 @@ class AuthorizeRequest:
     expiration_date: str | None = None
     entry_mode: str = "012"
     track2: str | None = None
+    # CVV solo en modo manual (012). La banda magnética (022) no lo contiene,
+    # así que en ese modo no se envía (cvv=None) y el procesador no lo valida.
+    cvv: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -47,6 +47,12 @@ def build_purchase_request(
     if command.track2:
         iso.track2_35 = _normalize_track2(command.track2)
         bits.append(35)
+    # DE55 = CVV. Solo se envía en modo manual (012); la banda (022) no lo trae
+    # y el procesador no debe validarlo. Cuando viene, el autorizador compara el
+    # cvv_actual de la tarjeta y rechaza (CVV_ERROR) si no coincide.
+    if command.cvv:
+        iso.cvv_55 = _numeric_ticket(command.cvv)
+        bits.append(55)
     set_present(iso, *bits)
     return iso
 

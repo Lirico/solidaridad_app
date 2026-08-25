@@ -220,6 +220,9 @@ class CreateTransaction:
                 expiration_date=exp,
                 entry_mode=entry_mode,
                 track2=track2,
+                # El CVV se reenvía al gateway solo en el modo manual (012); en
+                # banda (022) la tarjeta no trae CVV y se omite (None).
+                cvv=(cvv.strip() if (entry_mode != "022" and cvv) else None),
             )
         )
         final = self._apply_gateway_result(pending.id, gateway_result)

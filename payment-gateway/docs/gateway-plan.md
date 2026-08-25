@@ -22,8 +22,10 @@ Adaptador sin contexto de clientes: recibe authorize/void HTTP, arma ISO8583
 }
 ```
 
-`ticket_number` se envía en DE62 (`numero_comprobante`). Es el sufijo numérico
-de `transaction_number` de la API (no el STAN).
+`ticket_number` se envía en DE62 (`numero_comprobante`). Desde 2026-08-24 la API
+lo arma con el **STAN** de la transacción (único por reintento) para evitar que
+el autorizador lo considere cupón duplicado (código 17 `CUP_DUP`). Histórico:
+era el sufijo numérico de `transaction_number` (no el STAN).
 
 ### `POST /v1/void` (anulación)
 

@@ -106,10 +106,12 @@ def test_create_approves() -> None:
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
     auth_req = gateway.authorize.call_args.args[0]
-    assert auth_req.ticket_number == "00000001"
+    assert auth_req.ticket_number == auth_req.stan
+    assert len(auth_req.ticket_number) == 6 and auth_req.ticket_number.isdigit()
     transactions.create_pending.assert_called_once()
     create_kwargs = transactions.create_pending.call_args.kwargs
-    assert create_kwargs["processor_ticket"] == "00000001"
+    assert create_kwargs["processor_ticket"] == create_kwargs["stan"]
+    assert create_kwargs["processor_ticket"] == auth_req.ticket_number
     transactions.update_result.assert_called_once()
 
 

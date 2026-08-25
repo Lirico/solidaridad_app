@@ -41,7 +41,7 @@ def _tx(**overrides: object) -> Transaction:
         request_fingerprint="fp",
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
-        processor_ticket="00000001",
+        processor_ticket="000001",
         void_idempotency_key=None,
     )
     base.update(overrides)
@@ -83,7 +83,7 @@ def test_void_approves() -> None:
     assert result.transaction.status == TransactionStatus.VOIDED
     gateway.void.assert_called_once()
     req = gateway.void.call_args.args[0]
-    assert req.original_ticket == "00000001"
+    assert req.original_ticket == "000001"
     assert req.void_ticket == req.stan
     transactions.apply_void_result.assert_called_once()
 

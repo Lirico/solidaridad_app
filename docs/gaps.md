@@ -6,6 +6,23 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-08-24
 
+> ✅ **Último cambio (2026-08-24):** fix del rechazo por "Pago rechazado" en la
+> venta por banda (V660P). El pago ya pasaba la validación y llegaba al
+> procesador, pero el autorizador lo rechazaba con código **17 = `CUP_DUP`**
+> ("cupón duplicado"). Causa raíz: la API enviaba en DE62 (`numero_comprobante`)
+> el **sufijo del `transaction_number`** (`000000NN`), un contador diario que se
+> **repite entre reintentos del mismo día / fechas seed**. El autorizador
+> detecta duplicados en `sgas_cup` por ese `numero_comprobante` (además de
+> vencimiento, importe, id_operación y tarjeta) y al reintentar encontraba el
+> cupón ya anotado → rechazo 17. Fix: el `processor_ticket` (DE62) ahora se arma
+> con el **STAN de la transacción** (único por reintento, `secrets.randbelow`).
+> La anulación no se rompe: `original_ticket` en DE37 sigue saliendo de
+> `tx.processor_ticket` (= STAN) y `getLoteIdFromCUP` (VERIFONE) lo correlaciona
+> por `numero_comprobante`. El `transaction_number` (clave pública legible) se
+> mantiene igual. Tests actualizados (`test_create_approves` verifica
+> `ticket_number == stan`; fixture de void con `processor_ticket=stan`).
+> `make check` OK en API (ruff ✓, mypy ✓, tests ✓). Ver fila G-P1-11.
+
 > ✅ **Último cambio (2026-08-24):** fix de venta por banda magnética (V660P)
 > rechazada con "Transacción Rechazada. La terminal reportó un error en la
 > autorización." Causa raíz: `_validate_entry_mode()` en la API rechazaba
@@ -253,6 +270,7 @@ Verifone (banda + térmica).
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
+| G-P1-11 | Ticket ISO único por reintento (DE62) | done | **2026-08-24:** el artículo por banda devolvía "Pago rechazado" (código 17 `CUP_DUP`). La causa era que el `processor_ticket` (DE62) se armaba con el sufijo del `transaction_number` (contador diario `000000NN`), repetido entre reintentos/fechas. Se cambió a que DE62 use el **STAN** (único por transacción). `original_ticket` (DE37) de la anulación sigue saliendo de `tx.processor_ticket` y `getLoteIdFromCUP` (VERIFONE) lo correlaciona por `numero_comprobante`, por lo que la anulación no se rompe. Ver "Último cambio" 2026-08-24. |
 
 ---
 

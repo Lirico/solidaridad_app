@@ -34,10 +34,7 @@ from domain.product import Product, parse_product, processor_product_code
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.installation_repository import InstallationRepository
-from persistence.repositories.transaction_repository import (
-    TransactionRepository,
-    ticket_from_transaction_number,
-)
+from persistence.repositories.transaction_repository import TransactionRepository
 
 
 class CreateTransactionHttpStatus(IntEnum):
@@ -176,8 +173,13 @@ class CreateTransaction:
 
         business_date = datetime.now(UTC).date()
         transaction_number = self._transactions.next_transaction_number(business_date)
-        processor_ticket = ticket_from_transaction_number(transaction_number)
         stan = f"{secrets.randbelow(1_000_000):06d}"
+        # El processor_ticket (DE62 / numero_comprobante del autorizador) se arma
+        # con el STAN para garantizar unicidad entre reintentos. Antes era el
+        # sufijo del transaction_number (contador diario 000000NN) que se repetía
+        # entre reintentos/fechas y el autorizador lo rechazaba como cupón
+        # duplicado (código 17 CUP_DUP). El STAN es único por transacción.
+        processor_ticket = stan
         proc_code = processor_product_code(parsed_product)
 
         try:

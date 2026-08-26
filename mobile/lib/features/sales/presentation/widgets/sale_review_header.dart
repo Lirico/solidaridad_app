@@ -13,9 +13,9 @@ class SaleReviewHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 180,
+      height: 120,
       color: AppColors.primaryOrange,
-      padding: const EdgeInsets.only(top: 60, left: 24, right: 16),
+      padding: const EdgeInsets.only(top: 40, left: 16, right: 12),
       child: Row(
         children: [
           if (onBackPressed != null)
@@ -31,13 +31,15 @@ class SaleReviewHeader extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const HeaderMenuButton(),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           const UserMenuButton(),
         ],
       ),

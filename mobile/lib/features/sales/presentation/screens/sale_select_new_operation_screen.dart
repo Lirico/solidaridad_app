@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../widgets/select_new_operation_content.dart';
 import '../widgets/select_new_operation_header.dart';
 
@@ -12,6 +13,7 @@ class SelectNewOperationScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
       appBar: const SelectNewOperationHeader(),
+      bottomNavigationBar: const AppBottomNavBar(),
       body: Column(
         children: [
           const SizedBox(height: 10),

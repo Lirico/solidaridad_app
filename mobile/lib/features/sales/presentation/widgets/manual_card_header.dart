@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/brand_logo_image.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class ManualCardHeader extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback? onBackPressed;
-
-  const ManualCardHeader({super.key, this.onBackPressed});
+  const ManualCardHeader({super.key});
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -14,10 +14,10 @@ class ManualCardHeader extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       backgroundColor: AppColors.primaryOrange,
       elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: onBackPressed ?? () => Navigator.maybePop(context),
-      ),
+      // Logo de la empresa al inicio de la cabecera.
+      leadingWidth: 68,
+      leading: const Center(child: BrandLogoImage(height: 34)),
+      titleSpacing: 0,
       title: const Text(
         'Ingreso Manual',
         style: TextStyle(
@@ -26,6 +26,7 @@ class ManualCardHeader extends StatelessWidget implements PreferredSizeWidget {
           fontSize: 20,
         ),
       ),
+      actions: const [UserMenuButton(), SizedBox(width: 8)],
     );
   }
 }

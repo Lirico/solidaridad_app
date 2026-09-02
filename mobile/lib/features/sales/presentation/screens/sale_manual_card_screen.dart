@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/manual_card_content.dart';
 import '../widgets/manual_card_header.dart';
@@ -50,9 +51,8 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
-      appBar: ManualCardHeader(
-        onBackPressed: () => Navigator.maybePop(context),
-      ),
+      appBar: const ManualCardHeader(),
+      bottomNavigationBar: const AppBottomNavBar(),
       body: SafeArea(
         top: false,
         child: Form(

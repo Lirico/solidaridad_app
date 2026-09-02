@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../../../sales/presentation/widgets/sale_review_header.dart';
 import '../../../sales/presentation/widgets/sale_status_content.dart';
@@ -42,6 +43,8 @@ class VoidResultScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
+      // Sin flecha atrás: la salida es FINALIZAR / VENTA / ⋯.
+      bottomNavigationBar: const AppBottomNavBar(hideBack: true),
       body: SafeArea(
         top: false,
         child: Column(

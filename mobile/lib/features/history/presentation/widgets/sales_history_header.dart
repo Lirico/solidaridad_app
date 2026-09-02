@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/brand_logo_image.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class SalesHistoryHeader extends StatelessWidget {
   const SalesHistoryHeader({super.key});
@@ -9,30 +10,27 @@ class SalesHistoryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: AppSpacing.headerHeight,
+      height: 180,
       color: AppColors.primaryOrange,
-      padding: const EdgeInsets.only(
-        top: AppSpacing.headerTopPadding,
-        left: AppSpacing.xl,
-        right: AppSpacing.md,
-      ),
+      padding: const EdgeInsets.only(top: 60, left: 24, right: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const Text(
-            'Historial de Ventas',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+          // Logo de la empresa, en la misma línea que el ícono de usuario.
+          const BrandLogoImage(height: 40),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Historial de Ventas',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          const SizedBox(width: 48),
+          const UserMenuButton(),
         ],
       ),
     );

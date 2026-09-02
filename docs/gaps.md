@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-08-17
+Última revisión: 2026-11-09
 
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
 > `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
@@ -231,6 +231,7 @@ Verifone (banda + térmica).
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
+| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las 14 screens interactivas (misma línea que el ícono de usuario; en `AuthHeader` arriba a la izquierda) y la barra inferior se conectó al `Scaffold` de todas ellas (deshabilitada en Login/Registro por no haber sesión; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). |
 
 ---
 
@@ -262,7 +263,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
-| UX: botones atrás/cancelar y copy en español | `SaleReviewHeader` oculta atrás si no hay callback (procesando/resultado); cancelar en espera de tarjeta hace `maybePop`; Tarjeta → waiting; QR aviso próximamente; mensajes de auth/ventas/status sin jerga EN (Timeout/AWS/API/`e.toString()`). |
+| UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo y Cerrar Lote deshabilitados + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera; las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 
 ---

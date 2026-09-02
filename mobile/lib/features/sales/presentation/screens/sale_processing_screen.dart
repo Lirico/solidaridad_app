@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
@@ -66,6 +67,11 @@ class SaleProcessingScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
+      // Durante el procesamiento no se permite volver ni iniciar otra acción.
+      bottomNavigationBar: const AppBottomNavBar(
+        enabled: false,
+        hideBack: true,
+      ),
       body: SafeArea(
         top: false,
         child: Column(

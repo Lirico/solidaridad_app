@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/brand_logo_image.dart';
+import '../widgets/user_menu_button.dart';
 import '../widgets/change_password_form_fields.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
@@ -52,6 +55,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leadingWidth: 68,
+        leading: const Center(child: BrandLogoImage(height: 34)),
+        titleSpacing: 0,
         title: Text(
           _isFirstLogin ? 'Cambio de Contraseña' : 'Seguridad',
           style: const TextStyle(
@@ -60,12 +67,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
         ),
         backgroundColor: Theme.of(context).colorScheme.primary,
-        iconTheme: IconThemeData(
-          color: _isFirstLogin ? Colors.transparent : Colors.white,
-        ),
-        automaticallyImplyLeading: !_isFirstLogin,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
+        actions: const [UserMenuButton(), SizedBox(width: 8)],
       ),
+      bottomNavigationBar: const AppBottomNavBar(),
       body: BlocConsumer<AuthCubit, AuthState>(
         listener: (context, state) {
           if (state is AuthSessionExpired) {

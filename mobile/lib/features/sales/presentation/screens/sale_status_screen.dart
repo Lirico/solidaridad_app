@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../data/receipt_printer.dart';
 import '../../domain/sale_model.dart';
 import '../widgets/sale_review_header.dart';
@@ -92,6 +93,8 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
+      // Sin flecha atrás: la salida es FINALIZAR / VENTA / ⋯.
+      bottomNavigationBar: const AppBottomNavBar(hideBack: true),
       body: SafeArea(
         top: false,
         child: Column(

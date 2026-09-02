@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../widgets/register_form_fields.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/auth_card.dart';
@@ -46,6 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      bottomNavigationBar: const AppBottomNavBar(enabled: false),
       body: SafeArea(
         top: false,
         child: Column(

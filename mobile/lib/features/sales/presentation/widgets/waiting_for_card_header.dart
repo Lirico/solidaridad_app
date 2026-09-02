@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/header_menu_button.dart';
+import '../../../../core/widgets/brand_logo_image.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 
 class WaitingForCardHeader extends StatelessWidget
@@ -15,6 +15,10 @@ class WaitingForCardHeader extends StatelessWidget
     return AppBar(
       backgroundColor: AppColors.primaryOrange,
       elevation: 0,
+      // Logo de la empresa al inicio de la cabecera.
+      leadingWidth: 68,
+      leading: const Center(child: BrandLogoImage(height: 34)),
+      titleSpacing: 0,
       title: const Text(
         'Nueva Operación',
         style: TextStyle(
@@ -23,7 +27,7 @@ class WaitingForCardHeader extends StatelessWidget
           fontSize: 20,
         ),
       ),
-      actions: const [HeaderMenuButton(), SizedBox(width: 8), UserMenuButton()],
+      actions: const [UserMenuButton(), SizedBox(width: 8)],
     );
   }
 }

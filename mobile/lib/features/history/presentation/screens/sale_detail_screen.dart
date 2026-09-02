@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/brand_logo_image.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/data/receipt_printer.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../widgets/sale_detail_ticket.dart';
@@ -36,6 +39,10 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leadingWidth: 68,
+        leading: const Center(child: BrandLogoImage(height: 34)),
+        titleSpacing: 0,
         title: const Text(
           'Detalle de Comprobante',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -43,7 +50,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
+        actions: const [UserMenuButton(), SizedBox(width: 8)],
       ),
+      bottomNavigationBar: const AppBottomNavBar(),
       body: Column(
         children: [
           Expanded(

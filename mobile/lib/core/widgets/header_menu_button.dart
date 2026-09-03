@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import '../constants/app_routes.dart';
-import '../theme/app_colors.dart';
 
-/// Botón "más" que abre un desplegable blanco con las opciones secundarias.
+import 'more_menu.dart';
+
+/// Botón "⋯ Más" de la barra inferior.
 ///
-/// Vive en la barra inferior compartida ([AppBottomNavBar]), por eso abre el
-/// popup superpuesto al botón ([PopupMenuPosition.over]) para que no se salga
-/// de pantalla al estar anclado en el borde inferior.
+/// Vive en la barra inferior compartida ([AppBottomNavBar]). Al tocarlo abre
+/// [MoreMenu]: un panel que ocupa el área del cajón blanco de la pantalla
+/// (ancho completo, radio superior 24, pegado a la barra inferior).
 ///
-/// Ítems actuales:
+/// Ítems del panel:
 /// - **Consultar saldo** y **Cerrar Lote**: deshabilitados hasta que el cliente
 ///   defina el contrato/backend (no hacen nada por ahora).
 /// - **Historial de ventas**: navega al listado.
@@ -16,96 +16,70 @@ import '../theme/app_colors.dart';
 /// El cambio de contraseña NO vive acá: es del menú del ícono de usuario
 /// ([UserMenuButton]).
 class HeaderMenuButton extends StatelessWidget {
-  /// Color del ícono. Blanco sobre cabeceras naranjas; oscuro sobre fondos
-  /// claros (barra inferior).
+  /// Color del ícono (y de la etiqueta "Más" cuando [showLabel] es true).
+  /// Blanco sobre cabeceras naranjas; oscuro sobre fondos claros (barra inferior).
   final Color iconColor;
 
   /// Permite deshabilitar el menú completo (p. ej. pantallas sin sesión).
   final bool enabled;
 
+  /// Muestra la palabra "Más" debajo de los tres puntos (barra inferior).
+  final bool showLabel;
+
   const HeaderMenuButton({
     super.key,
     this.iconColor = Colors.white,
     this.enabled = true,
+    this.showLabel = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      enabled: enabled,
-      icon: Icon(Icons.more_horiz, color: iconColor, size: 28),
-      tooltip: 'Más opciones',
-      position: PopupMenuPosition.over,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.white,
-      surfaceTintColor: Colors.white,
-      onSelected: (value) {
-        switch (value) {
-          case 'salesHistory':
-            Navigator.pushNamed(context, AppRoutes.salesHistory);
-            break;
-          // 'balanceInquiry' y 'closeBatch' están deshabilitados: no navegan.
-        }
-      },
-      itemBuilder: (context) => [
-        const PopupMenuItem<String>(
-          enabled: false,
-          value: 'balanceInquiry',
-          child: Row(
-            children: [
-              Icon(
-                Icons.account_balance_wallet_outlined,
-                color: AppColors.iconGrey,
-                size: 20,
+    return Semantics(
+      button: true,
+      label: 'Más opciones',
+      child: Tooltip(
+        message: 'Más opciones',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: enabled
+                ? () {
+                    // El botón llena los 64dp del menú: su borde superior en
+                    // coordenadas globales es el arranque de la barra inferior.
+                    final RenderBox box =
+                        context.findRenderObject()! as RenderBox;
+                    final double navTop = box.localToGlobal(Offset.zero).dy;
+                    MoreMenu.show(context, navTop: navTop);
+                  }
+                : null,
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: showLabel ? 64 : 48,
+              height: showLabel ? 64 : 48,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.more_horiz, color: iconColor, size: 28),
+                  if (showLabel) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      'Más',
+                      style: TextStyle(
+                        fontSize: 10,
+                        height: 1.0,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: iconColor,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Consultar saldo',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: AppColors.iconGrey),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
-        const PopupMenuItem<String>(
-          enabled: false,
-          value: 'closeBatch',
-          child: Row(
-            children: [
-              Icon(Icons.lock_outline, color: AppColors.iconGrey, size: 20),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Cerrar Lote',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: AppColors.iconGrey),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem<String>(
-          value: 'salesHistory',
-          child: Row(
-            children: [
-              Icon(Icons.history, color: AppColors.iconGrey, size: 20),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Historial de ventas',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

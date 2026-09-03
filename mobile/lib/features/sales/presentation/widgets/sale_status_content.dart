@@ -37,29 +37,33 @@ class SaleStatusContent extends StatelessWidget {
       children: [
         const Spacer(),
 
-        Icon(statusIcon, size: 100, color: statusColor),
-        const SizedBox(height: 24),
+        Icon(statusIcon, size: 64, color: statusColor),
+        const SizedBox(height: 12),
 
         Text(
           statusTitle,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
             color: statusColor,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
 
         Text(
           statusSubtitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 14, color: Colors.grey),
+          style: const TextStyle(fontSize: 13, color: Colors.grey),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: const Color(0xFFF8F9FA),
             borderRadius: BorderRadius.circular(8),
@@ -83,7 +87,7 @@ class SaleStatusContent extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         _buildPrintStatus(context),
 
         const Spacer(),
@@ -93,7 +97,7 @@ class SaleStatusContent extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryOrange,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -102,7 +106,7 @@ class SaleStatusContent extends StatelessWidget {
           child: const Text(
             'FINALIZAR',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.1,
             ),

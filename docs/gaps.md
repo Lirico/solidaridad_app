@@ -6,6 +6,23 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-03-09
 
+> ✅ **Último cambio (2026-03-09, integración con master / PR #19):** la rama se
+> actualizó a master, que ya incluía el fix de la pantalla de resultado (G-P1-13). Se
+> conservó la compactación validada en el V660P (ícono 100→64, títulos con
+> `maxLines`/elipsis, paddings y espaciados menores en `sale_status_content.dart`)
+> aplicada sobre el patrón de esta rama (`AppHeader` 64dp + `AppSheetPanel`), que agrega
+> `FittedBox` anti-desborde horizontal en las filas del ticket. `sale_status_screen.dart`
+> y `void_result_screen.dart` quedan en la versión de esta rama (cabecera compacta +
+> panel blanco a sangre completa). `flutter analyze` OK y `flutter test` OK (14 tests).
+
+> ✅ **Último cambio (2026-08-24, fix de UI en pantalla de resultado):** en el V660P la
+> pantalla de venta aprobada/anulación mostraba "Bottom overflowed by 79 pixels". Se
+> corrigió compactando el layout sin scroll: header 180→120px, se quitó el
+> `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y títulos
+> con `maxLines`+elipsis. Aplicado a `SaleStatusScreen` y `VoidResultScreen`; al
+> integrarse con esta rama quedan sobre el `AppHeader`/`AppSheetPanel` nuevo.
+> Ver fila G-P1-13.
+
 > ✅ **Último cambio (2026-03-09, UX "⋯ Más"):** el desplegable chico del botón
 > "⋯ Más" (`PopupMenuButton`) se reemplazó por **`MoreMenu`**
 > (`mobile/lib/core/widgets/more_menu.dart`): un panel modal transparente que
@@ -297,6 +314,7 @@ Verifone (banda + térmica).
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
+| G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
 
 ---
 

@@ -4,15 +4,17 @@ import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../data/sales_repository.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 
 import '../widgets/amount_input_formatter.dart';
 import '../widgets/product_selector.dart';
-import '../widgets/sale_form_header.dart';
 
 class SaleFormScreen extends StatefulWidget {
   const SaleFormScreen({super.key});
@@ -94,156 +96,127 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: AppColors.primaryOrange,
+      appBar: const AppHeader(
+        title: 'Nueva Operación',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
+      ),
       bottomNavigationBar: const AppBottomNavBar(),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SaleFormHeader(),
-            Expanded(
-              child: Transform.translate(
-                offset: const Offset(0, -20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+      body: AppSheetPanel(
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.assignment_outlined, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text(
+                      'Iniciar Nueva Venta',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                    child: Form(
-                      key: _formKey,
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: const [
-                                Icon(
-                                  Icons.assignment_outlined,
-                                  color: Colors.grey,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Iniciar Nueva Venta',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 32),
-                            const SizedBox(height: 8),
+                  ],
+                ),
+                const Divider(height: 32),
+                const SizedBox(height: 8),
 
-                            if (_loadingProducts)
-                              const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            else
-                              ProductSelector(
-                                products: _products,
-                                selectedCode: _selectedProductCode,
-                                onProductChanged: (code) {
-                                  final product = _products.firstWhere(
-                                    (p) => p.code == code,
-                                  );
-                                  setState(() {
-                                    _selectedProductCode = code;
-                                    _selectedProductLabel = product.label;
-                                  });
-                                },
-                              ),
-                            const SizedBox(height: 20),
-                            Text(
-                              _isBulkProduct
-                                  ? 'Cantidad de Gas (m³)'
-                                  : 'Cantidad de Unidades',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _unitsController,
-                              style: const TextStyle(fontSize: 22),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              inputFormatters: [AmountInputFormatter()],
-                              decoration: InputDecoration(
-                                hintText: _isBulkProduct
-                                    ? 'Ingresar m³'
-                                    : 'Ingresar unidades',
-                                prefixIcon: const Icon(
-                                  Icons.propane_tank_outlined,
-                                  size: 24,
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'La cantidad es obligatoria';
-                                }
-                                final normalized = value.replaceAll(',', '.');
-                                final parsedUnits = double.tryParse(normalized);
-                                if (parsedUnits == null) {
-                                  return 'Ingrese un número válido';
-                                }
-                                if (parsedUnits <= 0) {
-                                  return 'La cantidad debe ser mayor a cero';
-                                }
-                                return null;
-                              },
-                            ),
-                            SizedBox(height: AppSpacing.xxl),
+                if (_loadingProducts)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else
+                  ProductSelector(
+                    products: _products,
+                    selectedCode: _selectedProductCode,
+                    onProductChanged: (code) {
+                      final product = _products.firstWhere(
+                        (p) => p.code == code,
+                      );
+                      setState(() {
+                        _selectedProductCode = code;
+                        _selectedProductLabel = product.label;
+                      });
+                    },
+                  ),
+                const SizedBox(height: 20),
+                Text(
+                  _isBulkProduct
+                      ? 'Cantidad de Gas (m³)'
+                      : 'Cantidad de Unidades',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _unitsController,
+                  style: const TextStyle(fontSize: 22),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [AmountInputFormatter()],
+                  decoration: InputDecoration(
+                    hintText: _isBulkProduct
+                        ? 'Ingresar m³'
+                        : 'Ingresar unidades',
+                    prefixIcon: const Icon(
+                      Icons.propane_tank_outlined,
+                      size: 24,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'La cantidad es obligatoria';
+                    }
+                    final normalized = value.replaceAll(',', '.');
+                    final parsedUnits = double.tryParse(normalized);
+                    if (parsedUnits == null) {
+                      return 'Ingrese un número válido';
+                    }
+                    if (parsedUnits <= 0) {
+                      return 'La cantidad debe ser mayor a cero';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: AppSpacing.xxl),
 
-                            SizedBox(
-                              width: double.infinity,
-                              height: 60,
-                              child: ElevatedButton(
-                                onPressed: _onNext,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryOrange,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                  ),
-                                ),
-                                child: const Text(
-                                  'SIGUIENTE',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed: _onNext,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryOrange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                    ),
+                    child: const Text(
+                      'SIGUIENTE',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

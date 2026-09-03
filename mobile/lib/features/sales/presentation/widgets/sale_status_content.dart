@@ -56,7 +56,7 @@ class SaleStatusContent extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 14, color: Colors.grey),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 20),
 
         Container(
           padding: const EdgeInsets.all(16),
@@ -68,16 +68,16 @@ class SaleStatusContent extends StatelessWidget {
           child: Column(
             children: [
               _buildTicketRow('Nro. Operación', operation?.id ?? '---'),
-              const Divider(height: 20),
+              const Divider(height: 12),
               _buildTicketRow('Producto', operation?.productLabel ?? '---'),
-              const Divider(height: 20),
+              const Divider(height: 12),
               _buildTicketRow(
                 'Monto',
                 operation != null ? formatAmount(operation!.amount) : '---',
               ),
-              const Divider(height: 20),
+              const Divider(height: 12),
               _buildTicketRow('Tarjeta', operation?.cardNumber ?? '---'),
-              const Divider(height: 20),
+              const Divider(height: 12),
               _buildTicketRow('Código de respuesta', _responseCode(result)),
             ],
           ),
@@ -194,20 +194,35 @@ class SaleStatusContent extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
+        const SizedBox(width: 8),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ],

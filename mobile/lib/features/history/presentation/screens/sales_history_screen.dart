@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/formatters/amount_formatter.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 
 import '../../../auth/presentation/cubit/auth_state.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../../../sales/presentation/cubit/sales_cubit.dart';
 import '../../../sales/presentation/cubit/sales_state.dart';
-import '../widgets/sales_history_header.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   const SalesHistoryScreen({super.key});
@@ -78,50 +82,25 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SalesHistoryHeader(),
-            Expanded(
-              child: Transform.translate(
-                offset: const Offset(0, -20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: BlocListener<SalesCubit, SalesState>(
-                        listener: (context, state) {
-                          if (state is SalesSessionExpired) {
-                            context.read<AuthCubit>().logout();
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              AppRoutes.login,
-                              (route) => false,
-                            );
-                          }
-                        },
-                        child: _buildBody(context),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+      backgroundColor: AppColors.primaryOrange,
+      appBar: const AppHeader(
+        title: 'Historial de Ventas',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
+      ),
+      bottomNavigationBar: const AppBottomNavBar(),
+      body: AppSheetPanel(
+        child: BlocListener<SalesCubit, SalesState>(
+          listener: (context, state) {
+            if (state is SalesSessionExpired) {
+              context.read<AuthCubit>().logout();
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.login,
+                (route) => false,
+              );
+            }
+          },
+          child: _buildBody(context),
         ),
       ),
     );

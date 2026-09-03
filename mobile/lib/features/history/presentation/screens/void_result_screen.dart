@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/domain/sale_model.dart';
-import '../../../sales/presentation/widgets/sale_review_header.dart';
 import '../../../sales/presentation/widgets/sale_status_content.dart';
 
 class VoidResultScreen extends StatelessWidget {
@@ -10,8 +14,9 @@ class VoidResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
-    final VoidResult result =
-        (args is VoidResult ? args : const VoidResult.voided());
+    final VoidResult result = (args is VoidResult
+        ? args
+        : const VoidResult.voided());
 
     final Color statusColor;
     final IconData statusIcon;
@@ -41,46 +46,29 @@ class VoidResultScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SaleReviewHeader(title: 'Resultado de la Anulación'),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.shade300,
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: SaleStatusContent(
-                    result: PaymentResult.voided,
-                    statusColor: statusColor,
-                    statusIcon: statusIcon,
-                    statusTitle: statusTitle,
-                    statusSubtitle: statusSubtitle,
-                    onFinalize: () {
-                      Navigator.popUntil(
-                        context,
-                        (route) => route.settings.name == AppRoutes.salesHistory,
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ],
+      backgroundColor: AppColors.primaryOrange,
+      appBar: const AppHeader(
+        title: 'Resultado de la Anulación',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
+      ),
+      // Sin flecha atrás: la salida es FINALIZAR / VENTA / ⋯.
+      bottomNavigationBar: const AppBottomNavBar(hideBack: true),
+      body: AppSheetPanel(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SaleStatusContent(
+            result: PaymentResult.voided,
+            statusColor: statusColor,
+            statusIcon: statusIcon,
+            statusTitle: statusTitle,
+            statusSubtitle: statusSubtitle,
+            onFinalize: () {
+              Navigator.popUntil(
+                context,
+                (route) => route.settings.name == AppRoutes.salesHistory,
+              );
+            },
+          ),
         ),
       ),
     );

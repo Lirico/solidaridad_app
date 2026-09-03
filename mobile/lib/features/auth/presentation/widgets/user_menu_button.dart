@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 
@@ -51,7 +52,9 @@ class UserMenuButton extends StatelessWidget {
       color: Colors.white,
       surfaceTintColor: Colors.white,
       onSelected: (value) {
-        if (value == 'logout') {
+        if (value == 'changePassword') {
+          Navigator.pushNamed(context, AppRoutes.changePassword);
+        } else if (value == 'logout') {
           _confirmLogout(context);
         }
       },
@@ -74,6 +77,17 @@ class UserMenuButton extends StatelessWidget {
                   user.email,
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'changePassword',
+          child: Row(
+            children: [
+              Icon(Icons.lock_reset, color: AppColors.iconGrey, size: 20),
+              SizedBox(width: 12),
+              Text('Cambiar Contraseña'),
             ],
           ),
         ),

@@ -7,6 +7,4 @@ class AppSpacing {
   static const double lg = 20.0;
   static const double xl = 24.0;
   static const double xxl = 40.0;
-  static const double headerHeight = 180.0;
-  static const double headerTopPadding = 60.0;
 }

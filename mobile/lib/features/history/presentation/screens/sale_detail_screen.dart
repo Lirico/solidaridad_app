@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/data/receipt_printer.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../widgets/sale_detail_ticket.dart';
@@ -34,36 +38,33 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     final bool canPrint = operation.result == PaymentResult.approved;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Detalle de Comprobante',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
+      backgroundColor: AppColors.primaryOrange,
+      appBar: const AppHeader(
+        title: 'Detalle de Comprobante',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
+      bottomNavigationBar: const AppBottomNavBar(),
+      body: AppSheetPanel(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Container(
                   padding: const EdgeInsets.all(20.0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE9ECEF)),
+                  ),
                   child: SaleDetailTicket(operation: operation),
                 ),
               ),
             ),
-          ),
-          if (canPrint) _buildPrintButton(context, operation),
-          if (canVoid) _buildVoidButton(context, operation),
-        ],
+            if (canPrint) _buildPrintButton(context, operation),
+            if (canVoid) _buildVoidButton(context, operation),
+          ],
+        ),
       ),
     );
   }

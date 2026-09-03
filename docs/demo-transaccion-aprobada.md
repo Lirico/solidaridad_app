@@ -99,11 +99,24 @@ flutter run --dart-define=API_BASE_URL=http://<IP-PC>:8000/v1
 
 Sin `--dart-define=INSTALLATION_ID=...`, el default de la app es `05000001`.
 
+> ⚠️ **Importante para el V660P (dispositivo físico):** si se compila **sin**
+> `--dart-define=API_BASE_URL=...`, `ApiConfig` usa `http://10.0.2.2:8000/v1`,
+> que es el alias de loopback **solo del emulador Android**. En el V660P eso
+> deriva en *"Tiempo de espera agotado. Verifique su conexión."* (timeout de
+> 15 s en `AuthRepository.login`). Rebuild del APK debug del V660P:
+
+```bash
+flutter build apk --debug --target-platform android-arm \
+  --dart-define=API_BASE_URL=http://<IP-PC>:8000/v1 \
+  --dart-define=INSTALLATION_ID=05000001
+```
+
 ## 4. Troubleshooting
 
 | Código | Causa | Fix |
 |--------|-------|-----|
 | **89** | Terminal desconocida | Usar `05000001` |
+| **Timeout login V660P** | APK compilado sin `--dart-define=API_BASE_URL` → `ApiConfig` usa `10.0.2.2` (solo emulador) | Rebuild: `flutter build apk --debug --target-platform android-arm --dart-define=API_BASE_URL=http://<IP-PC>:8000/v1 --dart-define=INSTALLATION_ID=05000001` |
 | **17** | Venta demasiado reciente | Cubierto por `03_fix_demo` (`venta_min_horas_ultima_venta=0`); si no, `make reset` |
 | **51** | Fondos insuficientes | `make -C payment_processor recarga` |
 | **06** | Producto sin saldo cargado (`sgas_usuario_cta` sin fila para ese `prod_id`) | `make -C payment_processor recarga` (recarga los 5 productos) o `make reset` |

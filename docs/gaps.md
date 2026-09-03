@@ -4,7 +4,85 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-11-09
+Última revisión: 2026-03-09
+
+> ✅ **Último cambio (2026-03-09, UX "⋯ Más"):** el desplegable chico del botón
+> "⋯ Más" (`PopupMenuButton`) se reemplazó por **`MoreMenu`**
+> (`mobile/lib/core/widgets/more_menu.dart`): un panel modal transparente que
+> replica el cajón blanco de las pantallas operativas (ancho 100%, franja
+> naranja 10dp + radio superior 24 vía `AppSheetPanel`, borde pegado a la
+> barra inferior — medido desde el botón, que llena los 64dp del menú). La
+> cabecera y la barra inferior quedan visibles detrás; se cierra tocando fuera
+> (barrier transparente), con CERRAR o eligiendo una opción. Ítems: Consultar
+> saldo y Cerrar Lote deshabilitados ("Próximamente") + Historial de ventas
+> (navega). El trigger es ahora un `InkWell` en `HeaderMenuButton`. Evidencia:
+> `mobile/test/more_menu_overlay_test.dart` (bounds del panel == área del
+> cajón en 360×720 ±1px, cierre por CERRAR y por toque fuera). `flutter
+> analyze` OK, `flutter test` OK (14 tests). Pendiente verificación visual en
+> el V660P real.
+
+> ✅ **Último cambio (2026-03-09, build/demo V660P):** el APK debug para el
+> terminal físico se compila **siempre** con
+> `--dart-define=API_BASE_URL=http://<IP-PC>:8000/v1`
+> (+ `INSTALLATION_ID=05000001`). Sin el define, `ApiConfig` cae a
+> `http://10.0.2.2:8000/v1` (alias solo de emulador Android) y el login en el
+> V660P devuelve "Tiempo de espera agotado. Verifique su conexión." (timeout de
+> 15 s en `AuthRepository`). Verificado: API uvicorn en `0.0.0.0:8000` (PC en
+> LAN 192.168.0.4, terminal en 192.168.0.99, misma /24) y desde el device
+> `curl http://192.168.0.4:8000/docs` → 200. Queda documentado el comando en
+> `docs/demo-transaccion-aprobada.md`. Pendiente ideal (gap): detectar en
+> `ApiConfig` la IP del host para dispositivos físicos en vez de depender del
+> `--dart-define` manual.
+
+> ✅ **Último cambio (2026-03-09):** unificado el modelo visual de las pantallas
+> operativas al patrón de "Seleccioná el modo de pago": **fondo naranja** (igual
+> al de la cabecera) + **panel blanco a sangre completa** que arranca 10dp
+> debajo del `AppHeader` con **radio superior 24dp** (la franja y la zona que
+> recorta la curvatura quedan del color de la cabecera) y termina pegado al
+> borde superior de la barra inferior. Se eliminaron las tarjetas flotantes
+> blancas con radio 16dp y sombra sobre fondo gris `#F4F6F9` de: "Iniciar Nueva
+> Venta", "Confirmar Operación", "Procesando Transacción", "Resultado del
+> Cobro", "Ingreso Manual" (tenía hoja pegada arriba pero fondo gris), "Historial
+> de Ventas", "Detalle de Comprobante" (el ticket pasa a panel claro `#F8F9FA`
+> con borde `#E9ECEF` sobre la hoja blanca), "Anular venta" (el formulario ahora
+> vive dentro de la hoja) y "Resultado de la Anulación". "Seleccioná el modo de
+> pago" y "Esperando tarjeta" se refactorizaron al nuevo widget compartido
+> `mobile/lib/core/widgets/app_sheet_panel.dart` (`AppSheetPanel`), que
+> centraliza franja 10dp / radio 24dp / clip antiAlias para que el patrón quede
+> en un único punto. Los `Scaffold` **no usan `extendBody`**: la hoja se apoya
+> exactamente sobre la barra inferior opaca (no hay contenido literal oculto
+> detrás del menú). Login/Registro quedan fuera (conservan `AuthHeader` y card
+> con scroll). Evidencia: `mobile/test/terminal_layout_test.dart` actualizado al
+> nuevo template (fondo naranja + `AppSheetPanel` + barra inferior) en
+> 360×720dp; `flutter analyze` OK y `flutter test` OK (10 tests). Pendiente
+> verificación visual en el V660P real.
+
+> ✅ **Último cambio (2026-11-09):** eliminado el overflow vertical/horizontal en las
+> pantallas interactivas **sin incorporar scroll** y sin achicar controles (inputs 56,
+> botones 60, barra inferior 64). Se reemplazaron las cabeceras custom `Container(180dp)`
+> (`SaleFormHeader`, `SalesHistoryHeader`, `SaleReviewHeader` y wrappers equivalentes)
+> por un `AppHeader` compartido (AppBar naranja de 64dp con logo en `leading`) que
+> absorbe la barra de estado; se quitó el truco `Transform.translate(-20)` de solape
+> card/header; y se corrigieron Rows que desbordaban horizontal en 360dp de ancho
+> (`ReviewDataRow`, ticket de `SaleStatusContent`, fila de tarjeta de `SaleProcessing`).
+> Se eliminaron widgets `*_header.dart` duplicados y las constantes muertas
+> `AppSpacing.headerHeight`/`headerTopPadding`. La cabecera 64dp quedó aplicada a
+> "Iniciar Nueva Venta", "Confirmar Operación", "Resultado del Cobro", "Procesando
+> Cobro" y "Actualizar Contraseña"; en esta última además se eliminó la franja
+> naranja residual de 40dp + solape `translate(-20)` que simulaba la cabecera vieja
+> y se hizo flexible la fila de título del formulario. Además, el botón central
+> **VENTA** de la barra inferior pasó de `ElevatedButton.icon` rectangular (190×48
+> con "+") a un **botón circular de 58dp** con icono de carrito arriba del texto
+> "VENTA" (20px/10px), contenido dentro del menú de 64dp sin agrandarlo ni
+> sobresalir. Colores de marca: **fondo naranja de cabeceras + carrito/"VENTA"
+> blancos** (el blanco del menú), también cuando la barra está deshabilitada
+> (Procesando) — solo queda inerte. **Login y Registro ya no muestran la barra
+> inferior** (eran las únicas sin sesión). Evidencia: nuevo
+> `mobile/test/terminal_layout_test.dart` que monta header + tarjeta + barra inferior a
+> 720×1440 @2x (360×720dp) y falla ante cualquier overflow (review, estado aprobado,
+> anulación, procesando y actualizar contraseña) y verifica que `AppHeader` mida 64dp.
+> `flutter analyze` OK, `flutter test` OK (10 tests). Queda
+> pendiente verificación visual en el V660P real.
 
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
 > `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
@@ -231,7 +309,7 @@ Verifone (banda + térmica).
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
-| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las 14 screens interactivas (misma línea que el ícono de usuario; en `AuthHeader` arriba a la izquierda) y la barra inferior se conectó al `Scaffold` de todas ellas (deshabilitada en Login/Registro por no haber sesión; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). |
+| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. |
 
 ---
 
@@ -263,7 +341,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
-| UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo y Cerrar Lote deshabilitados + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera; las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
+| UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo y Cerrar Lote deshabilitados + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 
 ---

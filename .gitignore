@@ -94,3 +94,8 @@ payment-gateway/coverage.xml
 payment-gateway/.mypy_cache/
 payment-gateway/.pytest_cache/
 payment-gateway/.ruff_cache/
+
+# QA / artefactos locales
+mobile/ui_login*.xml
+mobile/ui_screen.xml
+api/*.pid

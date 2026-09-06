@@ -3,9 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/formatters/amount_formatter.dart';
 import '../../../../core/theme/app_colors.dart';
-
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../../../sales/presentation/cubit/sales_cubit.dart';
 import '../../../sales/presentation/widgets/card_fields_container.dart';
@@ -75,15 +78,11 @@ class _VoidCardScreenState extends State<VoidCardScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is! OperationModel) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Anular venta',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: AppColors.primaryOrange,
-          iconTheme: const IconThemeData(color: Colors.white),
-          elevation: 0,
+        appBar: const AppHeader(
+          title: 'Anular venta',
+          actions: [UserMenuButton(), SizedBox(width: 8)],
         ),
+        bottomNavigationBar: const AppBottomNavBar(),
         body: const Center(
           child: Text('Error: datos de operación no disponibles'),
         ),
@@ -93,18 +92,13 @@ class _VoidCardScreenState extends State<VoidCardScreen> {
     final operation = args;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      appBar: AppBar(
-        title: const Text(
-          'Anular venta',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: AppColors.primaryOrange,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
+      backgroundColor: AppColors.primaryOrange,
+      appBar: const AppHeader(
+        title: 'Anular venta',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
       ),
-      body: SafeArea(
-        top: false,
+      bottomNavigationBar: const AppBottomNavBar(),
+      body: AppSheetPanel(
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

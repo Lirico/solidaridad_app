@@ -22,12 +22,19 @@ class ChangePasswordFormFields extends StatelessWidget {
           children: const [
             Icon(Icons.lock_outline, color: Colors.grey),
             SizedBox(width: 8),
-            Text(
-              'Actualizar Contraseña',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Actualizar Contraseña',
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
               ),
             ),
           ],

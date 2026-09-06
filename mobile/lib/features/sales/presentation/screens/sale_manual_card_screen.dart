@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/manual_card_content.dart';
-import '../widgets/manual_card_header.dart';
 
 class SaleManualCardScreen extends StatefulWidget {
   const SaleManualCardScreen({super.key});
@@ -49,29 +53,20 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      appBar: ManualCardHeader(
-        onBackPressed: () => Navigator.maybePop(context),
+      backgroundColor: AppColors.primaryOrange,
+      appBar: const AppHeader(
+        title: 'Ingreso Manual',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
       ),
-      body: SafeArea(
-        top: false,
+      bottomNavigationBar: const AppBottomNavBar(),
+      body: AppSheetPanel(
         child: Form(
           key: _formKey,
-          child: Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            child: ManualCardContent(
-              cardNumberController: _cardNumberController,
-              expiryController: _expiryController,
-              cvvController: _cvvController,
-              onContinue: _onContinue,
-            ),
+          child: ManualCardContent(
+            cardNumberController: _cardNumberController,
+            expiryController: _expiryController,
+            cvvController: _cvvController,
+            onContinue: _onContinue,
           ),
         ),
       ),

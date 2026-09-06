@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
         top: false,
         child: Column(
           children: [
-            const AuthHeader(),
+            const AuthHeader(showLogo: false, useSolidaridadLogo: true),
             Expanded(
               child: Transform.translate(
                 offset: const Offset(0, -20),

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../cubit/sales_cubit.dart';
-import '../widgets/sale_review_header.dart';
 import '../widgets/sale_review_content.dart';
 
 class SaleReviewScreen extends StatelessWidget {
@@ -26,43 +30,19 @@ class SaleReviewScreen extends StatelessWidget {
     final salesState = context.watch<SalesCubit>().state;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            SaleReviewHeader(
-              title: 'Confirmar Operación',
-              onBackPressed: () => Navigator.pop(context),
-            ),
-            Expanded(
-              child: Transform.translate(
-                offset: const Offset(0, -20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.shade300,
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: SaleReviewContent(
-                      state: salesState,
-                      onConfirm: () => _onConfirmPayment(context),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+      backgroundColor: AppColors.primaryOrange,
+      appBar: const AppHeader(
+        title: 'Confirmar Operación',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
+      ),
+      bottomNavigationBar: const AppBottomNavBar(),
+      body: AppSheetPanel(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SaleReviewContent(
+            state: salesState,
+            onConfirm: () => _onConfirmPayment(context),
+          ),
         ),
       ),
     );

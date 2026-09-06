@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../../psdk/psdk_bridge.dart';
 import '../../domain/msr_card_data.dart';
 import '../cubit/sales_cubit.dart';
-import '../widgets/waiting_for_card_bottom_bar.dart';
 import '../widgets/waiting_for_card_content.dart';
-import '../widgets/waiting_for_card_header.dart';
 
 class WaitingForCardScreen extends StatefulWidget {
   const WaitingForCardScreen({super.key});
@@ -163,31 +165,19 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
-      appBar: const WaitingForCardHeader(),
-      body: Column(
-        children: [
-          const SizedBox(height: 10),
-          // Contenido principal blanco con bordes redondeados
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
-                ),
-              ),
-              child: WaitingForCardContent(
-                errorMessage: _errorMessage,
-                onRetry: _errorMessage != null ? _startReading : null,
-                onCancelOperation: _onBackPressed,
-              ),
-            ),
-          ),
-          // Botón Volver fijo en la parte inferior (fuera del contenedor blanco)
-          WaitingForCardBottomBar(onBackPressed: _onBackPressed),
-        ],
+      appBar: const AppHeader(
+        title: 'Nueva Operación',
+        actions: [UserMenuButton(), SizedBox(width: 8)],
+      ),
+      // La flecha "atrás" cancela la operación y la lectura de banda (el pop
+      // dispara dispose() → cancelReadMsr + tearDown del PSDK).
+      bottomNavigationBar: AppBottomNavBar(onBack: _onBackPressed),
+      body: AppSheetPanel(
+        child: WaitingForCardContent(
+          errorMessage: _errorMessage,
+          onRetry: _errorMessage != null ? _startReading : null,
+          onCancelOperation: _onBackPressed,
+        ),
       ),
     );
   }

@@ -68,10 +68,49 @@ impresión de ticket.
 - Manejo básico de carga, errores y reintentos (incluida idempotencia).
 - Build Android instalable en el modelo de terminal acordado.
 
-**Fuera de alcance de branding/UX avanzada** (igual que la estimación): no se
-incluye branding propio, logo, tipografía de marca, design system ni iteraciones
-visuales fuera de lo funcional acordado. UI estándar Material, priorizando
-claridad operativa.
+**Branding/UX:** la UI sigue siendo Material estándar y prioriza la claridad
+operativa, pero por decisión de producto (mockup `mobile/assets/Screen 1.jpg`)
+las pantallas interactivas incluyen:
+- el **logo de la empresa** (`mobile/assets/logo.png`, blanco sobre fondo
+  naranja) en la cabecera, alineado en la misma línea que el ícono de usuario;
+- una **barra de navegación inferior fija** con ← atrás, botón central
+  **VENTA** (va a la pantalla de selección de producto/cantidad) y botón
+  **⋯ "más"** (con la etiqueta "Más" debajo) que abre un **panel que ocupa el
+  mismo cajón blanco de la pantalla** (`MoreMenu` en `core/widgets`, ancho
+  100%, radio superior 24, pegado a la barra inferior; la cabecera y la barra
+  quedan visibles detrás y se cierra tocando fuera o con CERRAR) con
+  **Consultar saldo** y **Cerrar Lote** (pendientes de definición de contrato
+  con el cliente; deshabilitados por ahora) e **Historial de ventas**. El
+  cambio de contraseña es del menú del ícono de usuario.
+- el contenido de las pantallas operativas se apoya sobre un **panel blanco a
+  sangre completa** (`AppSheetPanel` en `core/widgets`) que asoma debajo de la
+  cabecera con **esquinas superiores redondeadas (24dp)** y deja ver el fondo
+  naranja (color de cabecera) en la franja de 10dp y detrás de la curvatura; el
+  panel ocupa el 100% del ancho y termina pegado al borde superior de la barra
+  inferior. Este patrón reemplaza a las tarjetas flotantes blancas con radio
+  16dp y sombra sobre fondo gris `#F4F6F9`.
+
+Excepciones: la pantalla de presentación (splash), la pantalla "Iniciando"
+(spinner) y **Login/Registro** no llevan la barra inferior (en auth no hay
+sesión ni acción de venta; antes se mostraba deshabilitada). Además, **Login no
+muestra el `logo.png` superior** (`AuthHeader(showLogo: false)`) porque esa
+pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra
+(desborde vertical); en su lugar, el centro de la cabecera de Login muestra
+`solidaridad_logo.png` (`useSolidaridadLogo: true`) reemplazando al bloque "GAS
+TERMINAL". Registro conserva el `logo.png` y el bloque "GAS TERMINAL". Siguen
+fuera de alcance la tipografía de marca, el design system y otras iteraciones
+visuales más allá de lo acordado.
+
+**Restricción de layout:** las pantallas operativas deben entrar en 360×720dp
+(referencia del device de QA) **sin scroll** y sin reducir el tamaño táctil de
+inputs/botones. Por eso las cabeceras del flujo se implementan como **AppBar
+naranja compacto (64dp) con logo como `leading`** (widget compartido `AppHeader`
+en `core/widgets`), en lugar del bloque alto naranja de 180dp, y el panel de
+contenido blanco (`AppSheetPanel`) arranca debajo del AppBar a sangre completa,
+sin solapes. Login/Registro conservan su
+`AuthHeader` (con scroll en la card) y no llevan la barra inferior. En la barra
+inferior, el botón **VENTA** es circular (58dp) con fondo naranja de cabeceras y
+carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 
 ### 2.2 Backend / API pública
 

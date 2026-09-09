@@ -4,7 +4,30 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-03-09
+Última revisión: 2026-09-09
+
+> ✅ **Último cambio (2026-09-09, envío de identidad de terminal en el login):**
+> el mobile envía la identidad de la terminal en el body de `POST /v1/auth/login`
+> con las **tres claves siempre presentes**: `installation_id` (define
+> `INSTALLATION_ID`) + `serial_number` + `logical_device_id`. Cuando no hay valor
+> real (terminal sin provisionar o sin PSDK/hardware), `serial_number` y
+> `logical_device_id` van como cadena vacía `""` (se normaliza como "sin dato"
+> tanto el vacío como el placeholder `"*"` que devuelve el PSDK). Nuevo
+> `DeviceIdentityService` en `mobile/lib/core/device/device_identity_service.dart`
+> que centraliza el `installation_id`, inicializa el PSDK best-effort (timeout ~4 s)
+> y lee `getDeviceInfo()`; `PsdkBridge.getDeviceInfo` devuelve mock con
+> `USE_MSR_MOCK=true` (mismo patrón que `readMsr`). **Backend sin cambios** (los
+> schemas Pydantic descartan campos extra; `extra="ignore"`). Evidencia:
+> `mobile/test/device_identity_service_test.dart` y
+> `mobile/test/auth_repository_login_test.dart`; `flutter analyze` OK y `flutter
+> test` OK (23 tests). **Verificado en V660P real (serial 713-348-525, Android 13):**
+> logcat del envío muestra el body con las 3 claves; en esta unidad (no provisionada
+> en TMS Verifone) `getDeviceInfo()` devuelve serial vacío y `logical_device_id="*"`,
+> por lo que se envían como `""`. **Nuevo gap:** el backend aún no declara/persiste
+> `serial_number`/`logical_device_id`; cuando el tech leader quiera consumirlos hay
+> que agregar campos opcionales en `api/presentation/schemas/auth.py` y decidir la
+> persistencia. En terminales registradas en Verifone el SDK debería devolver serial
+> y logical con valor real.
 
 > ✅ **Último cambio (2026-03-09, integración con master / PR #19):** la rama se
 > actualizó a master, que ya incluía el fix de la pantalla de resultado (G-P1-13). Se

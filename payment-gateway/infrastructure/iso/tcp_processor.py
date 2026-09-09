@@ -9,17 +9,19 @@ from domain.authorization import (
     AuthorizeCommand,
     VoidCommand,
 )
+from domain.balance import BalanceCommand, BalanceResult
 from domain.exceptions import (
     IsoPackError,
     ProcessorUnavailable,
     ProcessorUnreachable,
 )
 from infrastructure.iso.message_builder import (
+    build_balance_request,
     build_purchase_request,
     build_void_request,
 )
 from infrastructure.iso.packer import IsoMessage, pack_iso, unpack_iso
-from infrastructure.iso.response_mapper import map_iso_response
+from infrastructure.iso.response_mapper import map_balance_response, map_iso_response
 
 
 class TcpIsoProcessor:
@@ -33,6 +35,10 @@ class TcpIsoProcessor:
     def void(self, command: VoidCommand) -> AuthorizationResult:
         request = build_void_request(command, self._settings)
         return self._send(request)
+
+    def balance(self, command: BalanceCommand) -> BalanceResult:
+        request = build_balance_request(command, self._settings)
+        return self._send_balance(request)
 
     def _send(self, request: IsoMessage) -> AuthorizationResult:
         try:
@@ -54,6 +60,27 @@ class TcpIsoProcessor:
                 user_message="Respuesta ISO inválida",
             )
         return map_iso_response(response)
+
+    def _send_balance(self, request: IsoMessage) -> BalanceResult:
+        try:
+            frame = pack_iso(request)
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise IsoPackError("No se pudo armar el mensaje ISO") from exc
+
+        try:
+            response_frame = self._exchange(frame)
+        except (TimeoutError, OSError, ConnectionError) as exc:
+            raise ProcessorUnavailable() from exc
+
+        try:
+            response = unpack_iso(response_frame)
+        except IsoPackError:
+            return BalanceResult(
+                status=AuthorizationStatus.FAILED,
+                response_code="96",
+                user_message="Respuesta ISO inválida",
+            )
+        return map_balance_response(response)
 
     def _exchange(self, frame: bytes) -> bytes:
         host = self._settings.iso_host

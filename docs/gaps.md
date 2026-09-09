@@ -4,7 +4,19 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-03-09
+Última revisión: 2026-09-09
+
+> ✅ **Último cambio (2026-09-09, Consultar saldo):** se implementó la consulta de
+> saldo end-to-end sin tocar el procesador (usa su `consulta_saldo`/MTI `0100`
+> existente). Gateway: `POST /v1/balance` (construye `0100`, DE3 `310000`, lee el
+> saldo de DE4 y los productos de DE63) con `BalanceCommand`/`BalanceResult` y
+> `make check` OK. API: `POST /v1/balance` (sin producto en body) itera el
+> catálogo (993–997), agrega una fila por producto y lista con `0.00` los que
+> responden `06` (sin saldo asignado); `make check` OK. Mobile: se habilitó la
+> opción "Consultar saldo" del menú "⋯ Más" (antes deshabilitada) y se agregó el
+> flujo completo con la misma visual que la venta (captura Tarjeta/Ingreso manual
+> → confirmación → procesando → resultado con tabla **Producto | Cantidad**).
+> `flutter analyze` OK y `flutter test` OK.
 
 > ✅ **Último cambio (2026-03-09, integración con master / PR #19):** la rama se
 > actualizó a master, que ya incluía el fix de la pantalla de resultado (G-P1-13). Se
@@ -359,7 +371,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
-| UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo y Cerrar Lote deshabilitados + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
+| UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo navega al flujo de saldo, Cerrar Lote deshabilitado + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 
 ---

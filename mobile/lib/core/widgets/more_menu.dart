@@ -72,12 +72,17 @@ class MoreMenu {
           top: sheetTop,
           height: sheetHeight,
           onClose: () => Navigator.pop(dialogContext),
+          onBalanceSelected: () =>
+              Navigator.pop(dialogContext, AppRoutes.balanceCaptureMode),
           onHistorySelected: () =>
               Navigator.pop(dialogContext, AppRoutes.salesHistory),
         );
       },
     );
 
+    if (selection == AppRoutes.balanceCaptureMode && context.mounted) {
+      Navigator.pushNamed(context, AppRoutes.balanceCaptureMode);
+    }
     if (selection == AppRoutes.salesHistory && context.mounted) {
       Navigator.pushNamed(context, AppRoutes.salesHistory);
     }
@@ -89,12 +94,14 @@ class _MoreMenuOverlay extends StatelessWidget {
   final double top;
   final double height;
   final VoidCallback onClose;
+  final VoidCallback onBalanceSelected;
   final VoidCallback onHistorySelected;
 
   const _MoreMenuOverlay({
     required this.top,
     required this.height,
     required this.onClose,
+    required this.onBalanceSelected,
     required this.onHistorySelected,
   });
 
@@ -110,6 +117,7 @@ class _MoreMenuOverlay extends StatelessWidget {
           height: height,
           child: _MoreMenuSheet(
             onClose: onClose,
+            onBalanceSelected: onBalanceSelected,
             onHistorySelected: onHistorySelected,
           ),
         ),
@@ -121,10 +129,12 @@ class _MoreMenuOverlay extends StatelessWidget {
 /// Panel blanco con radio superior 24 y el listado de opciones.
 class _MoreMenuSheet extends StatelessWidget {
   final VoidCallback onClose;
+  final VoidCallback onBalanceSelected;
   final VoidCallback onHistorySelected;
 
   const _MoreMenuSheet({
     required this.onClose,
+    required this.onBalanceSelected,
     required this.onHistorySelected,
   });
 
@@ -153,11 +163,12 @@ class _MoreMenuSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const _MoreMenuTile(
+                    _MoreMenuTile(
                       icon: Icons.account_balance_wallet_outlined,
                       title: 'Consultar saldo',
-                      subtitle: 'Próximamente',
-                      enabled: false,
+                      subtitle: 'Consultar el saldo de la tarjeta',
+                      enabled: true,
+                      onTap: onBalanceSelected,
                     ),
                     const SizedBox(height: 12),
                     const _MoreMenuTile(

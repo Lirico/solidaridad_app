@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:solidaridad_app/core/constants/app_routes.dart';
 import 'package:solidaridad_app/core/widgets/app_bottom_nav_bar.dart';
 import 'package:solidaridad_app/core/widgets/app_header.dart';
 import 'package:solidaridad_app/core/widgets/app_sheet_panel.dart';
@@ -13,8 +14,12 @@ Future<void> _pumpTemplate(WidgetTester tester) async {
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
-    const MaterialApp(
-      home: Scaffold(
+    MaterialApp(
+      routes: {
+        AppRoutes.balanceCaptureMode: (context) =>
+            const Scaffold(body: Center(child: Text('balance_capture_mode_screen'))),
+      },
+      home: const Scaffold(
         appBar: AppHeader(title: 'Nueva Operación'),
         bottomNavigationBar: AppBottomNavBar(),
         body: AppSheetPanel(child: SizedBox.expand()),
@@ -65,7 +70,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     // Las opciones deshabilitadas no cierran el panel al tocarlas.
-    await tester.tap(find.text('Consultar saldo'));
+    await tester.tap(find.text('Cerrar Lote'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('moreMenuSheet')), findsOneWidget);
 
@@ -74,6 +79,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('moreMenuSheet')), findsNothing);
     expect(find.text('Más opciones'), findsNothing);
+  });
+
+  testWidgets('⋯ Más: Consultar saldo está habilitado y navega', (tester) async {
+    await _pumpTemplate(tester);
+
+    await tester.tap(find.byIcon(Icons.more_horiz).first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Consultar saldo'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('moreMenuSheet')), findsNothing);
+    expect(find.text('balance_capture_mode_screen'), findsOneWidget);
   });
 
   testWidgets('⋯ Más: tocar fuera del panel lo cierra', (tester) async {

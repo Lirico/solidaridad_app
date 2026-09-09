@@ -9,8 +9,9 @@ import 'more_menu.dart';
 /// (ancho completo, radio superior 24, pegado a la barra inferior).
 ///
 /// Ítems del panel:
-/// - **Consultar saldo** y **Cerrar Lote**: deshabilitados hasta que el cliente
-///   defina el contrato/backend (no hacen nada por ahora).
+/// - **Consultar saldo**: navega al flujo de consulta de saldo (captura manual
+///   o por banda, resultado con tabla Producto | Cantidad).
+/// - **Cerrar Lote**: deshabilitado ("Próximamente").
 /// - **Historial de ventas**: navega al listado.
 ///
 /// El cambio de contraseña NO vive acá: es del menú del ícono de usuario

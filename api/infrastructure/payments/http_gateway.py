@@ -1,10 +1,12 @@
-"""HTTP client for payment-gateway authorize / void."""
+"""HTTP client for payment-gateway authorize / void / balance."""
 
 import httpx
 
 from application.payments.ports import (
     AuthorizeRequest,
     AuthorizeResult,
+    BalanceRequest,
+    BalanceResult,
     GatewayOutcome,
     VoidRequest,
 )
@@ -59,6 +61,20 @@ class HttpPaymentGateway:
             payload["expiration_date"] = request.expiration_date
         return self._post("/v1/void", payload)
 
+    def balance(self, request: BalanceRequest) -> BalanceResult:
+        payload: dict[str, object] = {
+            "product_code": request.product_code,
+            "card_number": request.card_number,
+            "terminal_id": request.terminal_id,
+            "stan": request.stan,
+            "entry_mode": request.entry_mode,
+        }
+        if request.expiration_date is not None:
+            payload["expiration_date"] = request.expiration_date
+        if request.track2 is not None:
+            payload["track2"] = request.track2
+        return self._post_balance("/v1/balance", payload)
+
     def _post(self, path: str, payload: dict[str, object]) -> AuthorizeResult:
         try:
             response = self._client.post(path, json=payload)
@@ -101,4 +117,50 @@ class HttpPaymentGateway:
             user_message=data.get("user_message"),
             auth_id=data.get("auth_id"),
             retrieval_reference=data.get("retrieval_reference"),
+        )
+
+    def _post_balance(
+        self,
+        path: str,
+        payload: dict[str, object],
+    ) -> BalanceResult:
+        try:
+            response = self._client.post(path, json=payload)
+        except httpx.ConnectError:
+            return BalanceResult(outcome=GatewayOutcome.FAILED)
+        except httpx.TimeoutException:
+            return BalanceResult(outcome=GatewayOutcome.UNKNOWN)
+        except httpx.HTTPError:
+            return BalanceResult(outcome=GatewayOutcome.UNKNOWN)
+
+        if response.status_code == 503:
+            return BalanceResult(outcome=GatewayOutcome.FAILED)
+        if response.status_code == 502:
+            return BalanceResult(outcome=GatewayOutcome.UNKNOWN)
+        if response.status_code >= 500:
+            return BalanceResult(outcome=GatewayOutcome.UNKNOWN)
+        if response.status_code >= 400:
+            return BalanceResult(outcome=GatewayOutcome.FAILED)
+
+        try:
+            data = response.json()
+        except ValueError:
+            return BalanceResult(outcome=GatewayOutcome.UNKNOWN)
+
+        status = str(data.get("status", "")).upper()
+        if status == "APPROVED":
+            outcome = GatewayOutcome.APPROVED
+        elif status == "DECLINED":
+            outcome = GatewayOutcome.DECLINED
+        elif status == "FAILED":
+            outcome = GatewayOutcome.FAILED
+        else:
+            outcome = GatewayOutcome.UNKNOWN
+
+        return BalanceResult(
+            outcome=outcome,
+            response_code=data.get("response_code"),
+            user_message=data.get("user_message"),
+            available_balance_minor=data.get("available_balance_minor"),
+            assigned_products=data.get("assigned_products"),
         )

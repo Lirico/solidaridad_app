@@ -17,7 +17,7 @@ from domain.exceptions import (
     UnsupportedProduct,
 )
 from presentation.dependencies import get_check_balance
-from presentation.schemas.authorize import BalanceRequest, BalanceResponse
+from presentation.schemas.balance import BalanceRequest, BalanceResponse
 
 router = APIRouter()
 

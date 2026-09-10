@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_routes.dart';
 import 'more_menu.dart';
 
 /// Botón "⋯ Más" de la barra inferior.
@@ -13,6 +14,9 @@ import 'more_menu.dart';
 ///   o por banda, resultado con tabla Producto | Cantidad).
 /// - **Cerrar Lote**: deshabilitado ("Próximamente").
 /// - **Historial de ventas**: navega al listado.
+///
+/// La navegación de esas opciones vive acá: [MoreMenu] solo devuelve la
+/// `MoreMenuOption` elegida.
 ///
 /// El cambio de contraseña NO vive acá: es del menú del ícono de usuario
 /// ([UserMenuButton]).
@@ -34,6 +38,29 @@ class HeaderMenuButton extends StatelessWidget {
     this.showLabel = false,
   });
 
+  /// Abre el panel "⋯ Más" y navega a la opción elegida.
+  ///
+  /// [MoreMenu] no navega: devuelve la [MoreMenuOption] y acá se mapea a
+  /// [AppRoutes]. El botón llena los 64dp del menú, de modo que su borde
+  /// superior en coordenadas globales es también el arranque de la barra
+  /// inferior: ese valor es el `navTop` que espera `MoreMenu.show`.
+  Future<void> _openMoreMenu(BuildContext context) async {
+    final RenderBox box = context.findRenderObject()! as RenderBox;
+    final double navTop = box.localToGlobal(Offset.zero).dy;
+
+    final MoreMenuOption? option = await MoreMenu.show(context, navTop: navTop);
+    if (option == null || !context.mounted) {
+      return;
+    }
+
+    switch (option) {
+      case MoreMenuOption.balance:
+        Navigator.pushNamed(context, AppRoutes.balanceCaptureMode);
+      case MoreMenuOption.salesHistory:
+        Navigator.pushNamed(context, AppRoutes.salesHistory);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -44,16 +71,7 @@ class HeaderMenuButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: enabled
-                ? () {
-                    // El botón llena los 64dp del menú: su borde superior en
-                    // coordenadas globales es el arranque de la barra inferior.
-                    final RenderBox box =
-                        context.findRenderObject()! as RenderBox;
-                    final double navTop = box.localToGlobal(Offset.zero).dy;
-                    MoreMenu.show(context, navTop: navTop);
-                  }
-                : null,
+            onTap: enabled ? () => _openMoreMenu(context) : null,
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
               width: showLabel ? 64 : 48,

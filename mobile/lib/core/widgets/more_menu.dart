@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 
-import '../constants/app_routes.dart';
 import '../theme/app_colors.dart';
 import 'app_sheet_panel.dart';
+
+/// Opción elegida en el menú "⋯ Más".
+///
+/// El menú es UI pura: no conoce las rutas. Devuelve la opción elegida y el
+/// llamador (`HeaderMenuButton`) es el que la mapea a `AppRoutes` y navega.
+enum MoreMenuOption {
+  /// Consultar saldo de la tarjeta (`AppRoutes.balanceCaptureMode`).
+  balance,
+
+  /// Historial de ventas (`AppRoutes.salesHistory`).
+  salesHistory,
+}
 
 /// Menú "⋯ Más" ampliado.
 ///
@@ -14,6 +25,9 @@ import 'app_sheet_panel.dart';
 ///
 /// El overlay es transparente: la cabecera y la barra inferior quedan visibles
 /// detrás y cualquier toque fuera del panel lo cierra (`barrierDismissible`).
+///
+/// El panel no navega: devuelve la `MoreMenuOption` elegida (ver [show]) y el
+/// llamador decide la ruta.
 class MoreMenu {
   const MoreMenu._();
 
@@ -28,11 +42,15 @@ class MoreMenu {
   /// [navTop] es el borde superior de la barra inferior en coordenadas
   /// globales; se mide desde el botón (que llena los 64dp del menú) para que
   /// el panel termine exactamente donde arranca la barra.
-  static Future<void> show(
+  ///
+  /// Devuelve la `MoreMenuOption` elegida, o `null` si el panel se cerró (botón
+  /// CERRAR, toque fuera del panel o descarte del barrier). No navega: el mapeo
+  /// a `AppRoutes` lo hace el llamador.
+  static Future<MoreMenuOption?> show(
     BuildContext context, {
     required double navTop,
   }) async {
-    final String? selection = await showGeneralDialog<String>(
+    final MoreMenuOption? selection = await showGeneralDialog<MoreMenuOption>(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Cerrar menú de más opciones',
@@ -71,21 +89,14 @@ class MoreMenu {
         return _MoreMenuOverlay(
           top: sheetTop,
           height: sheetHeight,
-          onClose: () => Navigator.pop(dialogContext),
-          onBalanceSelected: () =>
-              Navigator.pop(dialogContext, AppRoutes.balanceCaptureMode),
-          onHistorySelected: () =>
-              Navigator.pop(dialogContext, AppRoutes.salesHistory),
+          // `null` cierra el panel: mismo valor que devuelve el barrier.
+          onSelected: (MoreMenuOption? option) =>
+              Navigator.pop(dialogContext, option),
         );
       },
     );
 
-    if (selection == AppRoutes.balanceCaptureMode && context.mounted) {
-      Navigator.pushNamed(context, AppRoutes.balanceCaptureMode);
-    }
-    if (selection == AppRoutes.salesHistory && context.mounted) {
-      Navigator.pushNamed(context, AppRoutes.salesHistory);
-    }
+    return selection;
   }
 }
 
@@ -93,16 +104,12 @@ class MoreMenu {
 class _MoreMenuOverlay extends StatelessWidget {
   final double top;
   final double height;
-  final VoidCallback onClose;
-  final VoidCallback onBalanceSelected;
-  final VoidCallback onHistorySelected;
+  final ValueChanged<MoreMenuOption?> onSelected;
 
   const _MoreMenuOverlay({
     required this.top,
     required this.height,
-    required this.onClose,
-    required this.onBalanceSelected,
-    required this.onHistorySelected,
+    required this.onSelected,
   });
 
   @override
@@ -115,11 +122,7 @@ class _MoreMenuOverlay extends StatelessWidget {
           left: 0,
           right: 0,
           height: height,
-          child: _MoreMenuSheet(
-            onClose: onClose,
-            onBalanceSelected: onBalanceSelected,
-            onHistorySelected: onHistorySelected,
-          ),
+          child: _MoreMenuSheet(onSelected: onSelected),
         ),
       ],
     );
@@ -128,15 +131,9 @@ class _MoreMenuOverlay extends StatelessWidget {
 
 /// Panel blanco con radio superior 24 y el listado de opciones.
 class _MoreMenuSheet extends StatelessWidget {
-  final VoidCallback onClose;
-  final VoidCallback onBalanceSelected;
-  final VoidCallback onHistorySelected;
+  final ValueChanged<MoreMenuOption?> onSelected;
 
-  const _MoreMenuSheet({
-    required this.onClose,
-    required this.onBalanceSelected,
-    required this.onHistorySelected,
-  });
+  const _MoreMenuSheet({required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +152,7 @@ class _MoreMenuSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _MoreMenuHeader(onClose: onClose),
+            _MoreMenuHeader(onClose: () => onSelected(null)),
             const Divider(height: 1),
             Expanded(
               child: SingleChildScrollView(
@@ -168,7 +165,7 @@ class _MoreMenuSheet extends StatelessWidget {
                       title: 'Consultar saldo',
                       subtitle: 'Consultar el saldo de la tarjeta',
                       enabled: true,
-                      onTap: onBalanceSelected,
+                      onTap: () => onSelected(MoreMenuOption.balance),
                     ),
                     const SizedBox(height: 12),
                     const _MoreMenuTile(
@@ -183,7 +180,7 @@ class _MoreMenuSheet extends StatelessWidget {
                       title: 'Historial de ventas',
                       subtitle: 'Ver operaciones realizadas',
                       enabled: true,
-                      onTap: onHistorySelected,
+                      onTap: () => onSelected(MoreMenuOption.salesHistory),
                     ),
                   ],
                 ),
@@ -197,7 +194,7 @@ class _MoreMenuSheet extends StatelessWidget {
                   SizedBox(
                     height: 50,
                     child: OutlinedButton(
-                      onPressed: onClose,
+                      onPressed: () => onSelected(null),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(
                           color: AppColors.primaryOrange,

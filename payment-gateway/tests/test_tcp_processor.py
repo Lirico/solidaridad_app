@@ -88,6 +88,18 @@ def test_tcp_processor_void_maps_approved_response() -> None:
     sock.sendall.assert_called_once()
 
 
+def test_tcp_processor_void_failed_on_bad_response() -> None:
+    settings = Settings(iso_transport="tcp")
+    processor = TcpIsoProcessor(settings)
+    with patch("infrastructure.iso.tcp_processor.socket.create_connection") as conn:
+        sock = MagicMock()
+        conn.return_value.__enter__.return_value = sock
+        sock.recv.side_effect = [b"\x00\x02", b"\xff\xff"]
+        result = processor.void(_void_cmd())
+    assert result.status == AuthorizationStatus.FAILED
+    assert result.response_code == "96"
+
+
 def test_tcp_processor_raises_unreachable_on_connect_error() -> None:
     settings = Settings(iso_transport="tcp")
     processor = TcpIsoProcessor(settings)

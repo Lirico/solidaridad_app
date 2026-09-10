@@ -1,6 +1,7 @@
 """TCP client for authkig ISO8583."""
 
 import socket
+from collections.abc import Callable
 
 from config.settings import Settings
 from domain.authorization import (
@@ -30,17 +31,22 @@ class TcpIsoProcessor:
 
     def authorize(self, command: AuthorizeCommand) -> AuthorizationResult:
         request = build_purchase_request(command, self._settings)
-        return self._send(request)
+        return self._send(request, map_iso_response, _invalid_authorization)
 
     def void(self, command: VoidCommand) -> AuthorizationResult:
         request = build_void_request(command, self._settings)
-        return self._send(request)
+        return self._send(request, map_iso_response, _invalid_authorization)
 
     def balance(self, command: BalanceCommand) -> BalanceResult:
         request = build_balance_request(command, self._settings)
-        return self._send_balance(request)
+        return self._send(request, map_balance_response, _invalid_balance)
 
-    def _send(self, request: IsoMessage) -> AuthorizationResult:
+    def _send[T: (AuthorizationResult, BalanceResult)](
+        self,
+        request: IsoMessage,
+        mapper: Callable[[IsoMessage], T],
+        fallback: Callable[[], T],
+    ) -> T:
         try:
             frame = pack_iso(request)
         except (ValueError, UnicodeEncodeError) as exc:
@@ -54,33 +60,8 @@ class TcpIsoProcessor:
         try:
             response = unpack_iso(response_frame)
         except IsoPackError:
-            return AuthorizationResult(
-                status=AuthorizationStatus.FAILED,
-                response_code="96",
-                user_message="Respuesta ISO inválida",
-            )
-        return map_iso_response(response)
-
-    def _send_balance(self, request: IsoMessage) -> BalanceResult:
-        try:
-            frame = pack_iso(request)
-        except (ValueError, UnicodeEncodeError) as exc:
-            raise IsoPackError("No se pudo armar el mensaje ISO") from exc
-
-        try:
-            response_frame = self._exchange(frame)
-        except (TimeoutError, OSError, ConnectionError) as exc:
-            raise ProcessorUnavailable() from exc
-
-        try:
-            response = unpack_iso(response_frame)
-        except IsoPackError:
-            return BalanceResult(
-                status=AuthorizationStatus.FAILED,
-                response_code="96",
-                user_message="Respuesta ISO inválida",
-            )
-        return map_balance_response(response)
+            return fallback()
+        return mapper(response)
 
     def _exchange(self, frame: bytes) -> bytes:
         host = self._settings.iso_host
@@ -115,3 +96,19 @@ def _recv_exact(sock: socket.socket, size: int) -> bytes:
         chunks.append(chunk)
         remaining -= len(chunk)
     return b"".join(chunks)
+
+
+def _invalid_authorization() -> AuthorizationResult:
+    return AuthorizationResult(
+        status=AuthorizationStatus.FAILED,
+        response_code="96",
+        user_message="Respuesta ISO inválida",
+    )
+
+
+def _invalid_balance() -> BalanceResult:
+    return BalanceResult(
+        status=AuthorizationStatus.FAILED,
+        response_code="96",
+        user_message="Respuesta ISO inválida",
+    )

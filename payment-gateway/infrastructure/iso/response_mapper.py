@@ -19,13 +19,21 @@ _MESSAGES: dict[str, str] = {
 }
 
 
-def map_iso_response(iso: IsoMessage) -> AuthorizationResult:
+def _classify_response(iso: IsoMessage) -> tuple[AuthorizationStatus, str, str]:
+    """Derive (status, response_code, user_message) from DE39/DE63."""
     code = (iso.respcode_39 or "").strip() or "96"
     if code in _APPROVED_CODES:
         status = AuthorizationStatus.APPROVED
     else:
         status = AuthorizationStatus.DECLINED
-    message = _MESSAGES.get(code, iso.field_63.strip() if iso.field_63 else "Rechazada")
+    message = _MESSAGES.get(
+        code, iso.field_63.strip() if iso.field_63 else "Rechazada"
+    )
+    return status, code, message
+
+
+def map_iso_response(iso: IsoMessage) -> AuthorizationResult:
+    status, code, message = _classify_response(iso)
     return AuthorizationResult(
         status=status,
         response_code=code,
@@ -41,12 +49,7 @@ def map_balance_response(iso: IsoMessage) -> BalanceResult:
     El saldo viene en DE4 (amount_4) como 12 dígitos con 2 decimales implícitos
     (p. ej. "000000010000" → 100.00). DE63 trae los productos asignados.
     """
-    code = (iso.respcode_39 or "").strip() or "96"
-    if code in _APPROVED_CODES:
-        status = AuthorizationStatus.APPROVED
-    else:
-        status = AuthorizationStatus.DECLINED
-    message = _MESSAGES.get(code, iso.field_63.strip() if iso.field_63 else "Rechazada")
+    status, code, message = _classify_response(iso)
 
     available_balance_minor: int | None = None
     amount = iso.amount_4.strip()

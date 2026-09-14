@@ -1,7 +1,8 @@
 """HTTP controllers package."""
 
 from presentation.controllers.authorize_controller import router as authorize_router
+from presentation.controllers.balance_controller import router as balance_router
 from presentation.controllers.ping_controller import router as ping_router
 from presentation.controllers.void_controller import router as void_router
 
-__all__ = ["authorize_router", "ping_router", "void_router"]
+__all__ = ["authorize_router", "balance_router", "ping_router", "void_router"]

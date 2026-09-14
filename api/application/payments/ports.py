@@ -46,7 +46,29 @@ class AuthorizeResult:
     retrieval_reference: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class BalanceRequest:
+    product_code: str
+    card_number: str
+    terminal_id: str
+    stan: str
+    expiration_date: str | None = None
+    entry_mode: str = "012"
+    track2: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BalanceResult:
+    outcome: GatewayOutcome
+    response_code: str | None = None
+    user_message: str | None = None
+    available_balance_minor: int | None = None
+    assigned_products: str | None = None
+
+
 class PaymentGateway(Protocol):
     def authorize(self, request: AuthorizeRequest) -> AuthorizeResult: ...
 
     def void(self, request: VoidRequest) -> AuthorizeResult: ...
+
+    def balance(self, request: BalanceRequest) -> BalanceResult: ...

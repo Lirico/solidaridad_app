@@ -1,6 +1,10 @@
 import httpx
 
-from application.payments.ports import AuthorizeRequest, GatewayOutcome
+from application.payments.ports import (
+    AuthorizeRequest,
+    BalanceRequest,
+    GatewayOutcome,
+)
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 
 
@@ -157,3 +161,76 @@ def test_void_approved() -> None:
     )
     assert result.outcome == GatewayOutcome.APPROVED
     assert result.auth_id == "V1"
+
+
+def _balance_request() -> BalanceRequest:
+    return BalanceRequest(
+        product_code="993",
+        card_number="4111111111111111",
+        terminal_id="05000001",
+        stan="000003",
+        expiration_date="2912",
+    )
+
+
+def test_balance_approved() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/balance"
+        return httpx.Response(
+            200,
+            json={
+                "status": "APPROVED",
+                "response_code": "00",
+                "user_message": "Aprobada",
+                "available_balance_minor": 10000,
+                "assigned_products": "Tipo de asignacion: Garrafa 10 kg",
+            },
+        )
+
+    result = _gateway(handler).balance(_balance_request())
+    assert result.outcome == GatewayOutcome.APPROVED
+    assert result.available_balance_minor == 10000
+    assert result.assigned_products == "Tipo de asignacion: Garrafa 10 kg"
+
+
+def test_balance_declined() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"status": "DECLINED", "response_code": "06", "user_message": "x"},
+        )
+
+    assert (
+        _gateway(handler).balance(_balance_request()).outcome
+        == GatewayOutcome.DECLINED
+    )
+
+
+def test_balance_connect_error_is_failed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom", request=request)
+
+    assert (
+        _gateway(handler).balance(_balance_request()).outcome
+        == GatewayOutcome.FAILED
+    )
+
+
+def test_balance_503_is_failed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, json={"message": "down"})
+
+    assert (
+        _gateway(handler).balance(_balance_request()).outcome
+        == GatewayOutcome.FAILED
+    )
+
+
+def test_balance_502_is_unknown() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502, json={"message": "ambiguous"})
+
+    assert (
+        _gateway(handler).balance(_balance_request()).outcome
+        == GatewayOutcome.UNKNOWN
+    )

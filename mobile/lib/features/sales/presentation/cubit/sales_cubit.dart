@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/sale_model.dart';
-import '../../domain/msr_card_data.dart';
+import '../../../../psdk/msr_card_data.dart';
 import '../../data/sales_repository.dart';
 import 'sales_state.dart';
 

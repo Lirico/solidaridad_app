@@ -7,11 +7,14 @@ from domain.authorization import (
     AuthorizeCommand,
     VoidCommand,
 )
+from domain.balance import BalanceCommand, BalanceResult
 
 
 class IsoProcessor(Protocol):
-    """Port: send an authorization/void to the ISO processor (or mock)."""
+    """Port: send an authorization/void/balance to the ISO processor (or mock)."""
 
     def authorize(self, command: AuthorizeCommand) -> AuthorizationResult: ...
 
     def void(self, command: VoidCommand) -> AuthorizationResult: ...
+
+    def balance(self, command: BalanceCommand) -> BalanceResult: ...

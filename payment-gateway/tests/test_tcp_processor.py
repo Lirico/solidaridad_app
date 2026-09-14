@@ -4,6 +4,7 @@ import pytest
 
 from config.settings import Settings
 from domain.authorization import AuthorizationStatus, AuthorizeCommand, VoidCommand
+from domain.balance import BalanceCommand
 from domain.exceptions import ProcessorUnavailable, ProcessorUnreachable
 from infrastructure.iso.packer import IsoMessage, pack_iso, set_present
 from infrastructure.iso.tcp_processor import TcpIsoProcessor
@@ -87,6 +88,18 @@ def test_tcp_processor_void_maps_approved_response() -> None:
     sock.sendall.assert_called_once()
 
 
+def test_tcp_processor_void_failed_on_bad_response() -> None:
+    settings = Settings(iso_transport="tcp")
+    processor = TcpIsoProcessor(settings)
+    with patch("infrastructure.iso.tcp_processor.socket.create_connection") as conn:
+        sock = MagicMock()
+        conn.return_value.__enter__.return_value = sock
+        sock.recv.side_effect = [b"\x00\x02", b"\xff\xff"]
+        result = processor.void(_void_cmd())
+    assert result.status == AuthorizationStatus.FAILED
+    assert result.response_code == "96"
+
+
 def test_tcp_processor_raises_unreachable_on_connect_error() -> None:
     settings = Settings(iso_transport="tcp")
     processor = TcpIsoProcessor(settings)
@@ -134,3 +147,65 @@ def test_dependencies_select_tcp() -> None:
     tcp = get_iso_processor(Settings(iso_transport="tcp"))
     assert isinstance(mock, MockIsoProcessor)
     assert isinstance(tcp, Tcp)
+
+
+def _balance_cmd() -> BalanceCommand:
+    return BalanceCommand(
+        product_code="993",
+        card_number="4111111111111111",
+        terminal_id="TERM0001",
+        stan="000003",
+    )
+
+
+def _balance_response_frame() -> bytes:
+    iso = IsoMessage(
+        tpdu="6000030000",
+        mtype="0110",
+        respcode_39="00",
+        amount_4="000000010000",
+        systracenum_11="000003",
+    )
+    set_present(iso, 4, 11, 39)
+    return pack_iso(iso)
+
+
+def test_tcp_processor_balance_maps_approved_response() -> None:
+    settings = Settings(iso_transport="tcp")
+    processor = TcpIsoProcessor(settings)
+    frame = _balance_response_frame()
+
+    with patch("infrastructure.iso.tcp_processor.socket.create_connection") as conn:
+        sock = MagicMock()
+        conn.return_value.__enter__.return_value = sock
+        sock.recv.side_effect = [frame[:2], frame[2:]]
+        result = processor.balance(_balance_cmd())
+
+    assert result.status == AuthorizationStatus.APPROVED
+    assert result.available_balance_minor == 10000
+    sock.sendall.assert_called_once()
+
+
+def test_tcp_processor_balance_failed_on_bad_response() -> None:
+    settings = Settings(iso_transport="tcp")
+    processor = TcpIsoProcessor(settings)
+    with patch("infrastructure.iso.tcp_processor.socket.create_connection") as conn:
+        sock = MagicMock()
+        conn.return_value.__enter__.return_value = sock
+        sock.recv.side_effect = [b"\x00\x02", b"\xff\xff"]
+        result = processor.balance(_balance_cmd())
+    assert result.status == AuthorizationStatus.FAILED
+    assert result.response_code == "96"
+
+
+def test_tcp_processor_balance_raises_unreachable_on_connect_error() -> None:
+    settings = Settings(iso_transport="tcp")
+    processor = TcpIsoProcessor(settings)
+    with (
+        patch(
+            "infrastructure.iso.tcp_processor.socket.create_connection",
+            side_effect=TimeoutError(),
+        ),
+        pytest.raises(ProcessorUnreachable),
+    ):
+        processor.balance(_balance_cmd())

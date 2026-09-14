@@ -206,9 +206,17 @@ completo es de **4 ramas**:
 | Rama | Qué hace | Estado |
 |------|----------|:------:|
 | **Rama 1** | Portar el bridge PSDK | ✅ Hecha |
-| **Rama 2** | Conectar `WaitingForCardScreen` al PSDK + navegación "Tarjeta" | ⏳ Pendiente |
+| **Rama 2** | Conectar `WaitingForCardScreen` al PSDK + navegación "Tarjeta" | ✅ Hecha |
 | **Rama 3** | Gateway con `entry_mode` dinámico + API con `entry_mode`/`track2` | ✅ Hecha |
-| **Rama 4** | Mobile `registerSale` con `entry_mode` + actualizar `docs/gaps.md` | ⏳ Pendiente |
+| **Rama 4** | Mobile `registerSale` con `entry_mode` + actualizar `docs/gaps.md` | ✅ Hecha |
+
+> **2026-10-09 (refactor):** el ciclo del lector (initialize → espera de
+> `sdiReady` → `readMsr` → limpieza) ya no vive en cada pantalla sino en
+> `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`), compartido por la
+> venta (`WaitingForCardScreen`), la consulta de saldo
+> (`BalanceWaitingForCardScreen`) y `ReceiptPrinter`. El `entry_mode` que envía
+> cada flujo no cambia: `022` (banda, sin track2) para ambas lecturas por banda y
+> `012` (manual) para el ingreso manual. Ver G-P0-06.
 
 ---
 

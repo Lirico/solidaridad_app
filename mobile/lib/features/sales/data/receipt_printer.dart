@@ -1,6 +1,5 @@
-import 'dart:async';
-
 import '../../../psdk/psdk_bridge.dart';
+import '../../../psdk/psdk_card_reader.dart';
 import '../domain/receipt_formatter.dart';
 import '../domain/sale_model.dart';
 
@@ -19,12 +18,17 @@ class PrintResult {
 /// Imprime el ticket térmico en la terminal Verifone V660P.
 ///
 /// Encapsula la inicialización del PaymentSDK (si no está listo) y la llamada
-/// a [PsdkBridge.printHtml]. Reutiliza la misma lógica de espera de `sdiReady`
-/// que usa `WaitingForCardScreen`.
+/// a [PsdkBridge.printHtml]. La espera de `sdiReady` (con el guard de
+/// race-condition) vive en [PsdkCardReader.ensureReady], compartida con las
+/// pantallas de lectura de banda.
 class ReceiptPrinter {
-  ReceiptPrinter({PsdkBridge? psdk}) : _psdk = psdk ?? PsdkBridge();
+  ReceiptPrinter({PsdkBridge? psdk, PsdkCardReader? reader})
+    : _psdk = psdk ?? PsdkBridge() {
+    _reader = reader ?? PsdkCardReader(psdk: _psdk);
+  }
 
   final PsdkBridge _psdk;
+  late final PsdkCardReader _reader;
 
   /// Imprime el ticket de [operation] en la térmica.
   ///
@@ -33,7 +37,7 @@ class ReceiptPrinter {
   Future<PrintResult> printTicket(OperationModel operation) async {
     try {
       // 1. Asegurar que el SDK esté inicializado y listo (sdiReady).
-      final bool ready = await _ensureSdkReady();
+      final bool ready = await _reader.ensureReady(initializeIfNeeded: true);
       if (!ready) {
         return const PrintResult.failure(
           'No se pudo inicializar la impresora. Reintente.',
@@ -54,40 +58,6 @@ class ReceiptPrinter {
       return const PrintResult.failure(
         'Error al imprimir el ticket. Reintente.',
       );
-    }
-  }
-
-  /// Inicializa el PaymentSDK y espera el evento `sdiReady`.
-  ///
-  /// `initialize()` es asíncrono: retorna de inmediato con `sdiReady=false` y
-  /// el SDK recién queda listo cuando llega `handleStatus` con SUCCESS. Este
-  /// método escucha [PsdkBridge.statusEvents] hasta que eso ocurra o se agote
-  /// [timeoutSec].
-  Future<bool> _ensureSdkReady({int timeoutSec = 20}) async {
-    final status = await _psdk.getStatus();
-    if (status['sdiReady'] == true) {
-      return true;
-    }
-
-    await _psdk.initialize();
-
-    final completer = Completer<bool>();
-    StreamSubscription<Map<String, dynamic>>? sub;
-
-    sub = _psdk.statusEvents.listen((event) {
-      final bool ready = event['sdiReady'] == true || event['success'] == true;
-      if (ready && !completer.isCompleted) {
-        completer.complete(true);
-      }
-    });
-
-    try {
-      return await completer.future.timeout(
-        Duration(seconds: timeoutSec),
-        onTimeout: () => false,
-      );
-    } finally {
-      await sub.cancel();
     }
   }
 }

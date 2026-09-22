@@ -4,7 +4,37 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-22 (prototipo visual de Cierre de Lote)
+
+
+> ✅ **Último cambio (2026-09-22, prototipo visual de Cierre de Lote):** se agregó
+> en mobile la pantalla **Cierre de Lote** del mockup del cliente
+> (`mobile/lib/features/batch_close/**`), sobre el patrón visual vigente
+> (`AppHeader` 64dp + `AppSheetPanel` + `AppBottomNavBar`). El header naranja con
+> `star_cluster` + "SOLIDARIDAD" y la barra de 5 ítems del mockup **no** se
+> reintrodujeron (duplicaban lo acordado en G-P2-06). Se habilitó el ítem
+> **Cerrar Lote** del menú "⋯ Más" (`MoreMenuOption.batchClose` →
+> `AppRoutes.batchClose`), que antes estaba deshabilitado ("Próximamente"), para
+> que la pantalla sea alcanzable desde la barra inferior.
+> **Es un prototipo visual, no el módulo terminado:** los valores de la pantalla
+> (Nº de lote `000123`, 45 ventas, total `2.055 kg` y las 5 filas de "Ventas por
+> Producto") son **datos de ejemplo** tomados del mockup
+> (`batch_close_screen.dart`), el total se muestra en **kg** porque la API no
+> expone importe/precio (decisión abierta D-3 en `docs/errores-ventas.md`) y el
+> botón CERRAR LOTE está **habilitado pero sin acción**. Además se agregó el
+> formateador `mobile/lib/core/formatters/quantity_formatter.dart` (miles `.` y
+> decimales `,`, sin agregar `intl`) y 2 colores de estado en `core/theme/
+> app_colors.dart`. Tests: 5 casos de pantalla/contenido
+> (`mobile/test/batch_close_content_test.dart`, incluye 360×720 sin desbordes y que
+> el botón quede habilitado), 3 del formateador
+> (`mobile/test/quantity_formatter_test.dart`) y 1 nuevo de navegación en
+> `mobile/test/more_menu_overlay_test.dart` (que además deja de esperar el ítem
+> deshabilitado). `flutter analyze` sin issues y `flutter test` OK (33 tests).
+> **Pendiente:** todo lo de atrás (resumen real desde la API, cierre contra el
+> procesador, importe en pesos, peso por producto, Nº de lote y ticket): ver el
+> gap nuevo **G-P2-10**. El prototipo funcionando (resumen real + cierre local)
+> queda en la rama `feature/cerrar_lote_screen`. `docs/alcance.md` actualizado.
+
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -374,7 +404,9 @@ Verifone (banda + térmica).
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
-| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). |
+| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). **2026-09-22 (cierre de lote):** el ítem **Cerrar Lote** del menú dejó de estar deshabilitado ("Próximamente") y ahora abre el **prototipo visual** de la pantalla (datos de ejemplo); ver G-P2-10. |
+| G-P2-10 | Cierre de Lote: resumen real y cierre contra el procesador | open | **2026-09-22 (prototipo visual):** mobile ya tiene la pantalla (`mobile/lib/features/batch_close/**`), pero con **datos de ejemplo** y el botón CERRAR LOTE **habilitado pero inerte** (sin acción). **Falta:** (1) el **resumen real** — la API no expone lote/cierre (`api/persistence/models/transaction.py` no tiene `lote`/`id_cierre`/`marca_cierre`; esos campos viven solo en la base del procesador, `payment_processor/docker/mysql/01_schema.sql`) y no hay `POST /v1/batch/close` ni un `GET` de lote (el `GET /v1/transactions` existente alcanza para armar el resumen en el cliente); (2) el **cierre efectivo** — el gateway no implementa MTI `0500` (solo `0100`, `0200`/`0210` y reverso `0400`: `payment-gateway/infrastructure/iso/**`) y el procesador responde `00` ante un cierre con diferencia detectada (BN-12, `payment_processor/legacy/bin/auth_thread.c:295-311`), así que un cierre descuadrado se reportaría como exitoso; (3) el **importe en pesos** del mockup — `amount` es cantidad y no importe (decisión abierta **D-3** en `docs/errores-ventas.md`; el precio por kg solo existe en MySQL del procesador, `precio_kg_gas`), por eso la pantalla muestra el total en **kg**; (4) el **peso por producto** (10/15/30/45 kg) — `packages/catalog` solo expone `label`/`unit` (y `GRANEL` es m³, que el mockup muestra como kg); (5) el **Nº de lote** (hoy es el valor de ejemplo `000123`); (6) el **ticket impreso** del cierre (el `ReceiptPrinter` actual imprime ventas de a una). **Se numera G-P2-10** (y no G-P2-07) para no colisionar con el trabajo pendiente de otros gaps. **Prototipo completo para retomar:** rama `feature/cerrar_lote_screen` (resumen real desde `GET /v1/transactions` + cierre local + pantalla de resultado). Evidencia: `mobile/lib/features/batch_close/**`, tests `mobile/test/batch_close_content_test.dart` y `mobile/test/quantity_formatter_test.dart`. |
+
 
 ---
 

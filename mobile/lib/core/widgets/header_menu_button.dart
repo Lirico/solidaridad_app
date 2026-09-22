@@ -12,7 +12,7 @@ import 'more_menu.dart';
 /// Ítems del panel:
 /// - **Consultar saldo**: navega al flujo de consulta de saldo (captura manual
 ///   o por banda, resultado con tabla Producto | Cantidad).
-/// - **Cerrar Lote**: deshabilitado ("Próximamente").
+/// - **Cerrar Lote**: navega al resumen del lote actual y su cierre.
 /// - **Historial de ventas**: navega al listado.
 ///
 /// La navegación de esas opciones vive acá: [MoreMenu] solo devuelve la
@@ -56,6 +56,8 @@ class HeaderMenuButton extends StatelessWidget {
     switch (option) {
       case MoreMenuOption.balance:
         Navigator.pushNamed(context, AppRoutes.balanceCaptureMode);
+      case MoreMenuOption.batchClose:
+        Navigator.pushNamed(context, AppRoutes.batchClose);
       case MoreMenuOption.salesHistory:
         Navigator.pushNamed(context, AppRoutes.salesHistory);
     }

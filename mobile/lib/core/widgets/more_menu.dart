@@ -11,6 +11,9 @@ enum MoreMenuOption {
   /// Consultar saldo de la tarjeta (`AppRoutes.balanceCaptureMode`).
   balance,
 
+  /// Cierre de lote (`AppRoutes.batchClose`).
+  batchClose,
+
   /// Historial de ventas (`AppRoutes.salesHistory`).
   salesHistory,
 }
@@ -168,11 +171,12 @@ class _MoreMenuSheet extends StatelessWidget {
                       onTap: () => onSelected(MoreMenuOption.balance),
                     ),
                     const SizedBox(height: 12),
-                    const _MoreMenuTile(
-                      icon: Icons.lock_outline,
+                    _MoreMenuTile(
+                      icon: Icons.assignment_outlined,
                       title: 'Cerrar Lote',
-                      subtitle: 'Próximamente',
-                      enabled: false,
+                      subtitle: 'Resumen y cierre del lote actual',
+                      enabled: true,
+                      onTap: () => onSelected(MoreMenuOption.batchClose),
                     ),
                     const SizedBox(height: 12),
                     _MoreMenuTile(

@@ -174,7 +174,7 @@ class _MoreMenuSheet extends StatelessWidget {
                     _MoreMenuTile(
                       icon: Icons.assignment_outlined,
                       title: 'Cerrar Lote',
-                      subtitle: 'Resumen y cierre del lote actual',
+                      subtitle: 'Resumen del lote actual',
                       enabled: true,
                       onTap: () => onSelected(MoreMenuOption.batchClose),
                     ),

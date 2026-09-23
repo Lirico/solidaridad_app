@@ -17,7 +17,6 @@ import 'package:solidaridad_app/features/batch_close/data/batch_close_repository
 import 'package:solidaridad_app/features/batch_close/domain/batch_close_model.dart';
 import 'package:solidaridad_app/features/batch_close/presentation/cubit/batch_close_cubit.dart';
 import 'package:solidaridad_app/features/batch_close/presentation/screens/batch_close_screen.dart';
-import 'package:solidaridad_app/features/batch_close/presentation/screens/batch_close_status_screen.dart';
 import 'package:solidaridad_app/features/batch_close/presentation/widgets/batch_close_content.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 
@@ -152,8 +151,6 @@ Future<void> _pumpScreen(
       child: MaterialApp(
         theme: appTheme,
         routes: {
-          AppRoutes.batchCloseStatus: (context) =>
-              const BatchCloseStatusScreen(),
           AppRoutes.login: (context) =>
               const Scaffold(body: Center(child: Text('login_screen'))),
         },
@@ -206,7 +203,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('CERRAR LOTE dispara el cierre', (tester) async {
+  testWidgets('CERRAR LOTE avisa al widget que lo monta', (tester) async {
     int closes = 0;
     await _pumpContent(tester, _mockupSummary(), onCloseBatch: () => closes++);
 
@@ -254,25 +251,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('CERRAR LOTE pide confirmación, cierra y muestra el resultado', (
-    tester,
-  ) async {
+  testWidgets('CERRAR LOTE no cierra ni navega (botón inerte)', (tester) async {
     await _pumpScreen(tester, MockBatchCloseRepository());
 
     await tester.tap(find.text('CERRAR LOTE'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cerrar lote'), findsOneWidget);
-    expect(
-      find.textContaining('¿Confirma el cierre del lote Nº 000001'),
-      findsOneWidget,
-    );
+    // Sin contrato de cierre no hay diálogo, ni comprobante, ni navegación.
+    expect(find.text('Cerrar lote'), findsNothing);
+    expect(find.text('CONFIRMAR'), findsNothing);
+    expect(find.text('Resultado del Cierre'), findsNothing);
+    expect(find.text('¡Lote Cerrado!'), findsNothing);
 
-    await tester.tap(find.text('CONFIRMAR'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Resultado del Cierre'), findsOneWidget);
-    expect(find.text('¡Lote Cerrado!'), findsOneWidget);
+    // La pantalla sigue mostrando el resumen del lote actual.
+    expect(find.text('Lote Actual'), findsOneWidget);
     expect(find.text('000001'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

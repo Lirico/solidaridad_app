@@ -8,17 +8,19 @@ import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../../psdk/psdk_card_reader.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
-import '../cubit/sales_cubit.dart';
-import '../widgets/waiting_for_card_content.dart';
+import '../../../sales/presentation/widgets/waiting_for_card_content.dart';
+import '../cubit/balance_cubit.dart';
 
-class WaitingForCardScreen extends StatefulWidget {
-  const WaitingForCardScreen({super.key});
+class BalanceWaitingForCardScreen extends StatefulWidget {
+  const BalanceWaitingForCardScreen({super.key});
 
   @override
-  State<WaitingForCardScreen> createState() => _WaitingForCardScreenState();
+  State<BalanceWaitingForCardScreen> createState() =>
+      _BalanceWaitingForCardScreenState();
 }
 
-class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
+class _BalanceWaitingForCardScreenState
+    extends State<BalanceWaitingForCardScreen> {
   final PsdkCardReader _reader = PsdkCardReader();
   bool _reading = false;
   String? _errorMessage;
@@ -40,11 +42,11 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
     super.dispose();
   }
 
-  /// Dispara la lectura de banda y navega a la revisión de venta.
+  /// Dispara la lectura de banda y navega a la revisión de saldo.
   ///
   /// Todo el ciclo delicado del PSDK (initialize, espera de `sdiReady` con
   /// guard de race-condition, `readMsr`, parseo y limpieza) vive en
-  /// [PsdkCardReader], compartido con el flujo de consulta de saldo.
+  /// [PsdkCardReader], compartido con el flujo de venta.
   Future<void> _startReading() async {
     if (_reading) return;
     setState(() {
@@ -58,9 +60,16 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
 
       switch (result) {
         case CardReadSuccess(:final data):
-          // Guardar los datos en el cubit y navegar a la revisión.
-          context.read<SalesCubit>().showReviewFromMsr(data);
-          Navigator.pushNamed(context, AppRoutes.saleReview);
+          // Guardar los datos en el cubit y navegar a la revisión. La lectura
+          // fue por banda magnética: entry_mode "022" y sin track2 (se envían
+          // PAN + vencimiento explícitos).
+          context.read<BalanceCubit>().setCardData(
+            cardNumber: data.pan,
+            expirationDate: data.expiryMmYy,
+            entryMode: '022',
+            track2: null,
+          );
+          Navigator.pushNamed(context, AppRoutes.balanceReview);
         case CardReadFailure(:final message):
           _showError(message);
       }
@@ -89,11 +98,9 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
       appBar: const AppHeader(
-        title: 'Nueva Operación',
+        title: 'Consultar Saldo',
         actions: [UserMenuButton(), SizedBox(width: 8)],
       ),
-      // La flecha "atrás" cancela la operación y la lectura de banda (el pop
-      // dispara dispose() → cancel() del lector).
       bottomNavigationBar: AppBottomNavBar(onBack: _onBackPressed),
       body: AppSheetPanel(
         child: WaitingForCardContent(

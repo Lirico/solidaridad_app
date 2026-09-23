@@ -4,10 +4,12 @@ from datetime import datetime
 
 from config.settings import Settings
 from domain.authorization import AuthorizeCommand, VoidCommand
+from domain.balance import BalanceCommand
 from domain.product import product_code_de49
 from infrastructure.iso.packer import IsoMessage, set_present
 
 _VOID_PROCESSING_CODE = "020000"
+_BALANCE_PROCESSING_CODE = "310000"
 
 
 def build_purchase_request(
@@ -41,6 +43,44 @@ def build_purchase_request(
         field_62=_numeric_ticket(command.ticket_number),
     )
     bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 41, 49, 62]
+    if command.expiration_date:
+        iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
+        bits.append(14)
+    if command.track2:
+        iso.track2_35 = _normalize_track2(command.track2)
+        bits.append(35)
+    set_present(iso, *bits)
+    return iso
+
+
+def build_balance_request(
+    command: BalanceCommand,
+    settings: Settings,
+    *,
+    now: datetime | None = None,
+) -> IsoMessage:
+    """Consulta de saldo: MTI 0100 + DE3 310000.
+
+    El autorizador (auth_thread.c) solo exige DE3/DE24/DE41 presentes y lee el
+    producto desde DE49 para calcular el saldo; el saldo vuelve en DE4.
+    """
+    moment = now or datetime.now()
+
+    iso = IsoMessage(
+        tpdu=settings.iso_tpdu,
+        mtype="0100",
+        pan_2=command.card_number,
+        procode_3=_pad_digits(_BALANCE_PROCESSING_CODE, 6),
+        systracenum_11=_pad_digits(command.stan, 6),
+        timetrx_12=moment.strftime("%H%M%S"),
+        datetrx_13=moment.strftime("%m%d"),
+        posentrymode_22=_pad_digits(command.entry_mode, 4),
+        nii_24=_pad_digits(settings.iso_nii, 4),
+        poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
+        termid_41=command.terminal_id[:8].ljust(8),
+        currcode_49=product_code_de49(command.product_code),
+    )
+    bits = [2, 3, 11, 12, 13, 22, 24, 25, 41, 49]
     if command.expiration_date:
         iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
         bits.append(14)

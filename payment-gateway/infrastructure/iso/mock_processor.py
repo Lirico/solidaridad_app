@@ -6,6 +6,7 @@ from domain.authorization import (
     AuthorizeCommand,
     VoidCommand,
 )
+from domain.balance import BalanceCommand, BalanceResult
 
 
 class MockIsoProcessor:
@@ -45,4 +46,22 @@ class MockIsoProcessor:
             user_message="Aprobada",
             auth_id="MOCKVD",
             retrieval_reference=command.stan.zfill(12),
+        )
+
+    def balance(self, command: BalanceCommand) -> BalanceResult:
+        if command.card_number == self.DECLINE_PAN:
+            return BalanceResult(
+                status=AuthorizationStatus.DECLINED,
+                response_code="05",
+                user_message="Denegada",
+            )
+        return BalanceResult(
+            status=AuthorizationStatus.APPROVED,
+            response_code="00",
+            user_message="Aprobada",
+            available_balance_minor=100000,
+            assigned_products=(
+                "Tipo de asignacion: Garrafa 10 kg Garrafa 15 kg "
+                "Garrafa 30 kg Tubo 45 kg Granel"
+            ),
         )

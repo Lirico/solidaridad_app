@@ -13,6 +13,7 @@ from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
+from application.payments.check_balance import CheckBalance
 from application.payments.create_transaction import CreateTransaction
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
@@ -116,6 +117,16 @@ def get_void_transaction(
     return VoidTransaction(
         session=db,
         transactions=TransactionRepository(db),
+        gateway=gateway,
+    )
+
+
+def get_check_balance(
+    db: Annotated[Session, Depends(get_db)],
+    gateway: Annotated[HttpPaymentGateway, Depends(get_payment_gateway)],
+) -> CheckBalance:
+    return CheckBalance(
+        installations=InstallationRepository(db),
         gateway=gateway,
     )
 

@@ -6,6 +6,8 @@ import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
 import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
+import 'features/balance/data/balance_repository.dart';
+import 'features/balance/presentation/cubit/balance_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
 
@@ -19,6 +21,12 @@ import 'features/sales/presentation/screens/sale_status_screen.dart';
 import 'features/sales/presentation/screens/sale_select_new_operation_screen.dart';
 import 'features/sales/presentation/screens/sale_manual_card_screen.dart';
 import 'features/sales/presentation/screens/sale_waiting_for_card_screen.dart';
+import 'features/balance/presentation/screens/balance_capture_mode_screen.dart';
+import 'features/balance/presentation/screens/balance_manual_card_screen.dart';
+import 'features/balance/presentation/screens/balance_waiting_for_card_screen.dart';
+import 'features/balance/presentation/screens/balance_review_screen.dart';
+import 'features/balance/presentation/screens/balance_processing_screen.dart';
+import 'features/balance/presentation/screens/balance_status_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
 import 'features/history/presentation/screens/sale_detail_screen.dart';
 import 'features/history/presentation/screens/void_card_screen.dart';
@@ -29,6 +37,7 @@ import 'core/widgets/splash_screen.dart';
 void main() {
   final deviceIdentity = DeviceIdentityService();
   final salesRepository = SalesRepository();
+  final balanceRepository = BalanceRepository();
   final authRepository = AuthRepository(deviceIdentity: deviceIdentity);
 
   runApp(
@@ -36,6 +45,9 @@ void main() {
       providers: [
         BlocProvider<SalesCubit>(
           create: (context) => SalesCubit(salesRepository: salesRepository),
+        ),
+        BlocProvider<BalanceCubit>(
+          create: (context) => BalanceCubit(repository: balanceRepository),
         ),
         BlocProvider<AuthCubit>(
           create: (context) => AuthCubit(authRepository: authRepository),
@@ -68,6 +80,16 @@ class MyApp extends StatelessWidget {
             const SelectNewOperationScreen(),
         AppRoutes.saleManualCard: (context) => const SaleManualCardScreen(),
         AppRoutes.saleWaitingForCard: (context) => const WaitingForCardScreen(),
+        AppRoutes.balanceCaptureMode: (context) =>
+            const BalanceCaptureModeScreen(),
+        AppRoutes.balanceManualCard: (context) =>
+            const BalanceManualCardScreen(),
+        AppRoutes.balanceWaitingForCard: (context) =>
+            const BalanceWaitingForCardScreen(),
+        AppRoutes.balanceReview: (context) => const BalanceReviewScreen(),
+        AppRoutes.balanceProcessing: (context) =>
+            const BalanceProcessingScreen(),
+        AppRoutes.balanceStatus: (context) => const BalanceStatusScreen(),
         AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
         AppRoutes.saleDetail: (context) => const SaleDetailScreen(),
         AppRoutes.voidCard: (context) => const VoidCardScreen(),

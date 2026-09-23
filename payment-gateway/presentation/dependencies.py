@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from application.payments.authorize_payment import AuthorizePayment
+from application.payments.check_balance import CheckBalance
 from application.payments.ports import IsoProcessor
 from application.payments.void_payment import VoidPayment
 from config.settings import Settings, get_settings
@@ -31,3 +32,9 @@ def get_void_payment(
     processor: Annotated[IsoProcessor, Depends(get_iso_processor)],
 ) -> VoidPayment:
     return VoidPayment(processor)
+
+
+def get_check_balance(
+    processor: Annotated[IsoProcessor, Depends(get_iso_processor)],
+) -> CheckBalance:
+    return CheckBalance(processor)

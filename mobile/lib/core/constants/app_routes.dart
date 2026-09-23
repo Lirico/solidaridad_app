@@ -15,4 +15,10 @@ class AppRoutes {
   static const String voidStatus = '/void_status';
   static const String splash = '/splash';
   static const String loading = '/loading';
+  static const String balanceCaptureMode = '/balance_capture_mode';
+  static const String balanceManualCard = '/balance_manual_card';
+  static const String balanceWaitingForCard = '/balance_waiting_for_card';
+  static const String balanceReview = '/balance_review';
+  static const String balanceProcessing = '/balance_processing';
+  static const String balanceStatus = '/balance_status';
 }

@@ -4,7 +4,54 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-09-09
+Última revisión: 2026-10-09
+
+> ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
+> delicado del PSDK Verifone a un servicio compartido,
+> `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`), para eliminar la
+> duplicación casi literal entre `sale_waiting_for_card_screen.dart` (184 líneas)
+> y `balance_waiting_for_card_screen.dart` (163 líneas), que era un riesgo de
+> desincronización de fixes críticos entre venta y saldo. El servicio expone
+> `ensureReady()` (espera de `sdiReady` con guard de race-condition vía
+> `getStatus` + stream), `readCard()` (initialize → ready → `readMsr` → parseo,
+> con resultado tipado `CardReadSuccess`/`CardReadFailure`) y `cancel()`
+> (`cancelReadMsr` → `tearDown`, en ese orden). Se preservan los fixes previos:
+> éxito por `hasClearData`, guardas `mounted`/`_disposed`, `entry_mode` `022` sin
+> track2 y el mock `USE_MSR_MOCK`. `ReceiptPrinter` también consume
+> `ensureReady(initializeIfNeeded: true)`, eliminando la tercera copia de la
+> espera de `sdiReady`. `MsrCardData` se movió de
+> `mobile/lib/features/sales/domain/` a `mobile/lib/psdk/msr_card_data.dart`.
+> Nuevo `mobile/test/psdk_card_reader_test.dart` (9 casos con `MockPsdkBridge` de
+> mocktail). `flutter analyze` OK y `flutter test` OK (24 tests). Ver G-P0-06.
+
+> ✅ **Último cambio (2026-10-09, refactor del menú "⋯ Más"):** `MoreMenu`
+> (`mobile/lib/core/widgets/more_menu.dart`) dejó de ser un widget que navega:
+> ahora es UI pura (no importa `AppRoutes`) y `MoreMenu.show` devuelve la opción
+> elegida como `Future<MoreMenuOption?>`, con `enum MoreMenuOption { balance,
+> salesHistory }` y `null` = panel cerrado (CERRAR, toque fuera o barrier). La
+> navegación se movió al llamador `HeaderMenuButton`
+> (`mobile/lib/core/widgets/header_menu_button.dart`), que mapea la opción a
+> `AppRoutes.balanceCaptureMode` / `AppRoutes.salesHistory` con un `switch`
+> exhaustivo y hace el `pushNamed` con guard `context.mounted`. Los tres
+> callbacks que se propagaban por `_MoreMenuOverlay`/`_MoreMenuSheet`
+> (`onClose`, `onBalanceSelected`, `onHistorySelected`) se colapsaron en un
+> único `ValueChanged<MoreMenuOption?> onSelected`. Sin cambio de comportamiento
+> visible (mismo panel, mismas opciones, mismos cierres); único consumidor de
+> `show`: `HeaderMenuButton`. `dart format` sin cambios, `flutter analyze` OK y
+> `flutter test` OK (24 tests, incluye `mobile/test/more_menu_overlay_test.dart`).
+> Ver G-P2-06.
+
+> ✅ **Último cambio (2026-09-09, Consultar saldo):** se implementó la consulta de
+> saldo end-to-end sin tocar el procesador (usa su `consulta_saldo`/MTI `0100`
+> existente). Gateway: `POST /v1/balance` (construye `0100`, DE3 `310000`, lee el
+> saldo de DE4 y los productos de DE63) con `BalanceCommand`/`BalanceResult` y
+> `make check` OK. API: `POST /v1/balance` (sin producto en body) itera el
+> catálogo (993–997), agrega una fila por producto y lista con `0.00` los que
+> responden `06` (sin saldo asignado); `make check` OK. Mobile: se habilitó la
+> opción "Consultar saldo" del menú "⋯ Más" (antes deshabilitada) y se agregó el
+> flujo completo con la misma visual que la venta (captura Tarjeta/Ingreso manual
+> → confirmación → procesando → resultado con tabla **Producto | Cantidad**).
+> `flutter analyze` OK y `flutter test` OK.
 
 > ✅ **Último cambio (2026-09-09, envío de identidad de terminal en el login):**
 > el mobile envía la identidad de la terminal en el body de `POST /v1/auth/login`
@@ -296,7 +343,7 @@ Verifone (banda + térmica).
 | G-P0-03 | Token de venta no enlazado a sesión real | done | `SalesCubit.loadHistory()`, `sendIsoMessage()` y `fetchProducts()` reciben el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
-| G-P0-06 | Lectura de banda (Verifone) | done | **Rama 1 (2026-11-08):** bridge PSDK portado del POC al mobile. `PsdkBridge.kt` + `MainActivity.kt` (canales `com.solidaridad.poc_verifone/psdk` y `psdk_events`) en `mobile/android/app/src/main/kotlin/`. Dart facade `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`. `.aar` PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`. `build.gradle.kts` con `minSdk=24` y dependencia `.aar`. `AndroidManifest.xml` con permisos Verifone. Build debug OK. **Rama 2 (2026-11-08):** `WaitingForCardScreen` como `StatefulWidget` conectado al PSDK (`initialize()` + `readMsr(timeoutSec: 30)`), mapea PAN/vencimiento a `showReview`. **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `flutter analyze` OK. **Rama 5 (2026-11-08):** fix de CVV para banda — la banda no contiene CVV, pero la API rechazaba `cvv: ''` (schema `min_length=3` → 422 y `_validate_cvv` → 400), por lo que la venta por banda fallaba antes de persistir (no aparecía en historial) aunque la tarjeta tuviera saldo. `cvv` ahora es opcional en `CreateTransactionRequest` y la validación se omite para `entry_mode='022'`. Tests en `test_create_transaction.py` y `test_transactions_http.py`; `make check` OK (118 tests, cobertura 95%). |
+| G-P0-06 | Lectura de banda (Verifone) | done | **Rama 1 (2026-11-08):** bridge PSDK portado del POC al mobile. `PsdkBridge.kt` + `MainActivity.kt` (canales `com.solidaridad.poc_verifone/psdk` y `psdk_events`) en `mobile/android/app/src/main/kotlin/`. Dart facade `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`. `.aar` PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`. `build.gradle.kts` con `minSdk=24` y dependencia `.aar`. `AndroidManifest.xml` con permisos Verifone. Build debug OK. **Rama 2 (2026-11-08):** `WaitingForCardScreen` como `StatefulWidget` conectado al PSDK (`initialize()` + `readMsr(timeoutSec: 30)`), mapea PAN/vencimiento a `showReview`. **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `flutter analyze` OK. **Rama 5 (2026-11-08):** fix de CVV para banda — la banda no contiene CVV, pero la API rechazaba `cvv: ''` (schema `min_length=3` → 422 y `_validate_cvv` → 400), por lo que la venta por banda fallaba antes de persistir (no aparecía en historial) aunque la tarjeta tuviera saldo. `cvv` ahora es opcional en `CreateTransactionRequest` y la validación se omite para `entry_mode='022'`. Tests en `test_create_transaction.py` y `test_transactions_http.py`; `make check` OK (118 tests, cobertura 95%). **2026-10-09 (refactor):** el ciclo del lector se extrajo a `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`: `ensureReady` + `readCard` + `cancel`), compartido por venta, consulta de saldo y `ReceiptPrinter`; `MsrCardData` se movió a `mobile/lib/psdk/msr_card_data.dart`. Nuevo `mobile/test/psdk_card_reader_test.dart` (9 casos). `flutter analyze` OK, `flutter test` OK (24 tests). |
 
 
 
@@ -350,7 +397,7 @@ Verifone (banda + térmica).
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
-| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. |
+| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). |
 
 ---
 
@@ -382,7 +429,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
-| UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo y Cerrar Lote deshabilitados + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
+| UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo navega al flujo de saldo, Cerrar Lote deshabilitado + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 
 ---

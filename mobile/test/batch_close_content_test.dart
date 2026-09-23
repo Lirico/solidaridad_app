@@ -162,6 +162,10 @@ Future<void> _pumpScreen(
 }
 
 OperationModel _approvedSale() {
+  // Hora fija dentro del día local: con `now - 5 min` la venta caía en el día
+  // anterior si el test corría pasada la medianoche, y el resumen (que filtra
+  // por día) quedaba vacío.
+  final DateTime now = DateTime.now();
   return OperationModel(
     id: 'OP-260922-00000001',
     productCode: 'GARRAFA_10',
@@ -169,7 +173,7 @@ OperationModel _approvedSale() {
     amount: 1,
     cardNumber: '•••• 1111',
     result: PaymentResult.approved,
-    date: DateTime.now().subtract(const Duration(minutes: 5)),
+    date: DateTime(now.year, now.month, now.day, 12),
   );
 }
 

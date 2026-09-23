@@ -10,6 +10,10 @@ import '../../domain/batch_close_model.dart';
 /// cubit: recibe el resumen ya calculado y avisa con [onCloseBatch], igual
 /// criterio que `BalanceStatusContent`.
 ///
+/// El botón se dibuja igual que en el mockup (visible y habilitado), pero el
+/// cierre todavía no tiene contrato con el procesador: quien lo monta le pasa
+/// un callback inerte. Ver `docs/gaps.md` (G-P2-10).
+///
 /// Layout: el resumen puede crecer (una fila por producto), así que la lista
 /// scrollea y el botón queda fijo abajo, siempre visible y sin desbordar en
 /// 360×720dp.
@@ -180,7 +184,7 @@ class _SummaryCard extends StatelessWidget {
           const SizedBox(height: 10),
           _SummaryRow(
             label: 'Total de Ventas',
-            value: '${formatQuantityEs(summary.totalKg)} kg',
+            value: '${formatQuantityEsExact(summary.totalKg)} kg',
             valueColor: AppColors.successStrong,
           ),
         ],
@@ -257,8 +261,14 @@ class _PartialWarning extends StatelessWidget {
   }
 }
 
-const double _qtyColumnWidth = 60;
-const double _kgColumnWidth = 78;
+// Anchos de columna pensados para el peor caso con decimales (p. ej.
+// "10.001,25 Kg" ≈ 86px en Roboto 14 bold): al dejar de redondear, la columna
+// de kg pasó de 78 a 92 y la de cantidad de 60 a 68. No hay test que lo mida
+// porque `flutter test` usa una fuente de prueba donde cada glifo mide el tamaño
+// de fuente (mediría ~1,8× el ancho real); la verificación es visual en el
+// dispositivo con un resumen que tenga fracciones.
+const double _qtyColumnWidth = 68;
+const double _kgColumnWidth = 92;
 
 /// Cabecera de la tabla de productos (mismos anchos que [_ProductRow]).
 class _ProductsHeaderRow extends StatelessWidget {
@@ -336,7 +346,7 @@ class _ProductRow extends StatelessWidget {
           SizedBox(
             width: _qtyColumnWidth,
             child: Text(
-              formatQuantityEs(item.quantity),
+              formatQuantityEsExact(item.quantity),
               textAlign: TextAlign.right,
               maxLines: 1,
               style: const TextStyle(
@@ -349,7 +359,7 @@ class _ProductRow extends StatelessWidget {
           SizedBox(
             width: _kgColumnWidth,
             child: Text(
-              '${formatQuantityEs(item.kg)} Kg',
+              '${formatQuantityEsExact(item.kg)} Kg',
               textAlign: TextAlign.right,
               maxLines: 1,
               style: const TextStyle(

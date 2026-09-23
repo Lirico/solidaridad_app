@@ -27,3 +27,37 @@ String formatQuantityEs(double value, {int decimals = 0}) {
   }
   return '$sign$grouped';
 }
+
+/// Máxima precisión de cantidad que acepta el backend (`AMOUNT_EXPONENT = 2`).
+const int quantityMaxDecimals = 2;
+
+/// Como [formatQuantityEs] pero con la precisión necesaria: hasta
+/// [quantityMaxDecimals] decimales y sin ceros finales.
+///
+/// Se usa donde esconder la fracción cambia el número mostrado (una venta de
+/// 5,5 unidades no son 6): hoy no redondear a entero es una decisión de
+/// visualización del Cierre de Lote.
+///
+/// Ejemplos:
+/// - `formatQuantityEsExact(37.5)`  -> `37,5`
+/// - `formatQuantityEsExact(18.75)` -> `18,75`
+/// - `formatQuantityEsExact(1200)`  -> `1.200`
+String formatQuantityEsExact(
+  double value, {
+  int maxDecimals = quantityMaxDecimals,
+}) {
+  if (maxDecimals <= 0) return formatQuantityEs(value);
+
+  String candidate = value.abs().toStringAsFixed(maxDecimals);
+  while (candidate.endsWith('0')) {
+    candidate = candidate.substring(0, candidate.length - 1);
+  }
+  if (candidate.endsWith('.')) {
+    candidate = candidate.substring(0, candidate.length - 1);
+  }
+
+  final int comma = candidate.indexOf('.');
+  final int used = comma < 0 ? 0 : candidate.length - comma - 1;
+  // Reusa [formatQuantityEs] para agrupar miles y resolver el signo.
+  return formatQuantityEs(value, decimals: used);
+}

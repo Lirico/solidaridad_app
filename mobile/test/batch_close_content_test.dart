@@ -212,6 +212,34 @@ void main() {
     expect(closes, 1);
   });
 
+  testWidgets('muestra la precisión decimal de cantidades, kg y total', (
+    tester,
+  ) async {
+    await _pumpContent(
+      tester,
+      const BatchSummary(
+        batchNumber: '000001',
+        salesCount: 1,
+        totalKg: 37.5,
+        products: [
+          BatchProductItem(
+            productCode: 'GARRAFA_15',
+            label: 'Garrafa 15 kg',
+            quantity: 2.5,
+            kg: 37.5,
+            unitLabel: 'unidades',
+          ),
+        ],
+      ),
+    );
+
+    // Una venta de 2,5 unidades no son 3 ni 38 kg.
+    expect(find.text('2,5'), findsOneWidget);
+    expect(find.text('37,5 Kg'), findsOneWidget);
+    expect(find.text('37,5 kg'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('sin ventas muestra el mensaje vacío y no desborda', (
     tester,
   ) async {

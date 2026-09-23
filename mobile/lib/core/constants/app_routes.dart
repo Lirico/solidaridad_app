@@ -22,5 +22,4 @@ class AppRoutes {
   static const String balanceProcessing = '/balance_processing';
   static const String balanceStatus = '/balance_status';
   static const String batchClose = '/batch_close';
-  static const String batchCloseStatus = '/batch_close_status';
 }

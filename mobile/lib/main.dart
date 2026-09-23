@@ -29,7 +29,6 @@ import 'features/balance/presentation/screens/balance_review_screen.dart';
 import 'features/balance/presentation/screens/balance_processing_screen.dart';
 import 'features/balance/presentation/screens/balance_status_screen.dart';
 import 'features/batch_close/presentation/screens/batch_close_screen.dart';
-import 'features/batch_close/presentation/screens/batch_close_status_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
 import 'features/history/presentation/screens/sale_detail_screen.dart';
 import 'features/history/presentation/screens/void_card_screen.dart';
@@ -98,7 +97,6 @@ class MyApp extends StatelessWidget {
             const BalanceProcessingScreen(),
         AppRoutes.balanceStatus: (context) => const BalanceStatusScreen(),
         AppRoutes.batchClose: (context) => const BatchCloseScreen(),
-        AppRoutes.batchCloseStatus: (context) => const BatchCloseStatusScreen(),
         AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
         AppRoutes.saleDetail: (context) => const SaleDetailScreen(),
         AppRoutes.voidCard: (context) => const VoidCardScreen(),

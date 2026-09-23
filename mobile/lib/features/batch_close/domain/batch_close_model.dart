@@ -6,7 +6,9 @@ import '../../sales/domain/sale_model.dart';
 /// (`unidades` / `m3`) pero **no** el peso por producto. Este mapa replica la
 /// equivalencia que usa el mockup del cliente (15 garrafas de 10 kg = 150 Kg).
 /// `GRANEL` se mide en m³ y el mockup lo muestra en Kg, así que vale 1:1.
-/// Pendiente de contrato: ver `docs/gaps.md` (G-P2-10).
+/// **Pendiente:** cuando se confirme el endpoint del backend que expone el peso
+/// por producto, este mapa se reemplaza por el valor del catálogo. Ver
+/// `docs/gaps.md` (G-P2-10).
 const Map<String, double> batchKgPerUnit = <String, double>{
   'GARRAFA_10': 10,
   'GARRAFA_15': 15,
@@ -66,7 +68,10 @@ class BatchProductItem {
 /// Se calcula en el cliente a partir de `GET /v1/transactions` porque hoy la API
 /// no expone un concepto de lote/cierre (ver `docs/gaps.md`, G-P2-10).
 class BatchSummary {
-  /// Número de lote mostrado en la pantalla (secuencia local, provisional).
+  /// Número de lote mostrado en la pantalla.
+  ///
+  /// **Provisorio:** lo aporta la app mientras la API no exponga el lote real
+  /// (ver `docs/gaps.md`, G-P2-10).
   final String batchNumber;
 
   /// Cantidad de ventas aprobadas del lote.
@@ -95,18 +100,21 @@ class BatchSummary {
 
   /// Agrupa las ventas aprobadas de la ventana del lote.
   ///
-  /// Ventana = desde el inicio del día local ([now]) o, si ya se cerró un lote
-  /// en esta sesión, desde [after] (ese cierre local).
+  /// Ventana = desde el inicio del día local ([now]): mientras no exista el
+  /// contrato de cierre no hay otro corte posible (ver `docs/gaps.md`,
+  /// G-P2-10).
   factory BatchSummary.fromOperations({
     required List<OperationModel> operations,
     required String batchNumber,
-    DateTime? after,
     DateTime? now,
     bool isPartial = false,
   }) {
     final DateTime reference = now ?? DateTime.now();
-    final DateTime cutoff =
-        after ?? DateTime(reference.year, reference.month, reference.day);
+    final DateTime cutoff = DateTime(
+      reference.year,
+      reference.month,
+      reference.day,
+    );
 
     final Map<String, BatchProductItem> byProduct =
         <String, BatchProductItem>{};

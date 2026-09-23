@@ -119,7 +119,6 @@ Future<void> _pumpScreen(
   when(
     () => repository.loadOperations(
       token: any(named: 'token'),
-      after: any(named: 'after'),
       now: any(named: 'now'),
     ),
   ).thenAnswer(

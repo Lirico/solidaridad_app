@@ -140,26 +140,6 @@ void main() {
       expect(summary.products.single.quantity, 2);
     });
 
-    test('respeta el corte del último cierre local (after)', () {
-      final BatchSummary summary = BatchSummary.fromOperations(
-        batchNumber: '000002',
-        now: _now,
-        after: DateTime(2026, 9, 22, 12, 0),
-        operations: [
-          _operation(productCode: 'GARRAFA_10', amount: 5, date: _todayMorning),
-          _operation(
-            productCode: 'GARRAFA_10',
-            amount: 4,
-            date: _todayAfternoon,
-          ),
-        ],
-      );
-
-      expect(summary.salesCount, 1);
-      expect(summary.products.single.quantity, 4);
-      expect(summary.products.single.kg, closeTo(40, 0.001));
-    });
-
     test('ordena los productos según el catálogo', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',

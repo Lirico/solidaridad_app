@@ -52,18 +52,21 @@ class BatchCloseRepository {
     : _httpClient = httpClient ?? http.Client(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
-  /// Carga las operaciones desde el arranque de la ventana del lote.
+  /// Carga las operaciones de la ventana del lote.
   ///
-  /// [after] es el último cierre local (si existe); si es `null`, la ventana
-  /// arranca al inicio del día de [now].
+  /// La ventana arranca al inicio del día de [now]: mientras no exista el
+  /// contrato de cierre no hay otro corte posible (ver `docs/gaps.md`,
+  /// G-P2-10).
   Future<BatchCloseLoadResult> loadOperations({
     required String token,
-    DateTime? after,
     DateTime? now,
   }) async {
     final DateTime reference = now ?? DateTime.now();
-    final DateTime cutoff =
-        after ?? DateTime(reference.year, reference.month, reference.day);
+    final DateTime cutoff = DateTime(
+      reference.year,
+      reference.month,
+      reference.day,
+    );
 
     final List<OperationModel> collected = <OperationModel>[];
     int offset = 0;

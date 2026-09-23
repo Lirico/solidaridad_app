@@ -191,32 +191,6 @@ void main() {
     verify(() => client.get(any(), headers: any(named: 'headers'))).called(2);
   });
 
-  test(
-    'el corte del último cierre local también limita la paginación',
-    () async {
-      _stubGet(
-        client,
-        (_) => jsonMapResponse(
-          _page(
-            items: List<Map<String, dynamic>>.generate(5, (_) => _item()),
-            total: 5,
-          ),
-        ),
-      );
-
-      final BatchCloseLoadResult result = await repository.loadOperations(
-        token: 'tok',
-        after: DateTime(2026, 9, 22, 14, 0),
-        now: _now,
-      );
-
-      // Las 5 ventas de las 13:00 quedaron antes del último cierre: se devuelven
-      // (el filtrado fino lo hace el dominio) y no se pide otra página.
-      expect(result.operations.length, 5);
-      verify(() => client.get(any(), headers: any(named: 'headers'))).called(1);
-    },
-  );
-
   test('marca el resumen como parcial al agotar el tope de páginas', () async {
     _stubGet(
       client,

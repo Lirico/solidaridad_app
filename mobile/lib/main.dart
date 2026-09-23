@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'core/device/device_identity_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
 import 'features/sales/data/sales_repository.dart';
@@ -34,9 +35,10 @@ import 'core/widgets/loading_screen.dart';
 import 'core/widgets/splash_screen.dart';
 
 void main() {
+  final deviceIdentity = DeviceIdentityService();
   final salesRepository = SalesRepository();
   final balanceRepository = BalanceRepository();
-  final authRepository = AuthRepository();
+  final authRepository = AuthRepository(deviceIdentity: deviceIdentity);
 
   runApp(
     MultiBlocProvider(

@@ -254,6 +254,7 @@ class SalesRepository {
           operationNumber: responseData['transaction_number'] ?? '',
           message:
               responseData['user_message'] ??
+              responseData['message'] ??
               'Venta rechazada por la entidad emisora.',
           errorCode: '${response.statusCode}',
         );

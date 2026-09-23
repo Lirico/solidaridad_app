@@ -89,15 +89,17 @@ las pantallas interactivas incluyen:
   panel ocupa el 100% del ancho y termina pegado al borde superior de la barra
   inferior. Este patrón reemplaza a las tarjetas flotantes blancas con radio
   16dp y sombra sobre fondo gris `#F4F6F9`.
-- el **Cierre de Lote** (menú ⋯ "más") muestra el **resumen del lote actual**
-  (Nº de lote, cantidad de ventas, total y ventas por producto con su cantidad y
-  su equivalente en kg) leyendo las **ventas aprobadas** de la terminal, y permite
-  cerrarlo desde el terminal con confirmación previa y pantalla de resultado. Hoy
-  el cierre es **local** (corte en el terminal + secuencia del Nº de lote) y el
-  total se expresa en **kg**: la API no publica importe/precio por producto, así
-  que el cierre efectivo contra el procesador, el total en pesos, el peso por
-  producto y el ticket quedan pendientes de definición de contrato (ver
-  `docs/gaps.md`, G-P2-10).
+- el **Cierre de Lote** (menú ⋯ "más") es una pantalla **informativa**: muestra el
+  **resumen del lote actual** (Nº de lote, cantidad de ventas, total y ventas por
+  producto con su cantidad y su equivalente en kg) leyendo las **ventas aprobadas
+  del día** de la terminal (`GET /v1/transactions`). **No cierra el lote**: el
+  botón CERRAR LOTE se dibuja como en el mockup (visible y habilitado) pero queda
+  **inerte**, y el Nº de lote es provisorio, porque la API todavía no expone
+  lote/cierre ni hay contrato de cierre con el procesador (ISO `0500`). El total
+  se expresa en **kg**: la API no publica importe/precio por producto. El cierre
+  efectivo, el total en pesos, el peso por producto desde el backend y el ticket
+  impreso quedan pendientes de definición de contrato (ver `docs/gaps.md`,
+  G-P2-10).
 
 Excepciones: la pantalla de presentación (splash), la pantalla "Iniciando"
 (spinner) y **Login/Registro** no llevan la barra inferior (en auth no hay

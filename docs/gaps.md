@@ -4,7 +4,17 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-23 (VE-01 venta por banda sin track2)
+
+> ✅ **Último cambio (2026-09-23, VE-01):** la venta por banda vuelve a llegar al
+> procesador. `CreateTransaction._validate_entry_mode` acepta `entry_mode`
+> `"022"` con vencimiento y **sin** track2 (PAN + DE14, que es lo que envía el
+> terminal). El 400 `InvalidEntryMode` queda solo cuando faltan ambos, con el
+> mensaje "Faltan datos de la tarjeta: la banda no incluyó vencimiento". La app
+> muestra ese `message` en el error de `registerSale` cuando no hay
+> `user_message`. No se reenvía el track2 (el PAN de la banda de este terminal
+> no coincide con el registrado; ver G-P0-15). Tests en
+> `test_create_transaction.py`. Ver G-P1-06.
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -166,9 +176,11 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > (`[REDACTED]`). Ver G-P0-06 / G-P1-02.
 
 > ✅ **Último cambio (2026-08-16):** validación de consistencia de `entry_mode` +
-> normalización de track2 (DE35). La API ahora valida que `entry_mode` sea solo
-> `"012"` (manual) o `"022"` (banda): `022` sin track2 ni vencimiento → 400
-> (`InvalidEntryMode`), `012` con track2 → 400, y cualquier otro valor → 400.
+> normalización de track2 (DE35). La API valida que `entry_mode` sea solo
+> `"012"` (manual) o `"022"` (banda): `022` con vencimiento y sin track2 es
+> válido; `022` sin track2 ni vencimiento → 400 (`InvalidEntryMode`), `012` con
+> track2 → 400, y cualquier otro valor → 400. Corregido el 2026-09-23 (VE-01):
+> la implementación exigía track2 siempre y rechazaba la banda del terminal.
 > El gateway normaliza el track2 antes de armar DE35: quita sentinels (`;`/`?`)
 > y el separador alternativo `D`, dejando el layout `PAN=EXPIRY` que espera el
 > autorizador C (`iso_common.c` / `auth_mycli.c`). Se agregaron tests de

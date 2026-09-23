@@ -15,14 +15,21 @@ final DateTime _now = DateTime(2026, 9, 22, 15, 30);
 final DateTime _today = DateTime(2026, 9, 22, 13, 0);
 final DateTime _yesterday = DateTime(2026, 9, 21, 23, 0);
 
+/// Secuencia de Nº de operación: cada ítem de prueba tiene su propio id.
+int _idSeq = 0;
+
+String _nextTransactionNumber() =>
+    'OP-260922-${(++_idSeq).toString().padLeft(8, '0')}';
+
 Map<String, dynamic> _item({
+  String? id,
   String product = 'GARRAFA_10',
   double amount = 1,
   DateTime? date,
   String status = 'APPROVED',
 }) {
   return <String, dynamic>{
-    'transaction_number': 'OP-260922-00000001',
+    'transaction_number': id ?? _nextTransactionNumber(),
     'product': product,
     'amount': amount.toString(),
     'card_last4': '1111',
@@ -188,6 +195,39 @@ void main() {
     // no hace falta pedir la tercera.
     expect(result.operations.length, 200);
     expect(result.isPartial, isFalse);
+    verify(() => client.get(any(), headers: any(named: 'headers'))).called(2);
+  });
+
+  test('una ventana desplazada no repite la venta ya cargada', () async {
+    final List<Map<String, dynamic>> firstPage =
+        List<Map<String, dynamic>>.generate(100, (_) => _item());
+    final Map<String, dynamic> repeated = firstPage.last;
+
+    _stubGet(client, (offset) {
+      // Con una venta nueva entre páginas, la lista se corre y la segunda página
+      // arranca repitiendo el último ítem de la primera.
+      return jsonMapResponse(
+        _page(
+          items: offset == 0
+              ? firstPage
+              : [repeated, _item(product: 'GARRAFA_30', amount: 3)],
+          total: 101,
+        ),
+      );
+    });
+
+    final BatchCloseLoadResult result = await repository.loadOperations(
+      token: 'tok',
+      now: _now,
+    );
+
+    // 100 de la primera página + 1 nueva: la repetida se descarta.
+    expect(result.operations.length, 101);
+    expect(
+      result.operations.map((item) => item.id).toSet().length,
+      101,
+      reason: 'no debe haber ventas contadas dos veces',
+    );
     verify(() => client.get(any(), headers: any(named: 'headers'))).called(2);
   });
 

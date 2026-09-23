@@ -69,6 +69,11 @@ class BatchCloseRepository {
     );
 
     final List<OperationModel> collected = <OperationModel>[];
+
+    // La paginación por offset sobre una lista que crece (ventas nuevas) puede
+    // devolver un ítem ya cargado: se acumula sin repetir por Nº de operación.
+    final Set<String> seenIds = <String>{};
+
     int offset = 0;
     bool isPartial = false;
 
@@ -116,7 +121,10 @@ class BatchCloseRepository {
             .toList();
         if (pageItems.isEmpty) break;
 
-        collected.addAll(pageItems);
+        // Si entró una venta entre dos páginas, el offset se corrió y la API
+        // repite el último ítem de la página anterior: se descarta por Nº de
+        // operación para no contar la venta (ni sus kg) dos veces.
+        collected.addAll(pageItems.where((item) => seenIds.add(item.id)));
         offset += pageItems.length;
 
         // La lista viene de más nuevo a más viejo: si el último ítem ya quedó

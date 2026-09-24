@@ -4,7 +4,22 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-24
+
+> ✅ **Último cambio (2026-09-24, VE-04 cobro sin confirmar):** un 201 con
+> `status: UNKNOWN` y un timeout del cliente quedan en `PaymentResult.unknown`.
+> La pantalla dice «No pudimos confirmar el cobro», ofrece ver la operación y
+> no muestra `REINTENTAR`. `FAILED` sigue como error de conexión. Ver G-P1-11.
+
+> ✅ **Último cambio (2026-09-24, VE-05 motivo en la pantalla de resultado):** el
+> rechazo ya no muestra el texto fijo ni el código 51. El subtítulo y la fila
+> de respuesta usan `userMessage` cuando el servidor lo envió. Ver G-P1-11.
+
+> ✅ **Último cambio (2026-09-24, VE-06 mensajes de error de la API):** la app
+> leía solo `user_message`. Los 400/409 de venta y anulación responden
+> `message`, y ese texto se perdía detrás de «Venta rechazada por la entidad
+> emisora» / «Anulación rechazada por la entidad emisora». `apiUserMessage`
+> usa `user_message` y, si no viene, `message`. Ver G-P1-12.
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -360,6 +375,8 @@ Verifone (banda + térmica).
 
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
+| G-P1-11 | Resultado de venta con texto y código fijos | done | **2026-09-24 (VE-05):** `SaleStatusScreen` muestra `userMessage` en el subtítulo del rechazo y del error de conexión. La fila de un rechazo usa ese texto, o «Rechazada» si no hay mensaje; ya no pinta `51 (Fondos insuficientes)`. **2026-09-24 (VE-04):** `UNKNOWN` (y el timeout del cliente) es `PaymentResult.unknown`: aviso «No pudimos confirmar el cobro», botón «VER OPERACIÓN» y sin `REINTENTAR`. |
+| G-P1-12 | Errores 400/409 de la API no llegan al operador | done | **2026-09-24 (VE-06):** `SalesRepository` lee `user_message` o `message` en el rechazo de venta y de anulación. Si el servidor no manda texto, se mantiene el fallback genérico. Test: `mobile/test/sales_repository_messages_test.dart`. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
 

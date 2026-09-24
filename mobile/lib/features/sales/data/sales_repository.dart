@@ -21,6 +21,18 @@ String _generateIdempotencyKey() {
   return '$timestamp-$random';
 }
 
+/// Texto que ve el operador. Un 201 trae `user_message`; un 400/409 trae
+/// `message`. Si no hay ninguno, se usa [fallback].
+String apiUserMessage(Map<String, dynamic> data, String fallback) {
+  for (final key in ['user_message', 'message']) {
+    final value = data[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value;
+    }
+  }
+  return fallback;
+}
+
 class SalesRepository {
   final http.Client _httpClient;
   final String _baseUrl;
@@ -121,9 +133,10 @@ class SalesRepository {
       }
 
       return VoidResult.declined(
-        message:
-            responseData['user_message'] as String? ??
-            'Anulación rechazada por la entidad emisora.',
+        message: apiUserMessage(
+          responseData,
+          'Anulación rechazada por la entidad emisora.',
+        ),
       );
     } on SessionExpiredException {
       rethrow;
@@ -252,9 +265,10 @@ class SalesRepository {
         return SaleResponse(
           isApproved: false,
           operationNumber: responseData['transaction_number'] ?? '',
-          message:
-              responseData['user_message'] ??
-              'Venta rechazada por la entidad emisora.',
+          message: apiUserMessage(
+            responseData,
+            'Venta rechazada por la entidad emisora.',
+          ),
           errorCode: '${response.statusCode}',
         );
       }

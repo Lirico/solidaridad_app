@@ -66,6 +66,10 @@ impresión de ticket.
 - Comprobante en pantalla (respaldo / reimpresión visual).
 - Listado básico de transacciones y detalle/comprobante.
 - Manejo básico de carga, errores y reintentos (incluida idempotencia).
+- Espera del cobro: el terminal espera la respuesta de `POST /v1/transactions`
+  **más que el peor caso del backend** (45 s en la app, 35 s en la API). Si
+  aun así no llega el resultado, avisa que la operación quedó **pendiente de
+  confirmación** y no sugiere cobrar de nuevo.
 - Build Android instalable en el modelo de terminal acordado.
 
 **Branding/UX:** la UI sigue siendo Material estándar y prioriza la claridad

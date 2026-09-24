@@ -4,7 +4,15 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-23
+
+> ✅ **Último cambio (2026-09-23, VE-02):** el `POST` de venta espera 45 s
+> (`kSaleRequestTimeout` en `sales_repository.dart`), por encima de los 35 s de
+> `payment_gateway_timeout_seconds`. Si el cliente igual no recibe respuesta,
+> el mensaje es pendiente de confirmación y no invita a reintentar
+> (`saleConnectionSubtitle` en `sale_status_screen.dart`). Tests:
+> `sales_repository_timeout_test.dart` y `sale_status_content_test.dart`.
+> TC-V-009 (pausa del autorizador) sigue siendo manual. Ver G-P0-20.
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -339,6 +347,7 @@ Verifone (banda + térmica).
 | G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases_index.md`. |
 
 | G-P0-18 | Transacción de demo siempre rechazada por comercio inválido en autorizador | done | **Fix (2026-08-08):** `utils/demo/03_fix_demo.sql` montado por compose como paso `03` del init de MySQL: terminal `05000001` → `cod_comercio='012502'`, saldo en tarjetas de demo, `venta_min_horas_ultima_venta=0`. Recarga posterior sin reset: `make -C payment_processor recarga` (`utils/demo/recarga.sql`). Ambos auxiliares quedan fuera de `docker/mysql`. Guía: `docs/demo-transaccion-aprobada.md`. **2026-11-08:** el saldo en `sgas_usuario_cta` es por producto; ahora `03_fix_demo.sql` y `recarga.sql` cargan saldo para los 5 productos (993–997) en `6063007014007403` y `6063007014007401`, para que cualquier garrafa se apruebe (antes solo la de 10 kg, código 06). |
+| G-P0-20 | Timeout del terminal menor que el del backend (riesgo de doble cobro, VE-02) | done | **Fix (2026-09-23):** `kSaleRequestTimeout` = 45 s, solo en `registerSale`, por encima de `payment_gateway_timeout_seconds` (35 s). Ante timeout el texto es `kSalePendingConfirmationMessage` y `saleConnectionSubtitle` no invita a reintentar. Tests en `mobile/test/sales_repository_timeout_test.dart` y `mobile/test/sale_status_content_test.dart`. Pendiente: prueba manual TC-V-009 (`docker pause` 20 s). Anulación (15 s) y saldo (20 s) quedan fuera. |
 
 
 

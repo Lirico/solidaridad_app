@@ -149,6 +149,20 @@ def test_unpack_rejects_short_and_incomplete() -> None:
         unpack_iso(b"\x00\x10" + b"\x00" * 5)
 
 
+def test_build_purchase_request_rejects_short_expiration() -> None:
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="4111111111111111",
+        terminal_id="TERM0001",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="12",
+    )
+    with pytest.raises(IsoPackError):
+        build_purchase_request(cmd, Settings())
+
+
 def test_build_purchase_request_sets_fields() -> None:
     settings = Settings()
     cmd = AuthorizeCommand(

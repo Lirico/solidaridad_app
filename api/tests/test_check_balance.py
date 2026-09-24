@@ -67,6 +67,20 @@ def test_check_balance_product_without_saldo_is_zero() -> None:
     assert by_product["GARRAFA_15"] == 0
 
 
+def test_check_balance_rejects_invalid_expiration() -> None:
+    from domain.exceptions import InvalidExpirationDate
+
+    gateway = MagicMock()
+    uc = CheckBalance(_installation_repo(), gateway)
+    with pytest.raises(InvalidExpirationDate):
+        uc.execute(
+            installation_id="05000001",
+            card_number="4111111111111111",
+            expiration_date="1325",
+        )
+    gateway.balance.assert_not_called()
+
+
 def test_check_balance_card_invalid_returns_declined() -> None:
     outcomes = {
         code: BalanceResult(outcome=GatewayOutcome.DECLINED, response_code="14")

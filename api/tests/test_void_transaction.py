@@ -123,6 +123,21 @@ def test_void_same_idempotency_key_replays_without_gateway() -> None:
     )
 
 
+def test_void_rejects_invalid_expiration_before_gateway() -> None:
+    from domain.exceptions import InvalidExpirationDate
+
+    use_case, _, gateway = _build()
+    with pytest.raises(InvalidExpirationDate):
+        use_case.execute(
+            terminal_id="05000001",
+            transaction_number="OP-260716-00000001",
+            idempotency_key="void-1",
+            card_number="4111111111111111",
+            expiration_date="12",
+        )
+    gateway.void.assert_not_called()
+
+
 def test_void_not_found() -> None:
     use_case, transactions, _ = _build()
     transactions.get_by_transaction_number.return_value = None

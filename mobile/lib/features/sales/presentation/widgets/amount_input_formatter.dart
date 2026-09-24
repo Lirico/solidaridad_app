@@ -57,6 +57,14 @@ class AmountInputFormatter extends TextInputFormatter {
       );
     }
 
+    // DE4 admite 12 dígitos con 2 decimales implícitos: 9.999.999.999,99.
+    final parts = text.split(',');
+    final integerDigits = parts[0].replaceAll('-', '');
+    final decimalDigits = parts.length > 1 ? parts[1] : '';
+    if (integerDigits.length > 10 || decimalDigits.length > 2) {
+      return oldValue;
+    }
+
     // Recalcular la posición del cursor
     final cursorPosition = text.length;
 

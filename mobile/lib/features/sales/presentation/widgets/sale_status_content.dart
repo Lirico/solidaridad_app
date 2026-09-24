@@ -13,6 +13,7 @@ class SaleStatusContent extends StatelessWidget {
   final PrintStatus printStatus;
   final String printMessage;
   final VoidCallback? onRetryPrint;
+  final VoidCallback? onRetry;
   final VoidCallback onFinalize;
 
   const SaleStatusContent({
@@ -26,6 +27,7 @@ class SaleStatusContent extends StatelessWidget {
     this.printStatus = PrintStatus.idle,
     this.printMessage = '',
     this.onRetryPrint,
+    this.onRetry,
     required this.onFinalize,
   });
 
@@ -91,6 +93,31 @@ class SaleStatusContent extends StatelessWidget {
         _buildPrintStatus(context),
 
         const Spacer(),
+
+        if (onRetry != null) ...[
+          ElevatedButton(
+            onPressed: onRetry,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primaryOrange,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: AppColors.primaryOrange),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'REINTENTAR',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
 
         ElevatedButton(
           onPressed: onFinalize,

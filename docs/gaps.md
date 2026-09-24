@@ -6,6 +6,13 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-09
 
+> ✅ **Último cambio (2026-09-23, VE-03 idempotencia de venta):** la clave
+> `Idempotency-Key` se genera al abrir la revisión y se reutiliza en el envío y
+> en el reintento por error de red. `CONFIRMAR COBRO` queda deshabilitado
+> mientras el estado es `SalesProcessing`, y un segundo `sendIsoMessage` no
+> dispara otro `POST`. El servidor ya devolvía la venta existente ante la misma
+> clave. Sigue pendiente el manejo de HTTP 202. Ver G-P1-02.
+
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
 > `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`), para eliminar la
@@ -349,7 +356,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. El endpoint `POST /v1/auth/register` se mantiene para que la empresa pueda registrar usuarios vía Postman. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. Mobile genera y envía `Idempotency-Key` (timestamp+random) en cada `POST /v1/transactions`. **2026-08-16:** el reintento de **lectura MSR** ya está implementado — botón "REINTENTAR" en `WaitingForCardContent` que vuelve a llamar a `_startReading()` tras timeout/error. **Pendiente:** (1) reintentar el envío con la misma clave ante timeout/error idempotente — la `SaleStatusScreen` solo tiene botón "FINALIZAR", no "Reintentar" (hallazgo #24); (2) manejar status 202 (ACCEPTED). Falta botón "Reintentar" en `sale_status_content.dart` que reenvíe con la misma `Idempotency-Key`. Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. **Pendiente:** manejar HTTP 202 (ACCEPTED). Ver TC-069 en `docs/test_cases_index.md`. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | open | `SalesRepository.fetchProducts()` devuelve productos default hardcodeados ante cualquier excepción. `SalesRepository.fetchHistory()` devuelve lista vacía. Ningún repositorio muestra mensaje de error ni opción de reintentar al usuario. TC-062 y TC-072 esperaban "mensaje de error y opción de reintentar", pero la app usa fallback silencioso. Considerar agregar indicador visual cuando se usan datos fallback. Ver hallazgo #23 en `docs/test_cases_index.md`. |

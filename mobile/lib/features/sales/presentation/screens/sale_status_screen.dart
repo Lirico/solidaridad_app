@@ -6,8 +6,19 @@ import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../data/receipt_printer.dart';
+import '../../data/sales_repository.dart';
 import '../../domain/sale_model.dart';
 import '../widgets/sale_status_content.dart';
+
+/// Subtítulo de un cobro cuyo resultado no llegó.
+///
+/// Si hay mensaje de la operación (timeout, red, protocolo), se muestra ese.
+/// Si no, el aviso de pendiente de confirmación: no invita a cobrar de nuevo.
+String saleConnectionSubtitle(String? userMessage) {
+  final String? message = userMessage?.trim();
+  if (message != null && message.isNotEmpty) return message;
+  return kSalePendingConfirmationMessage;
+}
 
 class SaleStatusScreen extends StatefulWidget {
   const SaleStatusScreen({super.key});
@@ -85,8 +96,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = const Color(0xFFFF8C00);
         statusIcon = Icons.wifi_off_outlined;
         statusTitle = 'Error de Conexión';
-        statusSubtitle =
-            'No se pudo contactar con el procesador. Verifique su conectividad y reintente.';
+        statusSubtitle = saleConnectionSubtitle(operation?.userMessage);
       case PaymentResult.voided:
         statusColor = Colors.grey;
         statusIcon = Icons.undo;

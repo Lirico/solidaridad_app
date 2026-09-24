@@ -11,6 +11,19 @@ class SessionExpiredException implements Exception {
   const SessionExpiredException();
 }
 
+/// Espera del `POST /transactions` de una venta.
+///
+/// Tiene que seguir siendo mayor que `payment_gateway_timeout_seconds` de la
+/// API (35 s). Si el terminal corta antes, el procesador puede aprobar el
+/// cobro después de que la app ya mostró un error.
+const Duration kSaleRequestTimeout = Duration(seconds: 45);
+
+/// Texto cuando el cobro no respondió a tiempo. No invita a reintentar:
+/// la venta puede haber quedado aprobada en el servidor.
+const String kSalePendingConfirmationMessage =
+    'La operación quedó pendiente de confirmación. '
+    'Consulte el historial antes de volver a cobrar.';
+
 /// Generates a pseudo-unique idempotency key.
 ///
 /// In production, consider using the `uuid` package for guaranteed uniqueness.
@@ -24,10 +37,15 @@ String _generateIdempotencyKey() {
 class SalesRepository {
   final http.Client _httpClient;
   final String _baseUrl;
+  final Duration _saleTimeout;
 
-  SalesRepository({http.Client? httpClient, String? baseUrl})
-    : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+  SalesRepository({
+    http.Client? httpClient,
+    String? baseUrl,
+    Duration? saleTimeout,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _baseUrl = baseUrl ?? ApiConfig.baseUrl,
+       _saleTimeout = saleTimeout ?? kSaleRequestTimeout;
 
   Future<List<ProductInfo>> fetchProducts({required String token}) async {
     final url = Uri.parse('$_baseUrl/products');
@@ -223,7 +241,7 @@ class SalesRepository {
             },
             body: jsonEncode(bodyPayload),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(_saleTimeout);
 
       if (response.statusCode == 401) {
         return const SaleResponse(
@@ -262,8 +280,7 @@ class SalesRepository {
       return const SaleResponse(
         isApproved: false,
         operationNumber: '',
-        message:
-            'Tiempo de espera agotado con el procesador de pagos. Reintente.',
+        message: kSalePendingConfirmationMessage,
         errorCode: '99',
         connectionError: true,
       );

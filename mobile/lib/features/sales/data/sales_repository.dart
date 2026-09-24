@@ -253,10 +253,12 @@ class SalesRepository {
       if (response.statusCode == 200 ||
           response.statusCode == 201 ||
           response.statusCode == 202) {
-        final bool approved = responseData['status'] == 'APPROVED';
+        final String status = (responseData['status'] as String? ?? '')
+            .toUpperCase();
 
         return SaleResponse(
-          isApproved: approved,
+          isApproved: status == 'APPROVED',
+          isUnknown: status == 'UNKNOWN',
           operationNumber: responseData['transaction_number'] ?? 'OP-UNKNOWN',
           message: responseData['user_message'] ?? 'Operación procesada',
           errorCode: '00',
@@ -277,9 +279,9 @@ class SalesRepository {
         isApproved: false,
         operationNumber: '',
         message:
-            'Tiempo de espera agotado con el procesador de pagos. Reintente.',
+            'No pudimos confirmar el cobro. Consulte la operación antes de volver a cobrar.',
         errorCode: '99',
-        connectionError: true,
+        isUnknown: true,
       );
     } on SocketException {
       return const SaleResponse(

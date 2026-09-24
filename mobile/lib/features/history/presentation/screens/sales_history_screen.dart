@@ -144,6 +144,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ? Icons.check_circle
                       : operation.result == PaymentResult.voided
                       ? Icons.undo
+                      : operation.result == PaymentResult.unknown
+                      ? Icons.help_outline
                       : operation.result == PaymentResult.connectionError
                       ? Icons.wifi_off
                       : Icons.error,
@@ -151,6 +153,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ? Colors.green
                       : operation.result == PaymentResult.voided
                       ? Colors.grey
+                      : operation.result == PaymentResult.unknown
+                      ? const Color(0xFFB9770E)
                       : operation.result == PaymentResult.connectionError
                       ? Colors.orange
                       : Colors.red,

@@ -9,19 +9,21 @@ import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../cubit/sales_cubit.dart';
+import '../cubit/sales_state.dart';
 import '../widgets/sale_review_content.dart';
 
 class SaleReviewScreen extends StatelessWidget {
   const SaleReviewScreen({super.key});
 
   void _onConfirmPayment(BuildContext context) {
+    final salesCubit = context.read<SalesCubit>();
+    if (salesCubit.state is SalesProcessing) return;
+
     final authState = context.read<AuthCubit>().state;
     final token = authState is AuthSuccess ? authState.user!.token : '';
 
-    // Kick off the ISO message sending
-    context.read<SalesCubit>().sendIsoMessage(token: token);
+    salesCubit.sendIsoMessage(token: token);
 
-    // Navigate to the full-screen processing page
     Navigator.pushNamed(context, AppRoutes.saleProcessing);
   }
 

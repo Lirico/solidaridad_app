@@ -13,6 +13,10 @@ sealed class SalesState {
   final String? track2;
   final List<OperationModel> history;
 
+  /// Identificador de la operación. Se genera al abrir la revisión y se
+  /// reutiliza en el envío y en el reintento de red.
+  final String idempotencyKey;
+
   const SalesState({
     required this.productCode,
     required this.productLabel,
@@ -23,6 +27,7 @@ sealed class SalesState {
     this.entryMode = '012',
     this.track2,
     required this.history,
+    this.idempotencyKey = '',
   });
 }
 
@@ -74,6 +79,7 @@ class SalesReviewing extends SalesState {
     super.entryMode,
     super.track2,
     required super.history,
+    super.idempotencyKey,
   });
 }
 
@@ -88,6 +94,7 @@ class SalesProcessing extends SalesState {
     super.entryMode,
     super.track2,
     required super.history,
+    super.idempotencyKey,
   });
 }
 
@@ -107,6 +114,7 @@ class SalesCompleted extends SalesState {
     super.entryMode,
     super.track2,
     required super.history,
+    super.idempotencyKey,
     required this.result,
     this.operationNumber,
     this.errorMessage,

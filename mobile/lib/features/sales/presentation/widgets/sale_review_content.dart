@@ -81,7 +81,7 @@ class SaleReviewContent extends StatelessWidget {
           width: double.infinity,
           height: 60,
           child: ElevatedButton(
-            onPressed: onConfirm,
+            onPressed: state is SalesProcessing ? null : onConfirm,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryOrange,
               foregroundColor: Colors.white,

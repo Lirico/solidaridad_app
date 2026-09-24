@@ -13,6 +13,7 @@ class SaleStatusContent extends StatelessWidget {
   final PrintStatus printStatus;
   final String printMessage;
   final VoidCallback? onRetryPrint;
+  final VoidCallback? onViewOperation;
   final VoidCallback onFinalize;
 
   const SaleStatusContent({
@@ -26,6 +27,7 @@ class SaleStatusContent extends StatelessWidget {
     this.printStatus = PrintStatus.idle,
     this.printMessage = '',
     this.onRetryPrint,
+    this.onViewOperation,
     required this.onFinalize,
   });
 
@@ -48,7 +50,7 @@ class SaleStatusContent extends StatelessWidget {
             fontWeight: FontWeight.bold,
             color: statusColor,
           ),
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 6),
@@ -57,7 +59,7 @@ class SaleStatusContent extends StatelessWidget {
           statusSubtitle,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Colors.grey),
-          maxLines: 2,
+          maxLines: 3,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 16),
@@ -82,7 +84,13 @@ class SaleStatusContent extends StatelessWidget {
               const Divider(height: 12),
               _buildTicketRow('Tarjeta', operation?.cardNumber ?? '---'),
               const Divider(height: 12),
-              _buildTicketRow('Código de respuesta', _responseCode(result)),
+              _buildTicketRow(
+                'Código de respuesta',
+                _responseCode(result, operation),
+                wrapValue:
+                    result == PaymentResult.declined ||
+                    result == PaymentResult.unknown,
+              ),
             ],
           ),
         ),
@@ -91,6 +99,31 @@ class SaleStatusContent extends StatelessWidget {
         _buildPrintStatus(context),
 
         const Spacer(),
+
+        if (onViewOperation != null) ...[
+          ElevatedButton(
+            onPressed: onViewOperation,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primaryOrange,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: AppColors.primaryOrange),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'VER OPERACIÓN',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
 
         ElevatedButton(
           onPressed: onFinalize,
@@ -181,20 +214,26 @@ class SaleStatusContent extends StatelessWidget {
     }
   }
 
-  String _responseCode(PaymentResult result) {
+  String _responseCode(PaymentResult result, OperationModel? operation) {
     switch (result) {
       case PaymentResult.approved:
         return '00 (Aprobado)';
       case PaymentResult.declined:
-        return '51 (Fondos insuficientes)';
+        final message = operation?.userMessage?.trim();
+        if (message != null && message.isNotEmpty) return message;
+        return 'Rechazada';
       case PaymentResult.connectionError:
         return '99 (Tiempo agotado)';
       case PaymentResult.voided:
         return '00 (ANULADA)';
+      case PaymentResult.unknown:
+        final message = operation?.userMessage?.trim();
+        if (message != null && message.isNotEmpty) return message;
+        return 'Sin confirmar';
     }
   }
 
-  Widget _buildTicketRow(String label, String value) {
+  Widget _buildTicketRow(String label, String value, {bool wrapValue = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -215,19 +254,31 @@ class SaleStatusContent extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Flexible(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerRight,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          child: wrapValue
+              ? Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
         ),
       ],
     );

@@ -21,6 +21,18 @@ String _generateIdempotencyKey() {
   return '$timestamp-$random';
 }
 
+/// Texto que ve el operador. Un 201 trae `user_message`; un 400/409 trae
+/// `message`. Si no hay ninguno, se usa [fallback].
+String apiUserMessage(Map<String, dynamic> data, String fallback) {
+  for (final key in ['user_message', 'message']) {
+    final value = data[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value;
+    }
+  }
+  return fallback;
+}
+
 class SalesRepository {
   final http.Client _httpClient;
   final String _baseUrl;
@@ -121,9 +133,10 @@ class SalesRepository {
       }
 
       return VoidResult.declined(
-        message:
-            responseData['user_message'] as String? ??
-            'Anulación rechazada por la entidad emisora.',
+        message: apiUserMessage(
+          responseData,
+          'Anulación rechazada por la entidad emisora.',
+        ),
       );
     } on SessionExpiredException {
       rethrow;
@@ -240,10 +253,12 @@ class SalesRepository {
       if (response.statusCode == 200 ||
           response.statusCode == 201 ||
           response.statusCode == 202) {
-        final bool approved = responseData['status'] == 'APPROVED';
+        final String status = (responseData['status'] as String? ?? '')
+            .toUpperCase();
 
         return SaleResponse(
-          isApproved: approved,
+          isApproved: status == 'APPROVED',
+          isUnknown: status == 'UNKNOWN',
           operationNumber: responseData['transaction_number'] ?? 'OP-UNKNOWN',
           message: responseData['user_message'] ?? 'Operación procesada',
           errorCode: '00',
@@ -252,9 +267,10 @@ class SalesRepository {
         return SaleResponse(
           isApproved: false,
           operationNumber: responseData['transaction_number'] ?? '',
-          message:
-              responseData['user_message'] ??
-              'Venta rechazada por la entidad emisora.',
+          message: apiUserMessage(
+            responseData,
+            'Venta rechazada por la entidad emisora.',
+          ),
           errorCode: '${response.statusCode}',
         );
       }
@@ -263,9 +279,9 @@ class SalesRepository {
         isApproved: false,
         operationNumber: '',
         message:
-            'Tiempo de espera agotado con el procesador de pagos. Reintente.',
+            'No pudimos confirmar el cobro. Consulte la operación antes de volver a cobrar.',
         errorCode: '99',
-        connectionError: true,
+        isUnknown: true,
       );
     } on SocketException {
       return const SaleResponse(

@@ -30,6 +30,10 @@ class SaleDetailTicket extends StatelessWidget {
         statusColor = Colors.grey;
         statusIcon = Icons.undo;
         statusTitle = 'VENTA ANULADA';
+      case PaymentResult.unknown:
+        statusColor = const Color(0xFFB9770E);
+        statusIcon = Icons.help_outline;
+        statusTitle = 'COBRO SIN CONFIRMAR';
     }
 
     return Column(

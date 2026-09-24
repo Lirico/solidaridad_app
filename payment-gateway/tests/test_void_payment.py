@@ -47,6 +47,15 @@ def test_void_rejects_invalid_amount() -> None:
         pass
 
 
+def test_void_rejects_amount_above_de4() -> None:
+    uc = VoidPayment(MockIsoProcessor())
+    try:
+        uc.execute(_cmd(amount_minor=1_000_000_000_000))
+        raise AssertionError("expected InvalidAmount")
+    except InvalidAmount as exc:
+        assert "máximo permitido" in str(exc)
+
+
 def test_void_rejects_bad_pan() -> None:
     uc = VoidPayment(MockIsoProcessor())
     try:

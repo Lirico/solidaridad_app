@@ -29,6 +29,7 @@ from domain.exceptions import (
     MissingIdempotencyKey,
     MissingTerminalId,
 )
+from domain.expiration import parse_expiration_date
 from domain.money import Money, parse_amount
 from domain.product import Product, parse_product, processor_product_code
 from domain.transaction import Transaction
@@ -147,9 +148,7 @@ class CreateTransaction:
         card_last4 = pan[-4:]
 
 
-        exp = expiration_date.strip() if expiration_date else None
-        if exp == "":
-            exp = None
+        exp = parse_expiration_date(expiration_date)
         fingerprint = _fingerprint(
             product=parsed_product,
             amount_minor=money.amount_minor,

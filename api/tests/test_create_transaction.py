@@ -304,9 +304,44 @@ def test_gateway_declined() -> None:
         amount="1.50",
         card_number="4111111111111111",
         cvv="123",
-        expiration_date="2912",
+        expiration_date="1229",
     )
     assert result.transaction.status == TransactionStatus.DECLINED
+
+
+@pytest.mark.parametrize("expiration_date", ["12", "1325", "12/28", "0012", "abcd"])
+def test_invalid_expiration_date_does_not_call_gateway(expiration_date: str) -> None:
+    from domain.exceptions import InvalidExpirationDate
+
+    use_case, _, _, gateway = _build()
+    with pytest.raises(InvalidExpirationDate, match="Vencimiento inválido"):
+        use_case.execute(
+            user_id=1,
+            installation_id="inst-1",
+            idempotency_key="k1",
+            product="GARRAFA_10",
+            amount="1.50",
+            card_number="4111111111111111",
+            cvv="123",
+            expiration_date=expiration_date,
+        )
+    gateway.authorize.assert_not_called()
+
+
+def test_valid_expiration_date_is_forwarded() -> None:
+    use_case, _, _, gateway = _build()
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="1.50",
+        card_number="4111111111111111",
+        cvv="123",
+        expiration_date=" 1228 ",
+    )
+    auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.expiration_date == "1228"
 
 
 def test_invalid_cvv() -> None:

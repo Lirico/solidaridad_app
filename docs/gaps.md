@@ -6,6 +6,11 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-09
 
+> ✅ **Último cambio (2026-09-24, VE-07 vencimiento):** la API y el gateway
+> rechazan un `expiration_date` que no sea MMAA (cuatro dígitos, mes 01–12)
+> con «Vencimiento inválido», antes de armar el ISO. DE14 ya no se rellena
+> con ceros. Vacío sigue siendo válido. Ver G-P1-14.
+
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
 > `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`), para eliminar la
@@ -362,6 +367,7 @@ Verifone (banda + térmica).
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
+| G-P1-14 | Vencimiento de tarjeta sin validar | done | **2026-09-24 (VE-07):** `parse_expiration_date` exige MMAA (mes 01–12) en venta, anulación y saldo de la API, y en autorizar, anular y saldo del gateway. El error es «Vencimiento inválido» (HTTP 400). `message_builder` copia DE14 solo si ya tiene cuatro dígitos y no lo rellena con ceros. |
 
 ---
 

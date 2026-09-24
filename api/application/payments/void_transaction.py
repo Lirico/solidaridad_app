@@ -26,6 +26,7 @@ from domain.exceptions import (
     TransactionNotFound,
     TransactionNotVoidable,
 )
+from domain.expiration import parse_expiration_date
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.transaction_repository import (
@@ -78,9 +79,7 @@ class VoidTransaction:
 
         pan = _validate_pan(card_number)
         card_last4 = pan[-4:]
-        exp = expiration_date.strip() if expiration_date else None
-        if exp == "":
-            exp = None
+        exp = parse_expiration_date(expiration_date)
 
         tx = self._transactions.get_by_transaction_number(
             transaction_number=transaction_number,

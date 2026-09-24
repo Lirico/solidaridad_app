@@ -93,6 +93,42 @@ def test_authorize_rejects_bad_stan() -> None:
         pass
 
 
+def test_authorize_rejects_invalid_expiration() -> None:
+    from domain.exceptions import InvalidExpirationDate
+
+    uc = AuthorizePayment(MockIsoProcessor())
+    for expiration_date in ("12", "1325", "12/28"):
+        try:
+            uc.execute(_cmd(expiration_date=expiration_date))
+            raise AssertionError("expected InvalidExpirationDate")
+        except InvalidExpirationDate as exc:
+            assert str(exc) == "Vencimiento inválido"
+
+
+def test_authorize_forwards_valid_expiration() -> None:
+    class CapturingProcessor:
+        last: AuthorizeCommand | None = None
+
+        def authorize(self, command: AuthorizeCommand) -> AuthorizationResult:
+            self.last = command
+            return AuthorizationResult(
+                status=AuthorizationStatus.APPROVED,
+                response_code="00",
+                user_message="Aprobada",
+            )
+
+        def void(self, command: object) -> AuthorizationResult:
+            raise AssertionError("void should not be called")
+
+    processor = CapturingProcessor()
+    AuthorizePayment(processor).execute(_cmd(expiration_date="1228"))
+    assert processor.last is not None
+    assert processor.last.expiration_date == "1228"
+    AuthorizePayment(processor).execute(_cmd(expiration_date="   "))
+    assert processor.last is not None
+    assert processor.last.expiration_date is None
+
+
 def test_authorize_rejects_empty_ticket() -> None:
     from domain.exceptions import InvalidTicket
 

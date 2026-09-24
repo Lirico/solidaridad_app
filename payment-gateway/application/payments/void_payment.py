@@ -9,6 +9,7 @@ from domain.exceptions import (
     InvalidTerminalId,
     InvalidTicket,
 )
+from domain.expiration import parse_expiration_date
 from domain.product import product_code_de49
 
 
@@ -34,6 +35,7 @@ class VoidPayment:
         void_ticket = "".join(c for c in command.void_ticket.strip() if c.isdigit())
         if not void_ticket:
             raise InvalidTicket("ticket de anulación inválido")
+        expiration_date = parse_expiration_date(command.expiration_date)
 
         normalized = VoidCommand(
             product_code=command.product_code,
@@ -43,6 +45,6 @@ class VoidPayment:
             stan=stan.zfill(6),
             original_ticket=original,
             void_ticket=void_ticket,
-            expiration_date=command.expiration_date,
+            expiration_date=expiration_date,
         )
         return self._processor.void(normalized)

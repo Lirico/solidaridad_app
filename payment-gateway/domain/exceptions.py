@@ -18,6 +18,11 @@ class InvalidCardNumber(DomainError):
         super().__init__(message)
 
 
+class InvalidExpirationDate(DomainError):
+    def __init__(self, message: str = "Vencimiento inválido") -> None:
+        super().__init__(message)
+
+
 class InvalidTerminalId(DomainError):
     def __init__(self, message: str = "terminal_id es requerido") -> None:
         super().__init__(message)

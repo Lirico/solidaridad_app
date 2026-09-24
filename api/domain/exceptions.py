@@ -72,6 +72,13 @@ class InvalidCvv(DomainError):
         super().__init__(message)
 
 
+class InvalidExpirationDate(DomainError):
+    """Raised when expiration is not four digits MMAA with month 01-12."""
+
+    def __init__(self, message: str = "Vencimiento inválido") -> None:
+        super().__init__(message)
+
+
 class InvalidEntryMode(DomainError):
     """Raised when entry_mode is not "012"/"022" or is inconsistent with track2."""
 

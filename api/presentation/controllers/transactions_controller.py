@@ -19,6 +19,7 @@ from domain.exceptions import (
     InvalidCardNumber,
     InvalidCvv,
     InvalidEntryMode,
+    InvalidExpirationDate,
     MissingIdempotencyKey,
     MissingTerminalId,
     TransactionNotFound,
@@ -137,6 +138,7 @@ def create_transaction(
         InvalidCardNumber,
         InvalidCvv,
         InvalidEntryMode,
+        InvalidExpirationDate,
         MissingIdempotencyKey,
         MissingTerminalId,
     ) as exc:
@@ -202,6 +204,7 @@ def void_transaction(
         )
     except (
         InvalidCardNumber,
+        InvalidExpirationDate,
         MissingIdempotencyKey,
         TransactionNotVoidable,
         CardMismatch,

@@ -7,6 +7,7 @@ from domain.exceptions import (
     InvalidStan,
     InvalidTerminalId,
 )
+from domain.expiration import parse_expiration_date
 from domain.product import product_code_de49
 
 
@@ -24,13 +25,14 @@ class CheckBalance:
         stan = command.stan.strip()
         if not stan.isdigit() or len(stan) > 6:
             raise InvalidStan()
+        expiration_date = parse_expiration_date(command.expiration_date)
 
         normalized = BalanceCommand(
             product_code=command.product_code,
             card_number=pan,
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
             stan=stan.zfill(6),
-            expiration_date=command.expiration_date,
+            expiration_date=expiration_date,
             entry_mode=command.entry_mode,
             track2=command.track2,
         )

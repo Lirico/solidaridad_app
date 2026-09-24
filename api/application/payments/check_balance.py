@@ -23,6 +23,7 @@ from domain.exceptions import (
     InvalidEntryMode,
     MissingTerminalId,
 )
+from domain.expiration import parse_expiration_date
 from domain.product import list_products, processor_product_code
 from persistence.repositories.installation_repository import InstallationRepository
 
@@ -69,9 +70,7 @@ class CheckBalance:
         pan = _validate_pan(card_number)
         if entry_mode not in ("012", "022"):
             raise InvalidEntryMode()
-        exp = expiration_date.strip() if expiration_date else None
-        if exp == "":
-            exp = None
+        exp = parse_expiration_date(expiration_date)
 
         installation = self._installations.get_by_installation_id(installation_id)
         if installation is None:

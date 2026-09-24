@@ -5,6 +5,7 @@ from datetime import datetime
 from config.settings import Settings
 from domain.authorization import AuthorizeCommand, VoidCommand
 from domain.balance import BalanceCommand
+from domain.exceptions import IsoPackError
 from domain.product import product_code_de49
 from infrastructure.iso.packer import IsoMessage, set_present
 
@@ -44,7 +45,7 @@ def build_purchase_request(
     )
     bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 41, 49, 62]
     if command.expiration_date:
-        iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
+        iso.dateexpire_14 = _expiration_de14(command.expiration_date)
         bits.append(14)
     if command.track2:
         iso.track2_35 = _normalize_track2(command.track2)
@@ -82,7 +83,7 @@ def build_balance_request(
     )
     bits = [2, 3, 11, 12, 13, 22, 24, 25, 41, 49]
     if command.expiration_date:
-        iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
+        iso.dateexpire_14 = _expiration_de14(command.expiration_date)
         bits.append(14)
     if command.track2:
         iso.track2_35 = _normalize_track2(command.track2)
@@ -125,10 +126,17 @@ def build_void_request(
     )
     bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 37, 41, 49, 60, 62]
     if command.expiration_date:
-        iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
+        iso.dateexpire_14 = _expiration_de14(command.expiration_date)
         bits.append(14)
     set_present(iso, *bits)
     return iso
+
+
+def _expiration_de14(value: str) -> str:
+    """DE14 is copied as MMAA. Short values are not zero-padded (that made month 00)."""
+    if len(value) != 4 or not value.isdigit():
+        raise IsoPackError("Vencimiento inválido")
+    return value
 
 
 def _pad_digits(value: str, width: int) -> str:

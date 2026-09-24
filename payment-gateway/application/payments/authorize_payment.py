@@ -9,6 +9,7 @@ from domain.exceptions import (
     InvalidTerminalId,
     InvalidTicket,
 )
+from domain.expiration import parse_expiration_date
 from domain.product import product_code_de49
 
 
@@ -31,6 +32,7 @@ class AuthorizePayment:
         ticket = "".join(c for c in command.ticket_number.strip() if c.isdigit())
         if not ticket:
             raise InvalidTicket()
+        expiration_date = parse_expiration_date(command.expiration_date)
 
         normalized = AuthorizeCommand(
             product_code=command.product_code,
@@ -39,7 +41,7 @@ class AuthorizePayment:
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
             stan=stan.zfill(6),
             ticket_number=ticket,
-            expiration_date=command.expiration_date,
+            expiration_date=expiration_date,
             entry_mode=command.entry_mode,
             track2=command.track2,
         )

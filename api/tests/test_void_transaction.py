@@ -135,6 +135,43 @@ def test_void_not_found() -> None:
         )
 
 
+def test_void_unknown_with_key_calls_gateway_again() -> None:
+    existing = _tx(
+        status=TransactionStatus.UNKNOWN,
+        void_idempotency_key="void-1",
+    )
+    use_case, transactions, gateway = _build(existing=existing)
+    transactions.apply_void_result.return_value = _tx(
+        status=TransactionStatus.VOIDED,
+        user_message="Anulación aprobada",
+    )
+    result = use_case.execute(
+        terminal_id="05000001",
+        transaction_number="OP-260716-00000001",
+        idempotency_key="void-1",
+        card_number="4111111111111111",
+    )
+    gateway.void.assert_called_once()
+    transactions.record_idempotent_hit.assert_not_called()
+    assert result.transaction.status == TransactionStatus.VOIDED
+
+
+def test_void_unconfirmed_sale_is_not_voidable() -> None:
+    existing = _tx(status=TransactionStatus.UNKNOWN, void_idempotency_key=None)
+    use_case, _, gateway = _build(existing=existing)
+    with pytest.raises(
+        TransactionNotVoidable,
+        match="No pudimos confirmar el cobro",
+    ):
+        use_case.execute(
+            terminal_id="05000001",
+            transaction_number="OP-260716-00000001",
+            idempotency_key="void-1",
+            card_number="4111111111111111",
+        )
+    gateway.void.assert_not_called()
+
+
 def test_void_not_approved() -> None:
     use_case, _, _ = _build(existing=_tx(status=TransactionStatus.DECLINED))
     with pytest.raises(TransactionNotVoidable):

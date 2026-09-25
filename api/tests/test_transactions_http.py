@@ -8,6 +8,7 @@ from application.payments.create_transaction import (
     CreateTransactionHttpStatus,
     CreateTransactionResult,
 )
+from application.payments.get_transaction import GetTransaction
 from application.payments.list_transactions import (
     ListTransactions,
     ListTransactionsResult,
@@ -32,6 +33,7 @@ from presentation.dependencies import (
     get_create_transaction,
     get_current_user,
     get_list_transactions,
+    get_transaction,
     get_void_transaction,
 )
 
@@ -232,6 +234,7 @@ def test_list_transactions_200() -> None:
     assert item["card_last4"] == "1111"
     assert item["status"] == "APPROVED"
     assert item["user_message"] == "Pago aprobado"
+    assert item["can_void"] is True
 
 
 def test_list_transactions_empty() -> None:
@@ -290,6 +293,85 @@ def test_create_transaction_idempotency_conflict() -> None:
     finally:
         _clear()
     assert response.status_code == 409
+
+
+def _override_get(use_case: MagicMock) -> None:
+    app.dependency_overrides[get_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+
+
+def test_get_transaction_200() -> None:
+    use_case = MagicMock(spec=GetTransaction)
+    use_case.execute.return_value = _tx()
+    _override_get(use_case)
+    try:
+        response = client.get("/v1/transactions/OP-260716-00000001")
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["transaction_number"] == "OP-260716-00000001"
+    assert data["status"] == "APPROVED"
+    assert data["can_void"] is True
+    use_case.execute.assert_called_once_with(
+        terminal_id="inst-1",
+        transaction_number="OP-260716-00000001",
+    )
+
+
+def test_get_transaction_unknown_void_can_retry() -> None:
+    use_case = MagicMock(spec=GetTransaction)
+    use_case.execute.return_value = _tx(
+        status=TransactionStatus.UNKNOWN,
+        void_idempotency_key="void-1",
+        user_message="No pudimos confirmar la anulación.",
+    )
+    _override_get(use_case)
+    try:
+        response = client.get("/v1/transactions/OP-260716-00000001")
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "UNKNOWN"
+    assert data["can_void"] is True
+
+
+def test_get_transaction_unconfirmed_sale_cannot_void() -> None:
+    use_case = MagicMock(spec=GetTransaction)
+    use_case.execute.return_value = _tx(status=TransactionStatus.UNKNOWN)
+    _override_get(use_case)
+    try:
+        response = client.get("/v1/transactions/OP-260716-00000001")
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+    assert response.json()["can_void"] is False
+
+
+def test_get_transaction_404() -> None:
+    use_case = MagicMock(spec=GetTransaction)
+    use_case.execute.side_effect = TransactionNotFound()
+    _override_get(use_case)
+    try:
+        response = client.get("/v1/transactions/OP-260716-99999999")
+    finally:
+        _clear()
+
+    assert response.status_code == 404
+    assert response.json()["message"] == "Transacción no encontrada"
+
+
+def test_get_transaction_requires_auth() -> None:
+    response = client.get("/v1/transactions/OP-260716-00000001")
+    assert response.status_code == 401
 
 
 def test_void_transaction_200() -> None:

@@ -7,6 +7,8 @@ def test_approved_default() -> None:
 
 def test_declined_known_code() -> None:
     assert message_for_code("51", approved=False) == "Fondos insuficientes"
+    assert message_for_code("13", approved=False) == "Monto inválido"
+    assert message_for_code("89", approved=False) == "Terminal desconocida"
 
 
 def test_declined_unknown_code() -> None:

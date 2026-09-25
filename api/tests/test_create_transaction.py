@@ -10,6 +10,7 @@ from application.payments.create_transaction import (
 from application.payments.ports import AuthorizeResult, GatewayOutcome
 from domain.exceptions import (
     IdempotencyConflict,
+    InvalidAmount,
     InvalidCardNumber,
     MissingIdempotencyKey,
     MissingTerminalId,
@@ -29,7 +30,7 @@ def _tx(**overrides: object) -> Transaction:
         terminal_id="05000001",
         product=Product.GARRAFA_10,
         processor_product_code="993",
-        amount_minor=150,
+        amount_minor=200,
         status=TransactionStatus.APPROVED,
         card_last4="1111",
         stan="000001",
@@ -99,7 +100,7 @@ def test_create_approves() -> None:
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="4111111111111111",
         cvv="123",
     )
@@ -122,7 +123,7 @@ def test_missing_idempotency_key() -> None:
             installation_id="inst-1",
             idempotency_key=None,
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="123",
         )
@@ -136,7 +137,7 @@ def test_invalid_pan() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="606300101400740X",
             cvv="123",
         )
@@ -149,7 +150,7 @@ def test_processor_pan_without_luhn_is_accepted() -> None:
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="6063001014007403",
         cvv="123",
     )
@@ -167,19 +168,19 @@ def test_missing_terminal() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="123",
         )
 
 
 def test_replay_pending_returns_202() -> None:
-    # fingerprint for GARRAFA_10|150|1111|
+    # fingerprint for GARRAFA_10|200|1111|
     from application.payments.create_transaction import _fingerprint
 
     fp = _fingerprint(
         product=Product.GARRAFA_10,
-        amount_minor=150,
+        amount_minor=200,
         card_last4="1111",
         expiration_date=None,
     )
@@ -191,7 +192,7 @@ def test_replay_pending_returns_202() -> None:
         installation_id="inst-1",
         idempotency_key="key-1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="4111111111111111",
         cvv="123",
     )
@@ -209,7 +210,7 @@ def test_replay_approved_returns_201_without_gateway() -> None:
 
     fp = _fingerprint(
         product=Product.GARRAFA_10,
-        amount_minor=150,
+        amount_minor=200,
         card_last4="1111",
         expiration_date=None,
     )
@@ -220,7 +221,7 @@ def test_replay_approved_returns_201_without_gateway() -> None:
         installation_id="inst-1",
         idempotency_key="key-1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="4111111111111111",
         cvv="123",
     )
@@ -246,7 +247,7 @@ def test_replay_conflict_on_different_body() -> None:
             installation_id="inst-1",
             idempotency_key="key-1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="123",
         )
@@ -262,7 +263,7 @@ def test_gateway_timeout_maps_to_unknown() -> None:
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="4111111111111111",
         cvv="123",
     )
@@ -281,7 +282,7 @@ def test_gateway_connect_failure_maps_to_failed() -> None:
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="4111111111111111",
         cvv="123",
     )
@@ -301,7 +302,7 @@ def test_gateway_declined() -> None:
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="4111111111111111",
         cvv="123",
         expiration_date="2912",
@@ -319,7 +320,7 @@ def test_invalid_cvv() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="12",
         )
@@ -333,7 +334,7 @@ def test_band_magnetic_022_allows_empty_cvv() -> None:
         installation_id="inst-1",
         idempotency_key="k1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="6063007014007403",
         cvv="",
         entry_mode="022",
@@ -360,7 +361,7 @@ def test_manual_012_still_validates_cvv() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="",
             entry_mode="012",
@@ -378,7 +379,7 @@ def test_band_022_without_track2_rejected() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="6063007014007403",
             cvv="",
             entry_mode="022",
@@ -396,7 +397,7 @@ def test_manual_012_with_track2_rejected() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="123",
             entry_mode="012",
@@ -415,7 +416,7 @@ def test_unsupported_entry_mode_rejected() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="123",
             entry_mode="999",
@@ -431,7 +432,7 @@ def test_empty_terminal_string() -> None:
             installation_id="inst-1",
             idempotency_key="k1",
             product="GARRAFA_10",
-            amount="1.50",
+            amount="2",
             card_number="4111111111111111",
             cvv="123",
         )
@@ -444,7 +445,7 @@ def test_integrity_error_replays_existing() -> None:
 
     fp = _fingerprint(
         product=Product.GARRAFA_10,
-        amount_minor=150,
+        amount_minor=200,
         card_last4="1111",
         expiration_date=None,
     )
@@ -457,9 +458,39 @@ def test_integrity_error_replays_existing() -> None:
         installation_id="inst-1",
         idempotency_key="key-1",
         product="GARRAFA_10",
-        amount="1.50",
+        amount="2",
         card_number="4111111111111111",
         cvv="123",
     )
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_not_called()
+
+
+def test_fractional_quantity_rejected_for_unit_product() -> None:
+    use_case, _, _, gateway = _build()
+    with pytest.raises(InvalidAmount, match="número entero"):
+        use_case.execute(
+            user_id=1,
+            installation_id="inst-1",
+            idempotency_key="k1",
+            product="GARRAFA_10",
+            amount="3.50",
+            card_number="4111111111111111",
+            cvv="123",
+        )
+    gateway.authorize.assert_not_called()
+
+
+def test_fractional_quantity_allowed_for_bulk() -> None:
+    use_case, _, _, gateway = _build()
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GRANEL",
+        amount="2.50",
+        card_number="4111111111111111",
+        cvv="123",
+    )
+    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    gateway.authorize.assert_called_once()

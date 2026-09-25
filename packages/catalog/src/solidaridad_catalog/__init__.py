@@ -10,6 +10,7 @@ from solidaridad_catalog.products import (
     parse_processor_code,
     parse_product,
     processor_code,
+    requires_integer_quantity,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "parse_processor_code",
     "parse_product",
     "processor_code",
+    "requires_integer_quantity",
 ]

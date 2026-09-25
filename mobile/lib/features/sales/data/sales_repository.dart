@@ -65,7 +65,11 @@ class SalesRepository {
       ProductInfo(code: 'GARRAFA_15', label: 'Garrafa 15 kg'),
       ProductInfo(code: 'GARRAFA_30', label: 'Garrafa 30 kg'),
       ProductInfo(code: 'TUBO_45', label: 'Tubo 45 kg'),
-      ProductInfo(code: 'GRANEL', label: 'Granel'),
+      ProductInfo(
+        code: 'GRANEL',
+        label: 'Granel',
+        unit: ProductUnit.metrosCubicos,
+      ),
     ];
   }
 

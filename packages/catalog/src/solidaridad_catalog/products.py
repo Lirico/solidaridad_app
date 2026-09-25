@@ -96,6 +96,11 @@ def processor_code(product: Product) -> str:
     return _BY_PRODUCT[product].processor_code.value
 
 
+def requires_integer_quantity(product: Product) -> bool:
+    """Garrafas y tubos se venden por unidad; el granel (m³) admite decimales."""
+    return _BY_PRODUCT[product].unit.singular != "m3"
+
+
 def parse_processor_code(value: str) -> str:
     code = value.strip()
     if code not in _BY_PROCESSOR:

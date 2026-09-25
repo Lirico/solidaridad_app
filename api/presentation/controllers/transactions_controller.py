@@ -10,6 +10,7 @@ from application.payments.create_transaction import (
     CreateTransaction,
     CreateTransactionHttpStatus,
 )
+from application.payments.get_transaction import GetTransaction
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
 from domain.exceptions import (
@@ -26,11 +27,13 @@ from domain.exceptions import (
     UnsupportedProduct,
 )
 from domain.money import AMOUNT_EXPONENT
+from domain.transaction import Transaction
 from presentation.dependencies import (
     CurrentUser,
     get_create_transaction,
     get_current_user,
     get_list_transactions,
+    get_transaction,
     get_void_transaction,
 )
 from presentation.schemas.transactions import (
@@ -42,6 +45,19 @@ from presentation.schemas.transactions import (
 )
 
 router = APIRouter()
+
+
+def _transaction_item(transaction: Transaction) -> TransactionItemResponse:
+    return TransactionItemResponse(
+        transaction_number=transaction.transaction_number,
+        product=transaction.product.value,
+        amount=str(Decimal(transaction.amount_minor) / (10**AMOUNT_EXPONENT)),
+        card_last4=transaction.card_last4,
+        status=transaction.status.value,
+        user_message=transaction.user_message or "",
+        can_void=transaction.can_void(),
+        created_at=transaction.created_at,
+    )
 
 
 @router.get(
@@ -64,19 +80,38 @@ def list_transactions(
         limit=limit,
         offset=offset,
     )
-    items = [
-        TransactionItemResponse(
-            transaction_number=t.transaction_number,
-            product=t.product.value,
-            amount=str(Decimal(t.amount_minor) / (10**AMOUNT_EXPONENT)),
-            card_last4=t.card_last4,
-            status=t.status.value,
-            user_message=t.user_message or "",
-            created_at=t.created_at,
-        )
-        for t in result.transactions
-    ]
+    items = [_transaction_item(t) for t in result.transactions]
     return TransactionListResponse(items=items, total=result.total)
+
+
+@router.get(
+    "/{transaction_number}",
+    response_model=TransactionItemResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing/invalid token",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Transaction not found",
+        },
+    },
+)
+def get_transaction_detail(
+    transaction_number: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[GetTransaction, Depends(get_transaction)],
+) -> TransactionItemResponse | JSONResponse:
+    try:
+        transaction = use_case.execute(
+            terminal_id=current_user.installation_id,
+            transaction_number=transaction_number,
+        )
+    except TransactionNotFound as exc:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": str(exc)},
+        )
+    return _transaction_item(transaction)
 
 
 @router.post(

@@ -4,7 +4,17 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-25
+
+> ✅ **Último cambio (2026-09-25, VE-10 anulación sin confirmar):** una anulación
+> que queda `UNKNOWN` (había `void_idempotency_key`) se puede reintentar: el
+> caso de uso vuelve a llamar al gateway aunque la clave coincida. Un cobro
+> `UNKNOWN` sin esa clave sigue sin anularse, con un mensaje que explica que
+> hay que saber si el pago se acreditó. `GET /v1/transactions/{transaction_number}`
+> devuelve el mismo ítem del listado más `can_void`. La app distingue
+> `PaymentResult.unknown`, consulta ese detalle y ofrece reintentar la
+> anulación; el 400 de anulación muestra el `message` de la API. El reverso
+> ISO `0400` (G-P1-09) no entra en este cambio. Ver G-P0-12.
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -331,7 +341,7 @@ Verifone (banda + térmica).
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases_index.md`. |
 | G-P0-16 | `must_change_password` no se forzaba en registros nuevos | done | **Fix aplicado (2026-08-03):** `register_user.py` seteaba `must_change_password=False` siempre, impidiendo forzar el cambio de contraseña en el primer login. Se corrigió a `True` en `api/application/auth/register_user.py` línea 62. Tests actualizados en `test_register_user.py` y `test_auth_register_http.py`. Ver hallazgo #6 en `docs/test_cases_index.md`. |
-| G-P0-12 | Endpoint de detalle de transacción no implementado | open | `GET /v1/transactions/{id}` no existe. Solo hay listado (`GET /v1/transactions`) y creación (`POST /v1/transactions`). La app mobile podría necesitarlo para mostrar detalle desde el historial. Ver hallazgo #9 en `docs/test_cases_index.md`. |
+| G-P0-12 | Endpoint de detalle de transacción no implementado | done | **2026-09-25:** `GET /v1/transactions/{transaction_number}` filtra por terminal y responde el ítem de listado más `can_void` (`GetTransaction` + `Transaction.can_void()`). El listado también incluye `can_void`. La app lo usa desde el resultado de una anulación `UNKNOWN` (CONSULTAR ESTADO) y habilita REINTENTAR ANULACIÓN solo si `can_void` es verdadero. Ver hallazgo #9 en `docs/test_cases_index.md`. |
 | G-P0-13 | Tests automatizados del gateway fallan por código 96 | done | **Fix aplicado (2026-08-04):** los tests `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock` ahora fuerzan el `MockIsoProcessor` vía `dependency_overrides` en `payment-gateway/tests/test_authorize_http.py`, haciéndolos deterministas independientemente del `.env` local (`ISO_TRANSPORT=tcp`). `make check` pasa: lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓. Ver hallazgo #20 en `docs/test_cases_index.md`. |
 | G-P0-14 | Procesador no setea DE39 (código de respuesta) en varios escenarios | open | El procesador C solo setea `respcode_39` en algunos casos (ej: código 05 para TRANS_DENY). En otros escenarios (monto $100, terminal inválida, tarjeta sin saldo, tarjeta vencida) el DE39 queda vacío. El gateway interpreta DE39 vacío como código 96 (`response_mapper.py` línea 22: `code = (iso.respcode_39 or "").strip() or "96"`). Esto causa que el gateway devuelva `FAILED` en lugar de `DECLINED` con el código correcto. Requiere fix en `auth_thread.c` para asegurar que DE39 siempre tenga un código de respuesta válido. |
 | G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | **2026-08-13 (corrección de diagnóstico):** el rechazo por banda magnética en V660p NO era "fondos insuficientes" (51) sino código **14 "Tarjeta inválida"** (`TIT_DES_SUP`). El log `authkig.log` mostraba `TRACK II DATA: 4606300701400740...` (banda) mientras la pantalla leía el PAN correcto `6063007014007403`: el track2 (DE35) de esta terminal trae un PAN distinto al registrado y `getCardNumber()` copiaba los primeros 16 chars del track2 para `entry_mode='022'`, por lo que `valida_usuario_existe()` no encontraba la tarjeta → 14. **Fix en 3 capas:** (1) `getCardNumber()` prefiere DE2 (PAN) cuando viene presente y usa track2 solo si no hay DE2 (`auth_mycli.c`); (2) `WaitingForCardScreen` envía PAN + vencimiento con `entry_mode='022'` y ya no manda track2; (3) **gateway `build_purchase_request` ahora SIEMPRE envía DE2 (PAN) + DE14 y agrega DE35 (track2) solo si viene, en lugar de enviar DE35 EN LUGAR de DE2** (`payment-gateway/infrastructure/iso/message_builder.py`). El punto (3) es el que faltaba: con el APK viejo (que sí manda track2) el gateway descartaba DE2 y el autorizador caía al track2 → 14. Verificado con curl al gateway enviando `track2` (simula APK viejo): `{"status":"APPROVED","response_code":"00",...}` y log con `PRIMARY ACCOUNT NUMBER: 6063007014007403` + `TRACK II DATA: 4606300701400740...` + `RESPONSE CODE: 00` + `FIELD 63: MONTO A PAGAR BENEFICIARIO 400.00` (llegó a `venta_cupon()`). `make check` OK en gateway (55 tests, cobertura 98.96%). Ver hallazgo #21 en `docs/test_cases_index.md`. |
@@ -389,8 +399,9 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
 | `POST /v1/transactions/{tn}/void` (anulación con reingreso de tarjeta) | Implementado en `api/`; status `VOIDED`; DE62 ticket = sufijo de `transaction_number` |
-| UI mobile de anulación con reingreso de tarjeta | Flujo completo: detalle → reingreso tarjeta → resultado → historial actualizado. `voidSale()` solo marca `VOIDED`/`UNKNOWN` en el historial; rechazos dejan la venta en `APPROVED` como hace la API. Ver `sales_history_screen.dart`, `sales_cubit.dart`, `void_card_screen.dart`, `void_result_screen.dart`. |
+| UI mobile de anulación con reingreso de tarjeta | Flujo completo: detalle → reingreso tarjeta → resultado → historial actualizado. `voidSale()` marca `VOIDED` o `unknown` (con `canVoid`) en el historial; rechazos dejan la venta en `APPROVED`. Si la anulación queda sin confirmar, el resultado ofrece consultar el detalle y reintentar. Ver `sales_history_screen.dart`, `sales_cubit.dart`, `void_card_screen.dart`, `void_result_screen.dart`. |
 | `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
+| `GET /v1/transactions/{transaction_number}` | Detalle de una operación del terminal, con `can_void`. Ver G-P0-12. |
 | Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Gateway `POST /v1/void` → ISO anulación (`0200`/`020000`) | Implementado en `payment-gateway/` |

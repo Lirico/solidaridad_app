@@ -25,6 +25,10 @@ MSG_VOID_DECLINED = "Anulación rechazada"
 MSG_VOID_UNKNOWN = (
     "No pudimos confirmar la anulación. Consulte el estado de la operación."
 )
+MSG_VOID_SALE_UNCONFIRMED = (
+    "No pudimos confirmar el cobro. "
+    "No se puede anular hasta saber si el pago se acreditó."
+)
 MSG_VOID_FAILED = "No se pudo anular. Intente nuevamente."
 
 MSG_BALANCE_OK = "Consulta de saldo exitosa"

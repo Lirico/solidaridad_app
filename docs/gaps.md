@@ -4,7 +4,15 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-25
+
+> **Último cambio (2026-09-25, VE-09):** la cantidad se valida según la unidad
+> del catálogo. Garrafas y tubos exigen un entero (la app lo bloquea en el
+> formulario y la API responde «La cantidad debe ser un número entero» antes
+> de llamar al procesador). El granel (m³) admite hasta 2 decimales; un tercer
+> decimal se rechaza en el formulario. El mapa de DE39 de la API y del gateway
+> incluye el código `13` (monto inválido) y los códigos `12`, `17`, `19`, `25`,
+> `30`, `89` y `95`. Ver G-P2-07.
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -374,6 +382,7 @@ Verifone (banda + térmica).
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
+| G-P2-07 | Decimales de cantidad según la unidad del producto y mensaje del DE39 `13` (VE-09) | done | **2026-09-25:** el formulario usa `unit` del catálogo (`unidad` entero, `m3` hasta 2 decimales). `CreateTransaction` rechaza una cantidad no entera en garrafas y tubos. `response_messages.py` y `response_mapper.py` traducen el DE39 `13` a «Monto inválido». |
 | G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). |
 
 ---

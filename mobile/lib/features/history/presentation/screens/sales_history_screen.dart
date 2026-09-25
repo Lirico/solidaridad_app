@@ -140,20 +140,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListTile(
                 leading: Icon(
-                  operation.result == PaymentResult.approved
-                      ? Icons.check_circle
-                      : operation.result == PaymentResult.voided
-                      ? Icons.undo
-                      : operation.result == PaymentResult.connectionError
-                      ? Icons.wifi_off
-                      : Icons.error,
-                  color: operation.result == PaymentResult.approved
-                      ? Colors.green
-                      : operation.result == PaymentResult.voided
-                      ? Colors.grey
-                      : operation.result == PaymentResult.connectionError
-                      ? Colors.orange
-                      : Colors.red,
+                  _historyIcon(operation.result),
+                  color: _historyColor(operation.result),
                   size: 32,
                 ),
                 title: Text(
@@ -180,5 +168,35 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         );
       },
     );
+  }
+}
+
+IconData _historyIcon(PaymentResult result) {
+  switch (result) {
+    case PaymentResult.approved:
+      return Icons.check_circle;
+    case PaymentResult.voided:
+      return Icons.undo;
+    case PaymentResult.connectionError:
+      return Icons.wifi_off;
+    case PaymentResult.unknown:
+      return Icons.help_outline;
+    case PaymentResult.declined:
+      return Icons.error;
+  }
+}
+
+Color _historyColor(PaymentResult result) {
+  switch (result) {
+    case PaymentResult.approved:
+      return Colors.green;
+    case PaymentResult.voided:
+      return Colors.grey;
+    case PaymentResult.connectionError:
+      return Colors.orange;
+    case PaymentResult.unknown:
+      return const Color(0xFFE67E22);
+    case PaymentResult.declined:
+      return Colors.red;
   }
 }

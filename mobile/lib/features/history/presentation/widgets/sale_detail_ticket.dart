@@ -26,6 +26,10 @@ class SaleDetailTicket extends StatelessWidget {
         statusColor = Colors.orange;
         statusIcon = Icons.wifi_off;
         statusTitle = 'ERROR DE CONEXIÓN';
+      case PaymentResult.unknown:
+        statusColor = const Color(0xFFE67E22);
+        statusIcon = Icons.help_outline;
+        statusTitle = 'SIN CONFIRMAR';
       case PaymentResult.voided:
         statusColor = Colors.grey;
         statusIcon = Icons.undo;

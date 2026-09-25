@@ -162,6 +162,7 @@ class SalesCubit extends Cubit<SalesState> {
       cardNumber: hiddenCard,
       result: paymentResult,
       date: DateTime.now(),
+      canVoid: paymentResult == PaymentResult.approved,
     );
 
     currentHistory.insert(0, newOperation);
@@ -230,7 +231,7 @@ class SalesCubit extends Cubit<SalesState> {
 
     final PaymentResult mappedResult = result.isVoided
         ? PaymentResult.voided
-        : PaymentResult.connectionError;
+        : PaymentResult.unknown;
 
     final updatedHistory = state.history.map((op) {
       if (op.id == transactionNumber) {
@@ -243,6 +244,7 @@ class SalesCubit extends Cubit<SalesState> {
           result: mappedResult,
           date: op.date,
           userMessage: result.message,
+          canVoid: result.isUnknown,
         );
       }
       return op;
@@ -250,6 +252,22 @@ class SalesCubit extends Cubit<SalesState> {
 
     emit(SalesInitialWithHistory(history: updatedHistory));
     return result;
+  }
+
+  /// Consulta el estado actual de una operación en la API.
+  Future<OperationModel> fetchTransaction({
+    required String token,
+    required String transactionNumber,
+  }) async {
+    try {
+      return await salesRepository.fetchTransaction(
+        token: token,
+        transactionNumber: transactionNumber,
+      );
+    } on SessionExpiredException {
+      emit(const SalesSessionExpired());
+      rethrow;
+    }
   }
 
   /// Appends more history items (used for pagination / load-more).

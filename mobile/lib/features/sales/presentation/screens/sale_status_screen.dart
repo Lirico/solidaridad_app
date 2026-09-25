@@ -87,6 +87,12 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusTitle = 'Error de Conexión';
         statusSubtitle =
             'No se pudo contactar con el procesador. Verifique su conectividad y reintente.';
+      case PaymentResult.unknown:
+        statusColor = const Color(0xFFE67E22);
+        statusIcon = Icons.help_outline;
+        statusTitle = 'No pudimos confirmar el cobro';
+        statusSubtitle =
+            'Consulte la operación antes de volver a cobrar o anular.';
       case PaymentResult.voided:
         statusColor = Colors.grey;
         statusIcon = Icons.undo;

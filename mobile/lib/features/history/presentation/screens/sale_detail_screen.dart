@@ -34,8 +34,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     }
 
     final operation = args;
-    final bool canVoid = operation.result == PaymentResult.approved;
+    final bool canVoid = operation.canVoid;
     final bool canPrint = operation.result == PaymentResult.approved;
+    final bool retryVoid = operation.result == PaymentResult.unknown;
 
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
@@ -62,7 +63,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               ),
             ),
             if (canPrint) _buildPrintButton(context, operation),
-            if (canVoid) _buildVoidButton(context, operation),
+            if (canVoid) _buildVoidButton(context, operation, retry: retryVoid),
           ],
         ),
       ),
@@ -121,7 +122,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     );
   }
 
-  Widget _buildVoidButton(BuildContext context, OperationModel operation) {
+  Widget _buildVoidButton(
+    BuildContext context,
+    OperationModel operation, {
+    required bool retry,
+  }) {
     return SafeArea(
       top: false,
       child: Padding(
@@ -131,9 +136,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           child: ElevatedButton.icon(
             onPressed: () => _confirmVoid(context, operation),
             icon: const Icon(Icons.undo),
-            label: const Text(
-              'ANULAR VENTA',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            label: Text(
+              retry ? 'REINTENTAR ANULACIÓN' : 'ANULAR VENTA',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryOrange,

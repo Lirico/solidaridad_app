@@ -15,6 +15,7 @@ from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
 from application.payments.create_transaction import CreateTransaction
+from application.payments.get_transaction import GetTransaction
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
 from config import Settings, get_settings
@@ -94,6 +95,14 @@ def get_list_transactions(
     db: Annotated[Session, Depends(get_db)],
 ) -> ListTransactions:
     return ListTransactions(
+        transactions=TransactionRepository(db),
+    )
+
+
+def get_transaction(
+    db: Annotated[Session, Depends(get_db)],
+) -> GetTransaction:
+    return GetTransaction(
         transactions=TransactionRepository(db),
     )
 

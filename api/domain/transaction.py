@@ -30,3 +30,12 @@ class Transaction:
     updated_at: datetime
     processor_ticket: str | None = None
     void_idempotency_key: str | None = None
+
+    def can_void(self) -> bool:
+        """Approved sales, and voids left unconfirmed, can be voided again."""
+        if self.status == TransactionStatus.APPROVED:
+            return True
+        return (
+            self.status == TransactionStatus.UNKNOWN
+            and self.void_idempotency_key is not None
+        )

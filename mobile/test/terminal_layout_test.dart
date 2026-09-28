@@ -6,6 +6,7 @@ import 'package:solidaridad_app/core/theme/app_colors.dart';
 import 'package:solidaridad_app/core/widgets/app_bottom_nav_bar.dart';
 import 'package:solidaridad_app/core/widgets/app_header.dart';
 import 'package:solidaridad_app/core/widgets/app_sheet_panel.dart';
+import 'package:solidaridad_app/core/terminal/terminal_id_store.dart';
 import 'package:solidaridad_app/features/auth/data/auth_repository.dart';
 import 'package:solidaridad_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:solidaridad_app/features/auth/presentation/screens/change_password_screen.dart';
@@ -205,19 +206,28 @@ void main() {
   testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x720', (
     tester,
   ) async {
+    final terminalIdStore = MemoryTerminalIdStore();
+    await terminalIdStore.save('05000001');
+
     await pumpAtTerminalSize(
       tester,
-      MultiBlocProvider(
-        providers: [
-          BlocProvider<AuthCubit>.value(
-            value: AuthCubit(authRepository: AuthRepository()),
-          ),
-        ],
-        child: const LoginScreen(),
+      RepositoryProvider<TerminalIdStore>.value(
+        value: terminalIdStore,
+        child: MultiBlocProvider(
+          providers: [
+            BlocProvider<AuthCubit>.value(
+              value: AuthCubit(authRepository: AuthRepository()),
+            ),
+          ],
+          child: const LoginScreen(),
+        ),
       ),
     );
 
+    await tester.pump();
+
     expect(tester.takeException(), isNull);
     expect(find.text('Ingresar a su Cuenta'), findsOneWidget);
+    expect(find.text('Terminal 05000001'), findsOneWidget);
   });
 }

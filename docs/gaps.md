@@ -4,7 +4,13 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-28
+
+> ✅ **Último cambio (2026-09-28, VE-11):** `SaleStatusScreen` ya no asume
+> `PaymentResult.approved` cuando la ruta no trae un `OperationModel`. Muestra
+> «No hay datos de la operación disponibles» y hace `maybePop`. Cubierto por
+> `mobile/test/sale_status_screen_test.dart`. El ciclo del PSDK (VE-12) sigue
+> abierto en G-P2-09.
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -375,6 +381,7 @@ Verifone (banda + térmica).
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
 | G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). |
+| G-P2-09 | Resultado de venta sin datos y ciclo del PSDK entre lectura e impresión | partial | **2026-09-28 (VE-11):** `SaleStatusScreen` sin `OperationModel` ya no se dibuja como «¡Transacción Aprobada!»: avisa que faltan datos y vuelve atrás (`Navigator.maybePop`), igual que `sale_detail_screen.dart`. Test `mobile/test/sale_status_screen_test.dart`. **Pendiente (VE-12):** la pantalla de espera de banda sigue viva tras el `push` y su `dispose` llama `cancel()`/`tearDown` sin `await`, con riesgo de tumbar la impresión que usa el mismo SDK. |
 
 ---
 

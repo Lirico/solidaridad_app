@@ -22,6 +22,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
   PrintStatus _printStatus = PrintStatus.idle;
   String _printMessage = '';
   bool _initialized = false;
+  bool _reportedMissingData = false;
 
   @override
   void didChangeDependencies() {
@@ -63,7 +64,21 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
   @override
   Widget build(BuildContext context) {
     final OperationModel? operation = _operation;
-    final PaymentResult result = operation?.result ?? PaymentResult.approved;
+    // Sin datos no se asume aprobada: es el mismo criterio que el detalle.
+    if (operation == null) {
+      if (_initialized && !_reportedMissingData) {
+        _reportedMissingData = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.maybePop(context);
+        });
+      }
+      return const Scaffold(
+        body: Center(child: Text('No hay datos de la operación disponibles')),
+      );
+    }
+
+    final PaymentResult result = operation.result;
 
     final Color statusColor;
     final IconData statusIcon;

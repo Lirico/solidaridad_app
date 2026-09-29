@@ -150,16 +150,36 @@ class SaleResponse {
   });
 }
 
+class ProductUnit {
+  final String singular;
+  final String plural;
+
+  const ProductUnit({required this.singular, required this.plural});
+
+  factory ProductUnit.fromJson(Map<String, dynamic> json) {
+    return ProductUnit(
+      singular: json['singular'] as String,
+      plural: json['plural'] as String,
+    );
+  }
+}
+
 class ProductInfo {
   final String code;
   final String label;
+  final ProductUnit unit;
 
-  const ProductInfo({required this.code, required this.label});
+  const ProductInfo({
+    required this.code,
+    required this.label,
+    required this.unit,
+  });
 
   factory ProductInfo.fromJson(Map<String, dynamic> json) {
     return ProductInfo(
       code: json['code'] as String,
       label: json['label'] as String,
+      unit: ProductUnit.fromJson(json['unit'] as Map<String, dynamic>),
     );
   }
 }

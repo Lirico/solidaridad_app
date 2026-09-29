@@ -24,8 +24,14 @@ class SalesCubit extends Cubit<SalesState> {
       emit(SalesInitialWithHistory(history: items));
     } on SessionExpiredException {
       emit(const SalesSessionExpired());
+    } on DataLoadException catch (error) {
+      emit(SalesHistoryLoadFailed(message: error.message));
     } catch (_) {
-      emit(SalesInitialWithHistory(history: const []));
+      emit(
+        const SalesHistoryLoadFailed(
+          message: 'Ocurrió un error inesperado. Reintente.',
+        ),
+      );
     }
   }
 

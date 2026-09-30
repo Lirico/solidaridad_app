@@ -4,7 +4,25 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-09
+Última revisión: 2026-09-30
+
+> ✅ **Último cambio (2026-09-30, login en el V660P):** el código de terminal y
+> **CAMBIAR** quedan en la misma fila del login. El padding superior del cajón
+> baja de 24 a 16 para que **INGRESAR** entre en el alto útil del equipo
+> (672 dp, sin la barra de navegación). Ver G-P0-08.
+
+> ✅ **Último cambio (2026-09-28, identidad de terminal en el equipo):** el
+> `installation_id` ya no se fija al compilar ni cae en `05000001`. La app lo
+> guarda en el dispositivo (`SharedPreferencesTerminalIdStore`, clave
+> `installation_id`) y lo pide una vez si no hay valor. El login muestra el
+> código en uso y permite cambiarlo; el cambio vale en el próximo inicio de
+> sesión. Login y registro no llaman al backend sin un código de 1 a 8
+> caracteres. `--dart-define=INSTALLATION_ID` solo precarga el campo de
+> laboratorio y no se envía hasta guardarlo. Evidencia:
+> `mobile/lib/core/terminal/terminal_id_store.dart`,
+> `mobile/lib/features/auth/presentation/screens/terminal_id_screen.dart`,
+> `mobile/test/terminal_id_store_test.dart` y
+> `mobile/test/auth_repository_terminal_id_test.dart`. Ver G-P0-08.
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -326,7 +344,7 @@ Verifone (banda + térmica).
 
 
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | done | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. **2026-08-15:** fix de crash en `SaleStatusScreen` — `ModalRoute.of(context)` se llamaba en `initState()` (prohibido: usa `dependOnInheritedWidgetOfExactType`); se movió la lectura de argumentos y el disparo de impresión a `didChangeDependencies()` con flag `_initialized`. `flutter analyze` OK. Pendiente: verificación física en V660P. |
-| G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-08-08:** default de `dev-term` → `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (terminal real GOBIERNO del demo; `dev-term` no existe en `terminales` → código 89). Pendiente: lectura runtime desde config del device. |
+| G-P0-08 | `installation_id` desde config de terminal | done | **2026-09-30:** en el login, el código y **CAMBIAR** comparten una fila y el padding superior del cajón baja de 24 a 16, para que **INGRESAR** entre en el alto útil del V660P (672 dp). **2026-09-28:** el código se guarda en el equipo (`SharedPreferencesTerminalIdStore`) y se muestra en el login. Sin valor guardado no se envía el login. Ya no hay default compilado `05000001`. `--dart-define=INSTALLATION_ID` solo precarga el campo. **2026-08-08:** el default anterior `dev-term` se había cambiado a `05000001` porque `dev-term` no existe en `terminales` (código 89). |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases_index.md`. |
@@ -398,7 +416,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
-| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
+| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados. La app lo lee del equipo (G-P0-08). |
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |
 | Status screen con 3 estados (aprobado/rechazado/error conexión POSNET) | `PaymentResult` enum + `connectionError` flag en `SaleResponse`; naranja para pérdida de conectividad POSNET |

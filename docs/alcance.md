@@ -48,8 +48,9 @@ impresión de ticket.
 
 - App Android en Flutter, orientada a operación de venta en terminal.
 - Login de usuario y cambio de contraseña.
-- Identificador de terminal (`installation_id` / terminal id, 8 caracteres)
-  configurado en el dispositivo; el operador no lo inventa por operación.
+- Identificador de terminal (`installation_id` / terminal id, hasta 8
+  caracteres) guardado en el equipo, no en la compilación. El operador lo ve
+  en el login y no lo elige por operación.
 - Pantalla inicial simple orientada a la venta.
 - Flujo de venta de gas:
   - selección de producto/especie (catálogo de gas);
@@ -179,7 +180,7 @@ App Flutter (Verifone)
 
 | Tema | Definición |
 |------|------------|
-| `installation_id` | Es el terminal id configurado en la terminal (hasta 8 caracteres). No lo define el cliente por cada venta. |
+| `installation_id` | Es el terminal id guardado en el equipo (hasta 8 caracteres), no un valor fijo del build. No lo define el cliente por cada venta. El login muestra el código en uso. |
 | Alta de terminal | La valida el procesador en la autorización. |
 | Captura principal | Lectura de banda en Verifone. |
 | Captura fallback | Ingreso manual. |

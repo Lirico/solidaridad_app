@@ -29,8 +29,12 @@ class _FixedSalesCubit extends SalesCubit {
 /// Monta el template real de las pantallas interactivas (AppBar compacto +
 /// panel blanco a sangre completa + barra inferior) al tamaño del device usado
 /// en QA (720x1440 px a densidad 2 → 360x720 dp).
-Future<void> pumpAtTerminalSize(WidgetTester tester, Widget child) async {
-  tester.view.physicalSize = const Size(720, 1440);
+Future<void> pumpAtTerminalSize(
+  WidgetTester tester,
+  Widget child, {
+  Size physicalSize = const Size(720, 1440),
+}) async {
+  tester.view.physicalSize = physicalSize;
   tester.view.devicePixelRatio = 2.0;
   addTearDown(tester.view.reset);
 
@@ -203,7 +207,7 @@ void main() {
     expect(find.text('CONFIRMAR CAMBIO'), findsOneWidget);
   });
 
-  testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x720', (
+  testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x672', (
     tester,
   ) async {
     final terminalIdStore = MemoryTerminalIdStore();
@@ -211,6 +215,7 @@ void main() {
 
     await pumpAtTerminalSize(
       tester,
+      physicalSize: const Size(720, 1344),
       RepositoryProvider<TerminalIdStore>.value(
         value: terminalIdStore,
         child: MultiBlocProvider(
@@ -229,5 +234,10 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Ingresar a su Cuenta'), findsOneWidget);
     expect(find.text('Terminal 05000001'), findsOneWidget);
+    expect(find.text('CAMBIAR'), findsOneWidget);
+
+    final ingresar = tester.getRect(find.text('INGRESAR'));
+    expect(ingresar.top, greaterThanOrEqualTo(0));
+    expect(ingresar.bottom, lessThanOrEqualTo(672));
   });
 }

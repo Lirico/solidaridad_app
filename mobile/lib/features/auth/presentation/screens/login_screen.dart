@@ -85,6 +85,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: AuthCard(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.md,
+                      AppSpacing.xl,
+                      AppSpacing.xl,
+                    ),
                     child: BlocConsumer<AuthCubit, AuthState>(
                       listener: (context, state) {
                         if (state is AuthSuccess) {
@@ -136,27 +142,39 @@ class _LoginScreenState extends State<LoginScreen> {
                                 userInputController: _userController,
                                 passwordInputController: _passwordController,
                               ),
-                              SizedBox(height: AppSpacing.lg),
-                              Text(
-                                _installationId == null
-                                    ? 'Terminal sin configurar'
-                                    : 'Terminal $_installationId',
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.formLabel.copyWith(
-                                  fontSize: 16,
-                                ),
+                              SizedBox(height: AppSpacing.sm),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _installationId == null
+                                          ? 'Terminal sin configurar'
+                                          : 'Terminal $_installationId',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.formLabel.copyWith(
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.padded,
+                                    ),
+                                    onPressed: _terminalReady
+                                        ? _openTerminalConfig
+                                        : null,
+                                    child: Text(
+                                      _installationId == null
+                                          ? 'CONFIGURAR'
+                                          : 'CAMBIAR',
+                                    ),
+                                  ),
+                                ],
                               ),
-                              TextButton(
-                                onPressed: _terminalReady
-                                    ? _openTerminalConfig
-                                    : null,
-                                child: Text(
-                                  _installationId == null
-                                      ? 'CONFIGURAR'
-                                      : 'CAMBIAR',
-                                ),
-                              ),
-                              SizedBox(height: AppSpacing.md),
+                              SizedBox(height: AppSpacing.sm),
 
                               SizedBox(
                                 width: double.infinity,

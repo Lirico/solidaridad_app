@@ -51,8 +51,9 @@ class MsrCardData {
     final String pan = (tags['pan'] ?? msr['panAscii'] ?? '') as String;
     final String track2 = (tags['track2'] ?? msr['track2'] ?? '') as String;
 
-    // El vencimiento puede venir en tags['expiry'] (YYMM) o, si viene vacío,
-    // se extrae del track2 (formato ";PAN=EXPIRY?SERVICE" → "=3012").
+    // El vencimiento puede venir en tags['expiry'] (YYMM). Si viene vacío, se
+    // toman los primeros 4 dígitos después del `=` del track2: en la banda
+    // real el service code va pegado (`;PAN=3012101?` → `3012`).
     final String expiryYyMm = _extractExpiryYyMm(
       (tags['expiry'] ?? '') as String,
       track2,
@@ -70,16 +71,24 @@ class MsrCardData {
   /// Devuelve el vencimiento en formato YYMM.
   ///
   /// Si [tagsExpiry] ya trae un valor (YYMM) se usa tal cual. Si viene vacío,
-  /// se extrae del [track2] cuyo formato es ";PAN=EXPIRY?SERVICE" (ej.
-  /// ";6063007014007403=3012?8" → "3012").
+  /// se toman los primeros 4 dígitos después del `=` del track2. En la banda
+  /// real el vencimiento no queda solo entre `=` y `?`: sigue el service code
+  /// (`;PAN=3012101?` → `3012`).
   static String _extractExpiryYyMm(String tagsExpiry, String track2) {
     if (tagsExpiry.isNotEmpty) return tagsExpiry;
 
     final int eq = track2.indexOf('=');
-    final int q = track2.indexOf('?', eq + 1);
-    if (eq >= 0 && q > eq) {
-      final String expiry = track2.substring(eq + 1, q);
-      if (expiry.length == 4) return expiry;
+    if (eq < 0) return '';
+    final StringBuffer digits = StringBuffer();
+    for (final int rune in track2.substring(eq + 1).runes) {
+      final String ch = String.fromCharCode(rune);
+      final bool isDigit = ch.compareTo('0') >= 0 && ch.compareTo('9') <= 0;
+      if (!isDigit) {
+        if (digits.isNotEmpty) break;
+        continue;
+      }
+      digits.write(ch);
+      if (digits.length == 4) return digits.toString();
     }
     return '';
   }

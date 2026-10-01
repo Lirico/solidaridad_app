@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
 import '../domain/sale_model.dart';
@@ -236,6 +237,12 @@ class SalesRepository {
       }
 
       final Map<String, dynamic> responseData = jsonDecode(response.body);
+      final String saleMessage =
+          (responseData['user_message'] ?? responseData['message'] ?? '')
+              .toString();
+      debugPrint(
+        'sale response status=${response.statusCode} message=$saleMessage',
+      );
 
       if (response.statusCode == 200 ||
           response.statusCode == 201 ||

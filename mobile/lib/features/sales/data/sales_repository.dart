@@ -15,7 +15,10 @@ class SessionExpiredException implements Exception {
 ///
 /// In production, consider using the `uuid` package for guaranteed uniqueness.
 /// This implementation combines a timestamp with random digits.
-String _generateIdempotencyKey() {
+///
+/// La venta genera la clave una sola vez (al abrir la revisión) y la reenvía
+/// en cada intento. La anulación sigue generando una clave por request.
+String generateIdempotencyKey() {
   final timestamp = DateTime.now().microsecondsSinceEpoch;
   final random = Random().nextInt(99999);
   return '$timestamp-$random';
@@ -88,7 +91,7 @@ class SalesRepository {
       bodyPayload['expiration_date'] = expirationDate;
     }
 
-    final idempotencyKey = _generateIdempotencyKey();
+    final idempotencyKey = generateIdempotencyKey();
 
     try {
       final response = await _httpClient
@@ -197,6 +200,7 @@ class SalesRepository {
     String entryMode = '012',
     String? track2,
     required String token,
+    required String idempotencyKey,
   }) async {
     final url = Uri.parse('$_baseUrl/transactions');
 
@@ -213,8 +217,6 @@ class SalesRepository {
     if (track2 != null && track2.isNotEmpty) {
       bodyPayload['track2'] = track2;
     }
-
-    final idempotencyKey = _generateIdempotencyKey();
 
     try {
       final response = await _httpClient
@@ -258,6 +260,7 @@ class SalesRepository {
           operationNumber: responseData['transaction_number'] ?? '',
           message:
               responseData['user_message'] ??
+              responseData['message'] ??
               'Venta rechazada por la entidad emisora.',
           errorCode: '${response.statusCode}',
         );

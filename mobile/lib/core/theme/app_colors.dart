@@ -11,6 +11,13 @@ class AppColors {
   static const Color errorRed = Color(0xFFD32F2F);
   static const Color warningOrange = Color(0xFFFF8C00);
 
+  // Status / feedback — superficies
+  /// Fondo de pills/etiquetas de estado en verde (p. ej. Nº de lote vigente).
+  static const Color successSurface = Color(0xFFE8F5E9);
+
+  /// Verde oscuro para texto sobre [successSurface].
+  static const Color successStrong = Color(0xFF2E7D32);
+
   // Backgrounds
   static const Color scaffoldBackground = Color(0xFFF4F6F9);
   static const Color cardBackground = Colors.white;

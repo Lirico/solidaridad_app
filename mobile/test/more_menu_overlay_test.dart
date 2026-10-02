@@ -16,8 +16,11 @@ Future<void> _pumpTemplate(WidgetTester tester) async {
   await tester.pumpWidget(
     MaterialApp(
       routes: {
-        AppRoutes.balanceCaptureMode: (context) =>
-            const Scaffold(body: Center(child: Text('balance_capture_mode_screen'))),
+        AppRoutes.balanceCaptureMode: (context) => const Scaffold(
+          body: Center(child: Text('balance_capture_mode_screen')),
+        ),
+        AppRoutes.batchClose: (context) =>
+            const Scaffold(body: Center(child: Text('batch_close_screen'))),
       },
       home: const Scaffold(
         appBar: AppHeader(title: 'Nueva Operación'),
@@ -30,28 +33,29 @@ Future<void> _pumpTemplate(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('⋯ Más abre un panel que cubre exactamente el área del cajón blanco', (
-    tester,
-  ) async {
-    await _pumpTemplate(tester);
+  testWidgets(
+    '⋯ Más abre un panel que cubre exactamente el área del cajón blanco',
+    (tester) async {
+      await _pumpTemplate(tester);
 
-    final sheetRect = tester.getRect(find.byType(AppSheetPanel).first);
+      final sheetRect = tester.getRect(find.byType(AppSheetPanel).first);
 
-    await tester.tap(find.byIcon(Icons.more_horiz).first);
-    await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.more_horiz).first);
+      await tester.pumpAndSettle();
 
-    expect(tester.takeException(), isNull);
+      expect(tester.takeException(), isNull);
 
-    final menuRect = tester.getRect(find.byKey(const Key('moreMenuSheet')));
-    // Ocupa el 100% del ancho…
-    expect(menuRect.left, sheetRect.left);
-    expect(menuRect.right, sheetRect.right);
-    // …arranca tras la franja naranja de 10dp bajo la cabecera…
-    expect(menuRect.top, sheetRect.top + AppSheetPanel.topGap);
-    // …y termina pegado al borde superior de la barra inferior (tolerancia de
-    // 1px por el borde/safe-area del entorno de layout).
-    expect(menuRect.bottom, closeTo(sheetRect.bottom, 1));
-  });
+      final menuRect = tester.getRect(find.byKey(const Key('moreMenuSheet')));
+      // Ocupa el 100% del ancho…
+      expect(menuRect.left, sheetRect.left);
+      expect(menuRect.right, sheetRect.right);
+      // …arranca tras la franja naranja de 10dp bajo la cabecera…
+      expect(menuRect.top, sheetRect.top + AppSheetPanel.topGap);
+      // …y termina pegado al borde superior de la barra inferior (tolerancia de
+      // 1px por el borde/safe-area del entorno de layout).
+      expect(menuRect.bottom, closeTo(sheetRect.bottom, 1));
+    },
+  );
 
   testWidgets('⋯ Más: el panel no desborda, muestra las opciones y se cierra', (
     tester,
@@ -69,11 +73,6 @@ void main() {
     expect(find.text('CERRAR'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    // Las opciones deshabilitadas no cierran el panel al tocarlas.
-    await tester.tap(find.text('Cerrar Lote'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('moreMenuSheet')), findsOneWidget);
-
     // CERRAR cierra el panel.
     await tester.tap(find.text('CERRAR'));
     await tester.pumpAndSettle();
@@ -81,7 +80,22 @@ void main() {
     expect(find.text('Más opciones'), findsNothing);
   });
 
-  testWidgets('⋯ Más: Consultar saldo está habilitado y navega', (tester) async {
+  testWidgets('⋯ Más: Cerrar Lote está habilitado y navega', (tester) async {
+    await _pumpTemplate(tester);
+
+    await tester.tap(find.byIcon(Icons.more_horiz).first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cerrar Lote'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('moreMenuSheet')), findsNothing);
+    expect(find.text('batch_close_screen'), findsOneWidget);
+  });
+
+  testWidgets('⋯ Más: Consultar saldo está habilitado y navega', (
+    tester,
+  ) async {
     await _pumpTemplate(tester);
 
     await tester.tap(find.byIcon(Icons.more_horiz).first);

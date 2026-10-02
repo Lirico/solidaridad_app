@@ -367,12 +367,40 @@ def test_manual_012_still_validates_cvv() -> None:
         )
 
 
+def test_band_022_with_expiration_without_track2_approved() -> None:
+    """Banda (022) con vencimiento y sin track2: es el flujo del terminal."""
+    use_case, transactions, _, gateway = _build()
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="1.50",
+        card_number="6063007014007403",
+        cvv="",
+        expiration_date="1228",
+        entry_mode="022",
+    )
+    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    assert result.transaction.status == TransactionStatus.APPROVED
+    gateway.authorize.assert_called_once()
+    auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.entry_mode == "022"
+    assert auth_req.track2 is None
+    assert auth_req.expiration_date == "1228"
+    transactions.create_pending.assert_called_once()
+    transactions.update_result.assert_called_once()
+
+
 def test_band_022_without_track2_rejected() -> None:
     """Banda (022) sin track2 ni vencimiento: inconsistente, se rechaza."""
     from domain.exceptions import InvalidEntryMode
 
     use_case, *_ = _build()
-    with pytest.raises(InvalidEntryMode):
+    with pytest.raises(
+        InvalidEntryMode,
+        match="Faltan datos de la tarjeta",
+    ):
         use_case.execute(
             user_id=1,
             installation_id="inst-1",

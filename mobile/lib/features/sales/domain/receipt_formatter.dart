@@ -29,6 +29,8 @@ class ReceiptFormatter {
         return 'ERROR DE CONEXIÓN';
       case PaymentResult.voided:
         return 'ANULADA';
+      case PaymentResult.unknown:
+        return 'SIN CONFIRMAR';
     }
   }
 

@@ -47,6 +47,10 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   bool get _canContinue =>
       !_loadingProducts && _productsError == null && _products.isNotEmpty;
 
+  bool get _allowsDecimals =>
+      _selectedProduct?.unit.allowsDecimals ??
+      _selectedProductCode == 'GRANEL';
+
   @override
   void initState() {
     super.initState();
@@ -212,20 +216,10 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                         size: 24,
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'La cantidad es obligatoria';
-                      }
-                      final normalized = value.replaceAll(',', '.');
-                      final parsedUnits = double.tryParse(normalized);
-                      if (parsedUnits == null) {
-                        return 'Ingrese un número válido';
-                      }
-                      if (parsedUnits <= 0) {
-                        return 'La cantidad debe ser mayor a cero';
-                      }
-                      return null;
-                    },
+                    validator: (value) => validateSaleQuantity(
+                      value,
+                      allowsDecimals: _allowsDecimals,
+                    ),
                   ),
                 ],
                 SizedBox(height: AppSpacing.xxl),

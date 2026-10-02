@@ -33,7 +33,16 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
 
   final _unitsController = TextEditingController();
 
-  bool get _isBulkProduct => _selectedProductCode == 'GRANEL';
+  ProductInfo? get _selectedProduct {
+    for (final product in _products) {
+      if (product.code == _selectedProductCode) return product;
+    }
+    return null;
+  }
+
+  bool get _allowsDecimals =>
+      _selectedProduct?.unit.allowsDecimals ??
+      _selectedProductCode == 'GRANEL';
 
   @override
   void initState() {
@@ -150,7 +159,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                   ),
                 const SizedBox(height: 20),
                 Text(
-                  _isBulkProduct
+                  _allowsDecimals
                       ? 'Cantidad de Gas (m³)'
                       : 'Cantidad de Unidades',
                   style: const TextStyle(
@@ -167,7 +176,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                   ),
                   inputFormatters: [AmountInputFormatter()],
                   decoration: InputDecoration(
-                    hintText: _isBulkProduct
+                    hintText: _allowsDecimals
                         ? 'Ingresar m³'
                         : 'Ingresar unidades',
                     prefixIcon: const Icon(
@@ -175,20 +184,10 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                       size: 24,
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'La cantidad es obligatoria';
-                    }
-                    final normalized = value.replaceAll(',', '.');
-                    final parsedUnits = double.tryParse(normalized);
-                    if (parsedUnits == null) {
-                      return 'Ingrese un número válido';
-                    }
-                    if (parsedUnits <= 0) {
-                      return 'La cantidad debe ser mayor a cero';
-                    }
-                    return null;
-                  },
+                  validator: (value) => validateSaleQuantity(
+                    value,
+                    allowsDecimals: _allowsDecimals,
+                  ),
                 ),
                 SizedBox(height: AppSpacing.xxl),
 

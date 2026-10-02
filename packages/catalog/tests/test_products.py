@@ -7,6 +7,7 @@ from solidaridad_catalog import (
     parse_processor_code,
     parse_product,
     processor_code,
+    requires_integer_quantity,
 )
 
 
@@ -26,6 +27,12 @@ def test_parse_product_and_processor_code() -> None:
     assert parse_product("garrafa_10") == Product.GARRAFA_10
     assert processor_code(Product.GARRAFA_10) == "993"
     assert parse_processor_code("993") == "993"
+
+
+def test_integer_quantity_follows_unit() -> None:
+    assert requires_integer_quantity(Product.GARRAFA_10)
+    assert requires_integer_quantity(Product.TUBO_45)
+    assert not requires_integer_quantity(Product.GRANEL)
 
 
 def test_rejects_unknown_codes() -> None:

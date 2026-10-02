@@ -12,10 +12,15 @@ _MESSAGES: dict[str, str] = {
     "12": "Transacción inválida",
     "13": "Monto inválido",
     "14": "Tarjeta inválida",
+    "17": "Cupón duplicado",
+    "19": "Error al registrar la operación",
+    "25": "Operación no encontrada",
     "30": "Error de formato",
     "51": "Fondos insuficientes",
     "54": "Tarjeta vencida",
+    "89": "Terminal desconocida",
     "91": "Emisor no disponible",
+    "95": "Diferencia de cierre",
 }
 
 

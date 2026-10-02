@@ -8,6 +8,8 @@ import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
 import 'features/balance/data/balance_repository.dart';
 import 'features/balance/presentation/cubit/balance_cubit.dart';
+import 'features/batch_close/data/batch_close_repository.dart';
+import 'features/batch_close/presentation/cubit/batch_close_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
 
@@ -28,6 +30,7 @@ import 'features/balance/presentation/screens/balance_waiting_for_card_screen.da
 import 'features/balance/presentation/screens/balance_review_screen.dart';
 import 'features/balance/presentation/screens/balance_processing_screen.dart';
 import 'features/balance/presentation/screens/balance_status_screen.dart';
+import 'features/batch_close/presentation/screens/batch_close_screen.dart';
 import 'features/history/presentation/screens/sales_history_screen.dart';
 import 'features/history/presentation/screens/sale_detail_screen.dart';
 import 'features/history/presentation/screens/void_card_screen.dart';
@@ -39,6 +42,7 @@ void main() {
   final terminalIdStore = SharedPreferencesTerminalIdStore();
   final salesRepository = SalesRepository();
   final balanceRepository = BalanceRepository();
+  final batchCloseRepository = BatchCloseRepository();
   final authRepository = AuthRepository(terminalIdStore: terminalIdStore);
 
   runApp(
@@ -51,6 +55,10 @@ void main() {
           ),
           BlocProvider<BalanceCubit>(
             create: (context) => BalanceCubit(repository: balanceRepository),
+          ),
+          BlocProvider<BatchCloseCubit>(
+            create: (context) =>
+                BatchCloseCubit(repository: batchCloseRepository),
           ),
           BlocProvider<AuthCubit>(
             create: (context) => AuthCubit(authRepository: authRepository),
@@ -95,6 +103,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.balanceProcessing: (context) =>
             const BalanceProcessingScreen(),
         AppRoutes.balanceStatus: (context) => const BalanceStatusScreen(),
+        AppRoutes.batchClose: (context) => const BatchCloseScreen(),
         AppRoutes.salesHistory: (context) => const SalesHistoryScreen(),
         AppRoutes.saleDetail: (context) => const SaleDetailScreen(),
         AppRoutes.voidCard: (context) => const VoidCardScreen(),

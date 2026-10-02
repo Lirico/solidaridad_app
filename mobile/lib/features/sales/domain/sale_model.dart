@@ -150,16 +150,76 @@ class SaleResponse {
   });
 }
 
+class ProductUnit {
+  final String singular;
+  final String plural;
+
+  const ProductUnit({required this.singular, required this.plural});
+
+  bool get allowsDecimals => singular == 'm3';
+
+  static const unidades = ProductUnit(singular: 'unidad', plural: 'unidades');
+  static const metrosCubicos = ProductUnit(singular: 'm3', plural: 'm3');
+
+  static ProductUnit forProductCode(String code) {
+    return code == 'GRANEL' ? metrosCubicos : unidades;
+  }
+}
+
 class ProductInfo {
   final String code;
   final String label;
+  final ProductUnit unit;
 
-  const ProductInfo({required this.code, required this.label});
+  const ProductInfo({
+    required this.code,
+    required this.label,
+    this.unit = ProductUnit.unidades,
+  });
 
   factory ProductInfo.fromJson(Map<String, dynamic> json) {
+    final code = json['code'] as String;
+    final rawUnit = json['unit'];
+    final ProductUnit unit;
+    if (rawUnit is Map) {
+      unit = ProductUnit(
+        singular: rawUnit['singular'] as String? ?? 'unidad',
+        plural: rawUnit['plural'] as String? ?? 'unidades',
+      );
+    } else {
+      unit = ProductUnit.forProductCode(code);
+    }
     return ProductInfo(
-      code: json['code'] as String,
+      code: code,
       label: json['label'] as String,
+      unit: unit,
     );
   }
+}
+
+/// Valida la cantidad del formulario.
+///
+/// Garrafas y tubos exigen un entero. El granel (m³) admite hasta 2 decimales,
+/// que es la escala que acepta la API.
+String? validateSaleQuantity(String? value, {required bool allowsDecimals}) {
+  if (value == null || value.trim().isEmpty) {
+    return 'La cantidad es obligatoria';
+  }
+  final normalized = value.trim().replaceAll(',', '.');
+  final parsed = double.tryParse(normalized);
+  if (parsed == null) {
+    return 'Ingrese un número válido';
+  }
+  if (parsed <= 0) {
+    return 'La cantidad debe ser mayor a cero';
+  }
+  final dot = normalized.indexOf('.');
+  final decimals = dot < 0 ? '' : normalized.substring(dot + 1);
+  if (decimals.length > 2) {
+    return 'La cantidad admite como máximo 2 decimales';
+  }
+  if (!allowsDecimals && parsed != parsed.truncateToDouble()) {
+    return 'La cantidad debe ser un número entero';
+  }
+  return null;
 }

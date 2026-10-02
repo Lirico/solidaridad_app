@@ -68,6 +68,7 @@ class SalesCubit extends Cubit<SalesState> {
         entryMode: entryMode,
         track2: track2,
         history: state.history,
+        idempotencyKey: generateIdempotencyKey(),
       ),
     );
   }
@@ -96,11 +97,14 @@ class SalesCubit extends Cubit<SalesState> {
         entryMode: '022',
         track2: null,
         history: state.history,
+        idempotencyKey: generateIdempotencyKey(),
       ),
     );
   }
 
   Future<void> sendIsoMessage({required String token}) async {
+    if (state is SalesProcessing) return;
+
     final currentProductCode = state.productCode;
     final currentProductLabel = state.productLabel;
     final currentAmount = state.amount;
@@ -109,6 +113,7 @@ class SalesCubit extends Cubit<SalesState> {
     final currentExpirationDate = state.expirationDate;
     final currentEntryMode = state.entryMode;
     final currentTrack2 = state.track2;
+    final currentIdempotencyKey = state.idempotencyKey;
 
     final currentHistory = List<OperationModel>.from(state.history);
 
@@ -123,6 +128,7 @@ class SalesCubit extends Cubit<SalesState> {
         entryMode: currentEntryMode,
         track2: currentTrack2,
         history: currentHistory,
+        idempotencyKey: currentIdempotencyKey,
       ),
     );
 
@@ -135,6 +141,7 @@ class SalesCubit extends Cubit<SalesState> {
       entryMode: currentEntryMode,
       track2: currentTrack2,
       token: token,
+      idempotencyKey: currentIdempotencyKey,
     );
 
     if (response.sessionExpired) {
@@ -177,6 +184,7 @@ class SalesCubit extends Cubit<SalesState> {
         entryMode: currentEntryMode,
         track2: currentTrack2,
         history: currentHistory,
+        idempotencyKey: currentIdempotencyKey,
         result: paymentResult,
         operationNumber: paymentResult == PaymentResult.approved
             ? response.operationNumber

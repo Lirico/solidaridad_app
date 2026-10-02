@@ -21,4 +21,5 @@ class AppRoutes {
   static const String balanceReview = '/balance_review';
   static const String balanceProcessing = '/balance_processing';
   static const String balanceStatus = '/balance_status';
+  static const String batchClose = '/batch_close';
 }

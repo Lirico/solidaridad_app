@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../data/receipt_printer.dart';
 import '../../domain/sale_model.dart';
+import '../cubit/sales_cubit.dart';
 import '../widgets/sale_status_content.dart';
 
 class SaleStatusScreen extends StatefulWidget {
@@ -22,6 +26,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
   PrintStatus _printStatus = PrintStatus.idle;
   String _printMessage = '';
   bool _initialized = false;
+  bool _reportedMissingData = false;
 
   @override
   void didChangeDependencies() {
@@ -40,6 +45,13 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         _printTicket();
       }
     }
+  }
+
+  void _retrySale(BuildContext context) {
+    final authState = context.read<AuthCubit>().state;
+    final token = authState is AuthSuccess ? authState.user!.token : '';
+    context.read<SalesCubit>().sendIsoMessage(token: token);
+    Navigator.pushNamed(context, AppRoutes.saleProcessing);
   }
 
   Future<void> _printTicket() async {
@@ -63,7 +75,21 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
   @override
   Widget build(BuildContext context) {
     final OperationModel? operation = _operation;
-    final PaymentResult result = operation?.result ?? PaymentResult.approved;
+    // Sin datos no se asume aprobada: es el mismo criterio que el detalle.
+    if (operation == null) {
+      if (_initialized && !_reportedMissingData) {
+        _reportedMissingData = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.maybePop(context);
+        });
+      }
+      return const Scaffold(
+        body: Center(child: Text('No hay datos de la operación disponibles')),
+      );
+    }
+
+    final PaymentResult result = operation.result;
 
     final Color statusColor;
     final IconData statusIcon;
@@ -122,6 +148,9 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             printMessage: _printMessage,
             onRetryPrint: result == PaymentResult.approved
                 ? _printTicket
+                : null,
+            onRetry: result == PaymentResult.connectionError
+                ? () => _retrySale(context)
                 : null,
             onFinalize: () {
               Navigator.pushNamedAndRemoveUntil(

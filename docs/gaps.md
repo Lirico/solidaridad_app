@@ -4,14 +4,97 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-09-24
+Última revisión: 2026-10-02
 
-> ✅ **Última revisión (2026-09-24, VE-08):** la cantidad de una venta no puede
+> ✅ **Último cambio (2026-09-24, VE-08):** la cantidad de una venta no puede
 > superar lo que entra en DE4 (12 dígitos, **9.999.999.999,99**). La API lo
 > rechaza en `parse_amount`, el gateway en el esquema y en authorize/void, y
 > `pack_iso` falla con `IsoPackError` si un campo fijo no tiene su longitud.
-> El formulario no acepta más de 10 enteros ni 2 decimales. VE-09 (decimales
-> por unidad y DE39 `13`) sigue abierto. Ver G-P2-07.
+> El formulario no acepta más de 10 enteros ni 2 decimales. Ver G-P2-07.
+
+
+> **Último cambio (2026-09-25, VE-09):** la cantidad se valida según la unidad
+> del catálogo. Garrafas y tubos exigen un entero (la app lo bloquea en el
+> formulario y la API responde «La cantidad debe ser un número entero» antes
+> de llamar al procesador). El granel (m³) admite hasta 2 decimales; un tercer
+> decimal se rechaza en el formulario. El mapa de DE39 de la API y del gateway
+> incluye el código `13` (monto inválido) y los códigos `12`, `17`, `19`, `25`,
+> `30`, `89` y `95`. Ver G-P2-07.
+Última revisión: 2026-09-23 (VE-01 venta por banda sin track2)
+
+> ✅ **Último cambio (2026-09-23, VE-01):** la venta por banda vuelve a llegar al
+> procesador. `CreateTransaction._validate_entry_mode` acepta `entry_mode`
+> `"022"` con vencimiento y **sin** track2 (PAN + DE14, que es lo que envía el
+> terminal). El 400 `InvalidEntryMode` queda solo cuando faltan ambos, con el
+> mensaje "Faltan datos de la tarjeta: la banda no incluyó vencimiento". La app
+> muestra ese `message` en el error de `registerSale` cuando no hay
+> `user_message`. No se reenvía el track2 (el PAN de la banda de este terminal
+> no coincide con el registrado; ver G-P0-15). Tests en
+> `test_create_transaction.py`. Ver G-P1-06.
+Última revisión: 2026-09-23 (Cierre de Lote sin cierre local)
+
+> ✅ **Último cambio (2026-09-23, Cierre de Lote sin cierre local):** la pantalla
+> **Cierre de Lote** pasó a ser **informativa**: muestra el resumen del lote
+> (ventas aprobadas del día, `GET /v1/transactions`) y **no cierra nada**. Se
+> retiró el cierre local del prototipo anterior: `BatchCloseCubit.closeBatch()`,
+> el corte de sesión (`_lastCloseAt`), la secuencia del Nº de lote
+> (`_batchSequence`), el diálogo de confirmación, la pantalla de resultado
+> (`batch_close_status_screen.dart` + `batch_close_status_content.dart`) y la ruta
+> `AppRoutes.batchCloseStatus`. El botón **CERRAR LOTE** se sigue dibujando como en
+> el mockup (visible y habilitado) pero queda **inerte**
+> (`BatchCloseScreen._onCloseBatchPending`) y el Nº de lote es una constante
+> provisoria (`BatchCloseCubit.provisionalBatchNumber = '000001'`). El repositorio
+> ya no filtra por el último cierre: la ventana del lote es siempre el día en
+> curso. El **peso por producto** sigue con el mapa local (`batchKgPerUnit`) a la
+> espera de confirmar el endpoint del backend que lo expone. Ajuste menor:
+> subtítulo del ítem del menú ⋯ "más" → "Resumen del lote actual". Tests: se
+> quitaron los casos del corte local y del resultado del cierre, y se agregó el de
+> botón inerte (`flutter analyze` sin issues; `flutter test` OK, 50 tests).
+> `docs/alcance.md` actualizado y gap **G-P2-10** reescrito. El repositorio además
+> **deduplica por Nº de operación** al paginar (una venta nueva entre páginas podía
+> contarse dos veces y inflar el conteo y los kg).
+
+> ✅ **Último cambio (2026-09-22, pantalla de Cierre de Lote):** se implementó en
+> mobile la pantalla **Cierre de Lote** del mockup del cliente, adaptada al patrón
+> visual vigente (`AppHeader` 64dp + `AppSheetPanel` + `AppBottomNavBar`); el
+> header naranja con `star_cluster` + "SOLIDARIDAD" y la barra de 5 ítems del
+> mockup **no** se reintrodujeron (duplicaban lo acordado en G-P2-06). Se habilitó
+> el ítem **Cerrar Lote** del menú "⋯ Más" (`MoreMenuOption.batchClose` →
+> `AppRoutes.batchClose`), que antes estaba deshabilitado ("Próximamente").
+> Feature nueva `mobile/lib/features/batch_close/**`: modelo + agregador
+> (`BatchSummary.fromOperations`: ventas **aprobadas** del día, o posteriores al
+> último cierre local, con cantidad y kg por producto), repositorio (pagina
+> `GET /v1/transactions` con corte temprano por ventana y **sin** fallback
+> silencioso: 401 → sesión expirada, timeout/socket/HTTP → error visible con
+> REINTENTAR, evitando repetir G-P1-07), cubit/estado, contenido
+> (`batch_close_content.dart`: resumen + "Ventas por Producto" con lista
+> scrollable y botón fijo, para entrar en 360×720 sin desbordar) y pantalla de
+> resultado del cierre (`batch_close_status_*`). Nuevo formateador
+> `mobile/lib/core/formatters/quantity_formatter.dart` (miles `.` y decimales `,`,
+> sin agregar `intl`) y 2 colores de estado en `core/theme/app_colors.dart`. Tests:
+> 27 nuevos (`batch_close_summary_test.dart` 8, `batch_close_repository_test.dart`
+> 9, `batch_close_content_test.dart` 7, `quantity_formatter_test.dart` 3) más la
+> actualización de `more_menu_overlay_test.dart` ("Cerrar Lote" ya no está
+> deshabilitado). `flutter analyze` sin issues y `flutter test` OK (52 tests).
+> **Limitación declarada:** el cierre es local (no hay ISO `0500`), el Nº de lote y
+> el corte viven en memoria de la app y el total se muestra en **kg** porque la API
+> no publica importe/precio: ver el gap nuevo **G-P2-10**. `docs/alcance.md`
+> actualizado.
+
+
+> ✅ **Último cambio (2026-09-23, VE-03 idempotencia de venta):** la clave
+> `Idempotency-Key` se genera al abrir la revisión y se reutiliza en el envío y
+> en el reintento por error de red. `CONFIRMAR COBRO` queda deshabilitado
+> mientras el estado es `SalesProcessing`, y un segundo `sendIsoMessage` no
+> dispara otro `POST`. El servidor ya devolvía la venta existente ante la misma
+> clave. Sigue pendiente el manejo de HTTP 202. Ver G-P1-02.
+
+> ✅ **Último cambio (2026-09-28, VE-11):** `SaleStatusScreen` ya no asume
+> `PaymentResult.approved` cuando la ruta no trae un `OperationModel`. Muestra
+> «No hay datos de la operación disponibles» y hace `maybePop`. Cubierto por
+> `mobile/test/sale_status_screen_test.dart`. El ciclo del PSDK (VE-12) sigue
+> abierto en G-P2-09.
+
 
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
@@ -173,9 +256,11 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > (`[REDACTED]`). Ver G-P0-06 / G-P1-02.
 
 > ✅ **Último cambio (2026-08-16):** validación de consistencia de `entry_mode` +
-> normalización de track2 (DE35). La API ahora valida que `entry_mode` sea solo
-> `"012"` (manual) o `"022"` (banda): `022` sin track2 ni vencimiento → 400
-> (`InvalidEntryMode`), `012` con track2 → 400, y cualquier otro valor → 400.
+> normalización de track2 (DE35). La API valida que `entry_mode` sea solo
+> `"012"` (manual) o `"022"` (banda): `022` con vencimiento y sin track2 es
+> válido; `022` sin track2 ni vencimiento → 400 (`InvalidEntryMode`), `012` con
+> track2 → 400, y cualquier otro valor → 400. Corregido el 2026-09-23 (VE-01):
+> la implementación exigía track2 siempre y rechazaba la banda del terminal.
 > El gateway normaliza el track2 antes de armar DE35: quita sentinels (`;`/`?`)
 > y el separador alternativo `D`, dejando el layout `PAN=EXPIRY` que espera el
 > autorizador C (`iso_common.c` / `auth_mycli.c`). Se agregaron tests de
@@ -356,7 +441,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. El endpoint `POST /v1/auth/register` se mantiene para que la empresa pueda registrar usuarios vía Postman. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. Mobile genera y envía `Idempotency-Key` (timestamp+random) en cada `POST /v1/transactions`. **2026-08-16:** el reintento de **lectura MSR** ya está implementado — botón "REINTENTAR" en `WaitingForCardContent` que vuelve a llamar a `_startReading()` tras timeout/error. **Pendiente:** (1) reintentar el envío con la misma clave ante timeout/error idempotente — la `SaleStatusScreen` solo tiene botón "FINALIZAR", no "Reintentar" (hallazgo #24); (2) manejar status 202 (ACCEPTED). Falta botón "Reintentar" en `sale_status_content.dart` que reenvíe con la misma `Idempotency-Key`. Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. **Pendiente:** manejar HTTP 202 (ACCEPTED). Ver TC-069 en `docs/test_cases_index.md`. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | open | `SalesRepository.fetchProducts()` devuelve productos default hardcodeados ante cualquier excepción. `SalesRepository.fetchHistory()` devuelve lista vacía. Ningún repositorio muestra mensaje de error ni opción de reintentar al usuario. TC-062 y TC-072 esperaban "mensaje de error y opción de reintentar", pero la app usa fallback silencioso. Considerar agregar indicador visual cuando se usan datos fallback. Ver hallazgo #23 en `docs/test_cases_index.md`. |
@@ -382,7 +467,10 @@ Verifone (banda + térmica).
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
 | G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). |
-| G-P2-07 | Tope de cantidad para que DE4 no desborde el ISO (VE-08 / VE-09) | partial | **2026-09-24 (VE-08):** tope único `9.999.999.999,99` (`MAX_AMOUNT_MINOR`) en `api/domain/money.py`, `payment-gateway/domain/amount.py` (esquema + authorize/void) y `AmountInputFormatter`. `pack_iso` valida la longitud fija de los campos ISO antes de armar la trama. **Pendiente VE-09:** decimales según unidad del producto y mapeo de DE39 `13`. |
+| G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). **2026-09-22 (cierre de lote):** el ítem **Cerrar Lote** del menú quedó **habilitado** y navega a la pantalla de resumen/cierre del lote actual; ver G-P2-10. **2026-09-23:** el subtítulo del ítem pasó a "Resumen del lote actual": la pantalla es informativa y no cierra el lote. |
+| G-P2-07 | Tope de DE4 y decimales de cantidad según la unidad (VE-08 / VE-09) | done | **2026-09-24 (VE-08):** tope único `9.999.999.999,99` (`MAX_AMOUNT_MINOR`) en `api/domain/money.py`, `payment-gateway/domain/amount.py` (esquema + authorize/void) y `AmountInputFormatter`. `pack_iso` valida la longitud fija de los campos ISO antes de armar la trama. **2026-09-25 (VE-09):** el formulario usa `unit` del catálogo (`unidad` entero, `m3` hasta 2 decimales). `CreateTransaction` rechaza una cantidad no entera en garrafas y tubos. `response_messages.py` y `response_mapper.py` traducen el DE39 `13` a «Monto inválido». |
+| G-P2-09 | Resultado de venta sin datos y ciclo del PSDK entre lectura e impresión | partial | **2026-09-28 (VE-11):** `SaleStatusScreen` sin `OperationModel` ya no se dibuja como «¡Transacción Aprobada!»: avisa que faltan datos y vuelve atrás (`Navigator.maybePop`), igual que `sale_detail_screen.dart`. Test `mobile/test/sale_status_screen_test.dart`. **Pendiente (VE-12):** la pantalla de espera de banda sigue viva tras el `push` y su `dispose` llama `cancel()`/`tearDown` sin `await`, con riesgo de tumbar la impresión que usa el mismo SDK. |
+| G-P2-10 | Cierre de lote real contra el procesador (hoy la pantalla sólo muestra el resumen) | open | **2026-09-23:** mobile ya muestra el resumen del lote actual leyendo `GET /v1/transactions`, pero **no cierra nada**: se retiró el cierre local que tenía el prototipo completo (diálogo de confirmación, `closeBatch()`, la pantalla de resultado `batch_close_status_*` y la ruta `batchCloseStatus`), el botón CERRAR LOTE queda inerte y el Nº de lote es una constante provisoria de la app (`BatchCloseCubit.provisionalBatchNumber`). **Falta el contrato real:** (1) la API no expone lote/cierre — `api/persistence/models/transaction.py` no tiene `lote`, `id_cierre` ni `marca_cierre` (esos campos existen solo en la base del procesador, `payment_processor/docker/mysql/01_schema.sql`) y no hay `POST /v1/batch/close`; (2) el gateway no implementa MTI `0500` (solo `0100`, `0200`/`0210` y reverso `0400`): `payment-gateway/infrastructure/iso/**`; (3) el procesador responde `00` ante un cierre con diferencia detectada (BN-12) y `00`/`19` según marca ante fallo (`payment_processor/legacy/bin/auth_thread.c:295-311`), así que un cierre descuadrado se reportaría como exitoso. **Datos del mockup sin fuente:** el **total en pesos** no es calculable porque `amount` es cantidad y no importe (decisión abierta **D-3** en `docs/errores-ventas.md`; el precio por kg solo existe en MySQL del procesador, `precio_kg_gas`), por eso la pantalla muestra el total en **kg**; el **peso por producto** (10/15/30/45 kg) está hardcodeado en `mobile/lib/features/batch_close/domain/batch_close_model.dart` (`batchKgPerUnit`) porque `packages/catalog` solo expone `label`/`unit` (y `GRANEL` es m³, que el mockup muestra como kg). **2026-09-23:** queda pendiente confirmar el endpoint del backend que expone el peso: hoy no existe — `GET /v1/products` devuelve `code`/`label`/`unit` sin peso, y el valor real vive en el MySQL del procesador (`sgas_productos.kgas_carga`), sin HTTP en este repo; el **Nº de lote** es provisorio (constante de la app) hasta que la API o el procesador lo expongan. **Además:** falta el ticket de cierre (el `ReceiptPrinter` actual imprime ventas de a una). **Se numera G-P2-10** (y no G-P2-07) para no colisionar con el trabajo pendiente de otros gaps. **2026-09-23 (paginación):** el resumen pagina `GET /v1/transactions` con `limit`/`offset` sobre una lista ordenada por `created_at DESC`; si entra una venta entre dos páginas la API puede repetir un ítem ya cargado, así que el repositorio **deduplica por Nº de operación** (`seenIds` en `mobile/lib/features/batch_close/data/batch_close_repository.dart`). **Pendiente de backend (fuera de este PR):** desempate `ORDER BY created_at DESC, id DESC` y, cuando exista el contrato de cierre, un agregado del lado del servidor (keyset/cursor o `GET /v1/batch/...`) que elimine la paginación del cliente. **2026-09-23 (precisión):** las cantidades y los kg se muestran con la precisión necesaria (hasta 2 decimales y sin ceros finales, `formatQuantityEsExact` en `mobile/lib/core/formatters/quantity_formatter.dart`), alineado con `AMOUNT_EXPONENT = 2` de `api/domain/money.py`; antes se redondeaba a entero (37,5 kg se veía como 38 kg y 5,5 unidades como 6). Mantener esta precisión cuando el agregado del backend devuelva los kg. Evidencia: `mobile/lib/features/batch_close/**`; tests `mobile/test/batch_close_{summary,repository,content}_test.dart` y `mobile/test/quantity_formatter_test.dart` (`flutter analyze` sin issues y `flutter test` OK: 53 tests). |
 
 ---
 

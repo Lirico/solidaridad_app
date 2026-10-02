@@ -352,3 +352,10 @@ def test_map_iso_response_declined() -> None:
     iso = IsoMessage(respcode_39="05")
     result = map_iso_response(iso)
     assert result.status == AuthorizationStatus.DECLINED
+
+
+def test_map_iso_response_invalid_amount() -> None:
+    iso = IsoMessage(respcode_39="13")
+    result = map_iso_response(iso)
+    assert result.status == AuthorizationStatus.DECLINED
+    assert result.user_message == "Monto inválido"

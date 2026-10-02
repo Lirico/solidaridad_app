@@ -23,6 +23,7 @@ from application.payments.response_messages import (
 )
 from domain.exceptions import (
     IdempotencyConflict,
+    InvalidAmount,
     InvalidCardNumber,
     InvalidCvv,
     InvalidEntryMode,
@@ -30,7 +31,12 @@ from domain.exceptions import (
     MissingTerminalId,
 )
 from domain.money import Money, parse_amount
-from domain.product import Product, parse_product, processor_product_code
+from domain.product import (
+    Product,
+    parse_product,
+    processor_product_code,
+    requires_integer_quantity,
+)
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.installation_repository import InstallationRepository
@@ -144,6 +150,11 @@ class CreateTransaction:
 
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
+        if (
+            requires_integer_quantity(parsed_product)
+            and money.amount_minor % 100 != 0
+        ):
+            raise InvalidAmount("La cantidad debe ser un número entero")
         pan = _validate_pan(card_number)
         exp = expiration_date.strip() if expiration_date else None
         if exp == "":

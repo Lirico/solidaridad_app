@@ -79,8 +79,8 @@ las pantallas interactivas incluyen:
   mismo cajón blanco de la pantalla** (`MoreMenu` en `core/widgets`, ancho
   100%, radio superior 24, pegado a la barra inferior; la cabecera y la barra
   quedan visibles detrás y se cierra tocando fuera o con CERRAR) con
-  **Consultar saldo** y **Cerrar Lote** (pendientes de definición de contrato
-  con el cliente; deshabilitados por ahora) e **Historial de ventas**. El
+  **Consultar saldo**, **Cerrar Lote** e **Historial de ventas** (el cierre de
+  lote se describe más abajo). El
   cambio de contraseña es del menú del ícono de usuario.
 - el contenido de las pantallas operativas se apoya sobre un **panel blanco a
   sangre completa** (`AppSheetPanel` en `core/widgets`) que asoma debajo de la
@@ -89,6 +89,17 @@ las pantallas interactivas incluyen:
   panel ocupa el 100% del ancho y termina pegado al borde superior de la barra
   inferior. Este patrón reemplaza a las tarjetas flotantes blancas con radio
   16dp y sombra sobre fondo gris `#F4F6F9`.
+- el **Cierre de Lote** (menú ⋯ "más") es una pantalla **informativa**: muestra el
+  **resumen del lote actual** (Nº de lote, cantidad de ventas, total y ventas por
+  producto con su cantidad y su equivalente en kg) leyendo las **ventas aprobadas
+  del día** de la terminal (`GET /v1/transactions`). **No cierra el lote**: el
+  botón CERRAR LOTE se dibuja como en el mockup (visible y habilitado) pero queda
+  **inerte**, y el Nº de lote es provisorio, porque la API todavía no expone
+  lote/cierre ni hay contrato de cierre con el procesador (ISO `0500`). El total
+  se expresa en **kg**: la API no publica importe/precio por producto. El cierre
+  efectivo, el total en pesos, el peso por producto desde el backend y el ticket
+  impreso quedan pendientes de definición de contrato (ver `docs/gaps.md`,
+  G-P2-10).
 
 Excepciones: la pantalla de presentación (splash), la pantalla "Iniciando"
 (spinner) y **Login/Registro** no llevan la barra inferior (en auth no hay

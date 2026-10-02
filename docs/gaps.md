@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-09-25
+Última revisión: 2026-10-02
 
 > **Último cambio (2026-09-25, VE-09):** la cantidad se valida según la unidad
 > del catálogo. Garrafas y tubos exigen un entero (la app lo bloquea en el

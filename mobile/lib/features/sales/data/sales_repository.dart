@@ -11,6 +11,23 @@ class SessionExpiredException implements Exception {
   const SessionExpiredException();
 }
 
+/// Fallo al cargar catálogo o historial. [message] es el texto para el operador.
+class DataLoadException implements Exception {
+  final String message;
+
+  const DataLoadException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+const _loadTimeoutMessage = 'Tiempo de espera agotado. Verifique su conexión.';
+const _loadNetworkMessage =
+    'No se pudo conectar con el servidor. Verifique su red.';
+const _loadHttpMessage = 'Error de comunicación con el servidor. Reintente.';
+const _loadRejectedMessage = 'No se pudieron cargar los datos. Reintente.';
+const _loadUnexpectedMessage = 'Ocurrió un error inesperado. Reintente.';
+
 /// Generates a pseudo-unique idempotency key.
 ///
 /// In production, consider using the `uuid` package for guaranteed uniqueness.
@@ -32,8 +49,7 @@ class SalesRepository {
     : _httpClient = httpClient ?? http.Client(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
-  Future<List<ProductInfo>> fetchProducts({required String token}) async {
-    final url = Uri.parse('$_baseUrl/products');
+  Future<http.Response> _authorizedGet(Uri url, String token) async {
     try {
       final response = await _httpClient
           .get(
@@ -48,32 +64,40 @@ class SalesRepository {
       if (response.statusCode == 401) {
         throw const SessionExpiredException();
       }
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-        return data
-            .map((item) => ProductInfo.fromJson(item as Map<String, dynamic>))
-            .toList();
-      }
-      return _defaultProducts();
+      return response;
     } on SessionExpiredException {
       rethrow;
+    } on TimeoutException {
+      throw const DataLoadException(_loadTimeoutMessage);
+    } on SocketException {
+      throw const DataLoadException(_loadNetworkMessage);
+    } on HttpException {
+      throw const DataLoadException(_loadHttpMessage);
+    } on http.ClientException {
+      throw const DataLoadException(_loadNetworkMessage);
     } catch (_) {
-      return _defaultProducts();
+      throw const DataLoadException(_loadUnexpectedMessage);
     }
   }
 
-  List<ProductInfo> _defaultProducts() {
-    return const [
-      ProductInfo(code: 'GARRAFA_10', label: 'Garrafa 10 kg'),
-      ProductInfo(code: 'GARRAFA_15', label: 'Garrafa 15 kg'),
-      ProductInfo(code: 'GARRAFA_30', label: 'Garrafa 30 kg'),
-      ProductInfo(code: 'TUBO_45', label: 'Tubo 45 kg'),
-      ProductInfo(
-        code: 'GRANEL',
-        label: 'Granel',
-        unit: ProductUnit.metrosCubicos,
-      ),
-    ];
+  Future<List<ProductInfo>> fetchProducts({required String token}) async {
+    final url = Uri.parse('$_baseUrl/products');
+    try {
+      final response = await _authorizedGet(url, token);
+      if (response.statusCode != 200) {
+        throw const DataLoadException(_loadRejectedMessage);
+      }
+      final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+      return data
+          .map((item) => ProductInfo.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on SessionExpiredException {
+      rethrow;
+    } on DataLoadException {
+      rethrow;
+    } catch (_) {
+      throw const DataLoadException(_loadUnexpectedMessage);
+    }
   }
 
   Future<VoidResult> voidTransaction({
@@ -160,34 +184,22 @@ class SalesRepository {
   }) async {
     final url = Uri.parse('$_baseUrl/transactions?limit=$limit&offset=$offset');
     try {
-      final response = await _httpClient
-          .get(
-            url,
-            headers: {
-              HttpHeaders.contentTypeHeader: 'application/json',
-              HttpHeaders.authorizationHeader: 'Bearer $token',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 401) {
-        throw const SessionExpiredException();
+      final response = await _authorizedGet(url, token);
+      if (response.statusCode != 200) {
+        throw const DataLoadException(_loadRejectedMessage);
       }
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> body =
-            jsonDecode(response.body) as Map<String, dynamic>;
-        final List<dynamic> items = body['items'] as List<dynamic>? ?? [];
-        return items
-            .map(
-              (item) => OperationModel.fromJson(item as Map<String, dynamic>),
-            )
-            .toList();
-      }
-      return [];
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+      final List<dynamic> items = body['items'] as List<dynamic>? ?? [];
+      return items
+          .map((item) => OperationModel.fromJson(item as Map<String, dynamic>))
+          .toList();
     } on SessionExpiredException {
       rethrow;
+    } on DataLoadException {
+      rethrow;
     } catch (_) {
-      return [];
+      throw const DataLoadException(_loadUnexpectedMessage);
     }
   }
 

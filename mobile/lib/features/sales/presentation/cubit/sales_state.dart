@@ -136,6 +136,22 @@ class SalesInitialWithHistory extends SalesState {
       );
 }
 
+/// La primera página del historial no se pudo cargar.
+class SalesHistoryLoadFailed extends SalesState {
+  final String message;
+
+  const SalesHistoryLoadFailed({required this.message})
+    : super(
+        productCode: '',
+        productLabel: '',
+        amount: 0.0,
+        cardNumber: '',
+        cvv: '',
+        expirationDate: '',
+        history: const [],
+      );
+}
+
 /// Emitted when the API returns 401 (token expired/invalid).
 class SalesSessionExpired extends SalesState {
   const SalesSessionExpired()

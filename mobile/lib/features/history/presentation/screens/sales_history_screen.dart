@@ -5,11 +5,13 @@ import '../../../../core/formatters/amount_formatter.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../../core/widgets/load_error_notice.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
+import '../../../sales/data/sales_repository.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../../../sales/presentation/cubit/sales_cubit.dart';
 import '../../../sales/presentation/cubit/sales_state.dart';
@@ -26,6 +28,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   int _offset = 0;
   static const int _limit = 20;
   bool _loadingMore = false;
+  String? _pageError;
 
   @override
   void initState() {
@@ -53,9 +56,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   void _onScroll() {
+    if (_pageError != null || _loadingMore) return;
     if (_scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 200 &&
-        !_loadingMore) {
+        _scrollController.position.maxScrollExtent - 200) {
       _loadMore();
     }
   }
@@ -63,20 +66,45 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   Future<void> _loadMore() async {
     final authState = context.read<AuthCubit>().state;
     if (authState is! AuthSuccess || authState.user == null) return;
+    if (_loadingMore) return;
 
-    setState(() => _loadingMore = true);
+    setState(() {
+      _loadingMore = true;
+      _pageError = null;
+    });
     final newOffset = _offset + _limit;
-    final items = await context.read<SalesCubit>().salesRepository.fetchHistory(
-      token: authState.user!.token,
-      limit: _limit,
-      offset: newOffset,
-    );
+    try {
+      final items = await context
+          .read<SalesCubit>()
+          .salesRepository
+          .fetchHistory(
+            token: authState.user!.token,
+            limit: _limit,
+            offset: newOffset,
+          );
 
-    if (items.isNotEmpty && mounted) {
-      setState(() => _offset = newOffset);
-      context.read<SalesCubit>().appendHistory(items);
+      if (!mounted) return;
+      if (items.isNotEmpty) {
+        setState(() => _offset = newOffset);
+        context.read<SalesCubit>().appendHistory(items);
+      }
+    } on SessionExpiredException {
+      if (!mounted) return;
+      context.read<AuthCubit>().logout();
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false,
+      );
+    } on DataLoadException catch (error) {
+      if (!mounted) return;
+      setState(() => _pageError = error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _pageError = 'Ocurrió un error inesperado. Reintente.');
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
-    if (mounted) setState(() => _loadingMore = false);
   }
 
   @override
@@ -113,6 +141,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
+        if (state is SalesHistoryLoadFailed) {
+          return Center(
+            child: LoadErrorNotice(
+              message: state.message,
+              onRetry: _loadInitialHistory,
+            ),
+          );
+        }
+
         final history = state.history;
 
         if (history.isEmpty) {
@@ -124,11 +161,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           );
         }
 
+        final showFooter = _loadingMore || _pageError != null;
+
         return ListView.builder(
           controller: _scrollController,
-          itemCount: history.length + (_loadingMore ? 1 : 0),
+          itemCount: history.length + (showFooter ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == history.length) {
+              if (_pageError != null) {
+                return LoadErrorNotice(
+                  message: _pageError!,
+                  onRetry: _loadMore,
+                );
+              }
               return const Padding(
                 padding: EdgeInsets.all(16),
                 child: Center(child: CircularProgressIndicator()),

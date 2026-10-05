@@ -1,6 +1,7 @@
 """Authorize a purchase via the ISO processor port."""
 
 from application.payments.ports import IsoProcessor
+from domain.amount import AMOUNT_TOO_LARGE, MAX_AMOUNT_MINOR
 from domain.authorization import AuthorizationResult, AuthorizeCommand
 from domain.exceptions import (
     InvalidAmount,
@@ -19,6 +20,8 @@ class AuthorizePayment:
     def execute(self, command: AuthorizeCommand) -> AuthorizationResult:
         if command.amount_minor <= 0:
             raise InvalidAmount()
+        if command.amount_minor > MAX_AMOUNT_MINOR:
+            raise InvalidAmount(AMOUNT_TOO_LARGE)
         pan = command.card_number.strip()
         if not pan.isdigit() or not (13 <= len(pan) <= 19):
             raise InvalidCardNumber()

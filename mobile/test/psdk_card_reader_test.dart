@@ -17,7 +17,16 @@ void main() {
   setUp(() {
     bridge = MockPsdkBridge();
     reader = PsdkCardReader(psdk: bridge);
+    when(
+      () => bridge.cancelReadMsr(),
+    ).thenAnswer((_) async => <String, dynamic>{'ok': true});
+    when(() => bridge.tearDown()).thenAnswer((_) async => <String, dynamic>{});
   });
+
+  void verifyReleasedOnce() {
+    verify(() => bridge.cancelReadMsr()).called(1);
+    verify(() => bridge.tearDown()).called(1);
+  }
 
   void stubInitialize() {
     when(
@@ -48,28 +57,67 @@ void main() {
         expect(data.pan, PsdkMsrMock.pan);
         // "3012" (YYMM) → "1230" (MMYY) para la API.
         expect(data.expiryMmYy, '1230');
+        verifyReleasedOnce();
       },
     );
 
-    test('sin datos claros: CardReadFailure(unreadable)', () async {
-      stubInitialize();
-      stubReadyStatus();
-      when(
-        () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
-      ).thenAnswer(
-        (_) async => <String, dynamic>{
-          'hasClearData': false,
-          'timedOut': false,
-        },
-      );
+    test(
+      'éxito: no devuelve el resultado antes de terminar el tearDown',
+      () async {
+        stubInitialize();
+        stubReadyStatus();
+        when(
+          () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
+        ).thenAnswer((_) async => PsdkMsrMock.readMsrSuccess());
+        final Completer<Map<String, dynamic>> tearDownGate = Completer();
+        when(() => bridge.tearDown()).thenAnswer((_) => tearDownGate.future);
 
-      final result = await reader.readCard();
+        final Future<CardReadResult> future = reader.readCard();
+        var completed = false;
+        future.whenComplete(() => completed = true);
+        await pumpEventQueue();
 
-      expect(
-        (result as CardReadFailure).reason,
-        CardReadFailureReason.unreadable,
-      );
-    });
+        expect(completed, isFalse);
+        verify(() => bridge.tearDown()).called(1);
+
+        tearDownGate.complete(<String, dynamic>{});
+        expect(await future, isA<CardReadSuccess>());
+        expect(completed, isTrue);
+      },
+    );
+
+    test(
+      'sin datos claros: CardReadFailure(unreadable) tras el tearDown',
+      () async {
+        stubInitialize();
+        stubReadyStatus();
+        when(
+          () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
+        ).thenAnswer(
+          (_) async => <String, dynamic>{
+            'hasClearData': false,
+            'timedOut': false,
+          },
+        );
+        final Completer<Map<String, dynamic>> tearDownGate = Completer();
+        when(() => bridge.tearDown()).thenAnswer((_) => tearDownGate.future);
+
+        final Future<CardReadResult> future = reader.readCard();
+        var completed = false;
+        future.whenComplete(() => completed = true);
+        await pumpEventQueue();
+
+        expect(completed, isFalse);
+        tearDownGate.complete(<String, dynamic>{});
+
+        final result = await future;
+        expect(
+          (result as CardReadFailure).reason,
+          CardReadFailureReason.unreadable,
+        );
+        verifyReleasedOnce();
+      },
+    );
 
     test('timeout de lectura: CardReadFailure(timedOut)', () async {
       stubInitialize();
@@ -86,6 +134,7 @@ void main() {
         (result as CardReadFailure).reason,
         CardReadFailureReason.timedOut,
       );
+      verifyReleasedOnce();
     });
 
     test('PAN vacío: CardReadFailure(badPan)', () async {
@@ -105,18 +154,32 @@ void main() {
       final result = await reader.readCard();
 
       expect((result as CardReadFailure).reason, CardReadFailureReason.badPan);
+      verifyReleasedOnce();
     });
 
-    test('initialize lanza: CardReadFailure(exception)', () async {
-      when(() => bridge.initialize()).thenThrow(Exception('boom'));
+    test(
+      'initialize lanza: CardReadFailure(exception) y libera el SDK',
+      () async {
+        when(() => bridge.initialize()).thenThrow(Exception('boom'));
+        final Completer<Map<String, dynamic>> tearDownGate = Completer();
+        when(() => bridge.tearDown()).thenAnswer((_) => tearDownGate.future);
 
-      final result = await reader.readCard();
+        final Future<CardReadResult> future = reader.readCard();
+        var completed = false;
+        future.whenComplete(() => completed = true);
+        await pumpEventQueue();
 
-      expect(
-        (result as CardReadFailure).reason,
-        CardReadFailureReason.exception,
-      );
-    });
+        expect(completed, isFalse);
+        tearDownGate.complete(<String, dynamic>{});
+
+        final result = await future;
+        expect(
+          (result as CardReadFailure).reason,
+          CardReadFailureReason.exception,
+        );
+        verifyReleasedOnce();
+      },
+    );
 
     test('SDK no listo a tiempo: CardReadFailure(notReady)', () async {
       stubInitialize();
@@ -132,7 +195,36 @@ void main() {
         CardReadFailureReason.notReady,
       );
       verifyNever(() => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')));
+      verifyReleasedOnce();
     });
+
+    test(
+      'notReady: no devuelve el fallo antes de terminar el tearDown',
+      () async {
+        stubInitialize();
+        when(
+          () => bridge.getStatus(),
+        ).thenAnswer((_) async => <String, dynamic>{});
+        when(() => bridge.statusEvents).thenAnswer((_) => const Stream.empty());
+        final Completer<Map<String, dynamic>> tearDownGate = Completer();
+        when(() => bridge.tearDown()).thenAnswer((_) => tearDownGate.future);
+
+        final Future<CardReadResult> future = reader.readCard(
+          readyTimeoutSec: 1,
+        );
+        var completed = false;
+        future.whenComplete(() => completed = true);
+
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+        expect(completed, isFalse);
+
+        tearDownGate.complete(<String, dynamic>{});
+        expect(
+          ((await future) as CardReadFailure).reason,
+          CardReadFailureReason.notReady,
+        );
+      },
+    );
   });
 
   group('PsdkCardReader.ensureReady', () {
@@ -161,17 +253,62 @@ void main() {
   });
 
   group('PsdkCardReader.cancel', () {
-    test('cancela la lectura antes de apagar el SDK (orden)', () async {
+    test('durante la lectura se une a una sola liberación', () async {
+      stubInitialize();
+      stubReadyStatus();
+      final Completer<Map<String, dynamic>> readGate = Completer();
       when(
-        () => bridge.cancelReadMsr(),
-      ).thenAnswer((_) async => <String, dynamic>{'ok': true});
+        () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
+      ).thenAnswer((_) => readGate.future);
+      final List<String> order = <String>[];
+      when(() => bridge.cancelReadMsr()).thenAnswer((_) async {
+        order.add('cancel');
+        return <String, dynamic>{'ok': true};
+      });
+      when(() => bridge.tearDown()).thenAnswer((_) async {
+        order.add('tearDown');
+        return <String, dynamic>{};
+      });
+
+      final Future<CardReadResult> future = reader.readCard();
+      await pumpEventQueue();
+
+      final Future<void> cancelFuture = reader.cancel();
+      readGate.complete(PsdkMsrMock.readMsrSuccess());
+      await cancelFuture;
+      await future;
+
+      expect(order, ['cancel', 'tearDown']);
+    });
+
+    test('después de leer no vuelve a apagar el SDK', () async {
+      stubInitialize();
+      stubReadyStatus();
       when(
-        () => bridge.tearDown(),
-      ).thenAnswer((_) async => <String, dynamic>{});
+        () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
+      ).thenAnswer((_) async => PsdkMsrMock.readMsrSuccess());
+
+      await reader.readCard();
+      clearInteractions(bridge);
 
       await reader.cancel();
 
-      verifyInOrder([() => bridge.cancelReadMsr(), () => bridge.tearDown()]);
+      verifyNever(() => bridge.cancelReadMsr());
+      verifyNever(() => bridge.tearDown());
+    });
+
+    test('una segunda lectura vuelve a liberar el SDK', () async {
+      stubInitialize();
+      stubReadyStatus();
+      when(
+        () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
+      ).thenAnswer((_) async => PsdkMsrMock.readMsrSuccess());
+
+      await reader.readCard();
+      await reader.readCard();
+
+      verify(() => bridge.cancelReadMsr()).called(2);
+      verify(() => bridge.tearDown()).called(2);
     });
   });
 }

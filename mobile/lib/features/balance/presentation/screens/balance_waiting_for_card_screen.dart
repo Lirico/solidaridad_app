@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -35,10 +37,10 @@ class _BalanceWaitingForCardScreenState
   @override
   void dispose() {
     _disposed = true;
-    // Cancelar la lectura en curso antes de apagar el SDK (cancelReadMsr →
-    // tearDown, en ese orden dentro del servicio), para no hacer tearDown con
-    // un readMsr todavía activo.
-    _reader.cancel();
+    // readCard ya liberó el SDK al terminar. cancel() solo aborta una lectura
+    // todavía en curso y, si la sesión ya se cerró, no vuelve a apagar el
+    // hardware.
+    unawaited(_reader.cancel());
     super.dispose();
   }
 

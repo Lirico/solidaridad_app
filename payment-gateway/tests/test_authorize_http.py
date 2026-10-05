@@ -91,6 +91,24 @@ def test_authorize_http_validation_error() -> None:
     assert "message" in response.json()
 
 
+def test_authorize_http_rejects_amount_above_de4() -> None:
+    response = client.post(
+        "/v1/authorize",
+        json=_payload(amount_minor=1_000_000_000_000),
+    )
+    assert response.status_code == 400
+    assert "máximo permitido" in response.json()["message"]
+
+
+def test_void_http_rejects_amount_above_de4() -> None:
+    response = client.post(
+        "/v1/void",
+        json=_void_payload(amount_minor=1_000_000_000_000),
+    )
+    assert response.status_code == 400
+    assert "máximo permitido" in response.json()["message"]
+
+
 def test_authorize_http_processor_unavailable() -> None:
     use_case = MagicMock()
     use_case.execute.side_effect = ProcessorUnavailable()

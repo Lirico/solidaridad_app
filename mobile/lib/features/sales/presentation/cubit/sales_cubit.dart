@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/sale_model.dart';
 import '../../../../psdk/msr_card_data.dart';
@@ -24,8 +25,14 @@ class SalesCubit extends Cubit<SalesState> {
       emit(SalesInitialWithHistory(history: items));
     } on SessionExpiredException {
       emit(const SalesSessionExpired());
+    } on DataLoadException catch (error) {
+      emit(SalesHistoryLoadFailed(message: error.message));
     } catch (_) {
-      emit(SalesInitialWithHistory(history: const []));
+      emit(
+        const SalesHistoryLoadFailed(
+          message: 'Ocurrió un error inesperado. Reintente.',
+        ),
+      );
     }
   }
 
@@ -86,6 +93,12 @@ class SalesCubit extends Cubit<SalesState> {
   /// (ej. "4606300701400740" en vez de "6063007014007403"). El autorizador usa
   /// el PAN explícito cuando viene presente.
   void showReviewFromMsr(MsrCardData data) {
+    final int eq = data.track2.indexOf('=');
+    debugPrint(
+      'msr review hasEquals=${eq >= 0} '
+      'digitsAfterEquals=${_digitsAfterEquals(data.track2)} '
+      'expiryLen=${data.expiryMmYy.length}',
+    );
     emit(
       SalesReviewing(
         productCode: state.productCode,
@@ -264,4 +277,23 @@ class SalesCubit extends Cubit<SalesState> {
   void appendHistory(List<OperationModel> items) {
     emit(SalesInitialWithHistory(history: [...state.history, ...items]));
   }
+}
+
+/// Dígitos seguidos después del `=`, salteando centinelas del inicio.
+///
+/// Devuelve solo la cantidad. No incluye el vencimiento ni la pista.
+int _digitsAfterEquals(String track2) {
+  final int eq = track2.indexOf('=');
+  if (eq < 0) return 0;
+  var count = 0;
+  for (final int rune in track2.substring(eq + 1).runes) {
+    final String ch = String.fromCharCode(rune);
+    final bool isDigit = ch.compareTo('0') >= 0 && ch.compareTo('9') <= 0;
+    if (!isDigit) {
+      if (count > 0) break;
+      continue;
+    }
+    count++;
+  }
+  return count;
 }

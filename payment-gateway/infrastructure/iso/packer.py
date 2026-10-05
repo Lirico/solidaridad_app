@@ -49,8 +49,62 @@ class IsoMessage:
     field_63: str = ""
 
 
+_FIXED_LENGTHS: dict[int, int] = {
+    3: 6,
+    4: 12,
+    11: 6,
+    12: 6,
+    13: 4,
+    14: 4,
+    15: 4,
+    22: 4,
+    24: 4,
+    25: 2,
+    37: 12,
+    38: 6,
+    39: 2,
+    41: 8,
+    42: 15,
+    49: 3,
+    50: 3,
+}
+
+
+def _fixed_field(iso: IsoMessage, bit: int) -> str:
+    fields = {
+        3: iso.procode_3,
+        4: iso.amount_4,
+        11: iso.systracenum_11,
+        12: iso.timetrx_12,
+        13: iso.datetrx_13,
+        14: iso.dateexpire_14,
+        15: iso.datesettle_15,
+        22: iso.posentrymode_22,
+        24: iso.nii_24,
+        25: iso.poscondcode_25,
+        37: iso.retrefnum_37,
+        38: iso.authid_38,
+        39: iso.respcode_39,
+        41: iso.termid_41,
+        42: iso.merchid_42,
+        49: iso.currcode_49,
+        50: iso.settcurrcode_50,
+    }
+    return fields[bit]
+
+
+def _check_fixed_lengths(iso: IsoMessage) -> None:
+    for bit, width in _FIXED_LENGTHS.items():
+        if not bitmap_get(iso.bitmap, bit):
+            continue
+        value = _fixed_field(iso, bit)
+        if len(value) != width:
+            raise IsoPackError(f"Campo ISO {bit} debe tener {width} caracteres")
+
+
 def pack_iso(iso: IsoMessage) -> bytes:
     """Pack message including 2-byte hex length prefix (full wire frame)."""
+    _check_fixed_lengths(iso)
     body = bytearray()
     body.extend(asc_to_bcd(iso.tpdu))
     body.extend(asc_to_bcd(iso.mtype))

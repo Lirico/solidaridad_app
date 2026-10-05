@@ -6,6 +6,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../../core/widgets/load_error_notice.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
@@ -26,10 +27,11 @@ class SaleFormScreen extends StatefulWidget {
 class _SaleFormScreenState extends State<SaleFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  String _selectedProductCode = 'GARRAFA_10';
-  String _selectedProductLabel = 'Garrafa 10 kg';
+  String _selectedProductCode = '';
+  String _selectedProductLabel = '';
   List<ProductInfo> _products = [];
   bool _loadingProducts = true;
+  String? _productsError;
 
   final _unitsController = TextEditingController();
 
@@ -39,6 +41,11 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
     }
     return null;
   }
+
+  String get _quantityUnit => _selectedProduct?.unit.plural ?? 'unidades';
+
+  bool get _canContinue =>
+      !_loadingProducts && _productsError == null && _products.isNotEmpty;
 
   bool get _allowsDecimals =>
       _selectedProduct?.unit.allowsDecimals ??
@@ -54,12 +61,19 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
     final authState = context.read<AuthCubit>().state;
     final token = authState is AuthSuccess ? authState.user!.token : '';
     final repo = context.read<SalesCubit>().salesRepository;
+    if (_productsError != null || !_loadingProducts) {
+      setState(() {
+        _loadingProducts = true;
+        _productsError = null;
+      });
+    }
     try {
       final products = await repo.fetchProducts(token: token);
       if (!mounted) return;
       setState(() {
         _products = products;
         _loadingProducts = false;
+        _productsError = null;
         if (products.isNotEmpty) {
           _selectedProductCode = products.first.code;
           _selectedProductLabel = products.first.label;
@@ -73,10 +87,19 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
         AppRoutes.login,
         (route) => false,
       );
+    } on DataLoadException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _products = [];
+        _loadingProducts = false;
+        _productsError = error.message;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() {
+        _products = [];
         _loadingProducts = false;
+        _productsError = 'Ocurrió un error inesperado. Reintente.';
       });
     }
   }
@@ -143,7 +166,20 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                       child: CircularProgressIndicator(),
                     ),
                   )
-                else
+                else if (_productsError != null)
+                  LoadErrorNotice(
+                    message: _productsError!,
+                    onRetry: _loadProducts,
+                  )
+                else if (_products.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'No hay productos disponibles.',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  )
+                else ...[
                   ProductSelector(
                     products: _products,
                     selectedCode: _selectedProductCode,
@@ -157,45 +193,42 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                       });
                     },
                   ),
-                const SizedBox(height: 20),
-                Text(
-                  _allowsDecimals
-                      ? 'Cantidad de Gas (m³)'
-                      : 'Cantidad de Unidades',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _unitsController,
-                  style: const TextStyle(fontSize: 22),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [AmountInputFormatter()],
-                  decoration: InputDecoration(
-                    hintText: _allowsDecimals
-                        ? 'Ingresar m³'
-                        : 'Ingresar unidades',
-                    prefixIcon: const Icon(
-                      Icons.propane_tank_outlined,
-                      size: 24,
+                  const SizedBox(height: 20),
+                  Text(
+                    'Cantidad ($_quantityUnit)',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  validator: (value) => validateSaleQuantity(
-                    value,
-                    allowsDecimals: _allowsDecimals,
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _unitsController,
+                    style: const TextStyle(fontSize: 22),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [AmountInputFormatter()],
+                    decoration: InputDecoration(
+                      hintText: 'Ingresar $_quantityUnit',
+                      prefixIcon: const Icon(
+                        Icons.propane_tank_outlined,
+                        size: 24,
+                      ),
+                    ),
+                    validator: (value) => validateSaleQuantity(
+                      value,
+                      allowsDecimals: _allowsDecimals,
+                    ),
                   ),
-                ),
+                ],
                 SizedBox(height: AppSpacing.xxl),
 
                 SizedBox(
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton(
-                    onPressed: _onNext,
+                    onPressed: _canContinue ? _onNext : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryOrange,
                       foregroundColor: Colors.white,

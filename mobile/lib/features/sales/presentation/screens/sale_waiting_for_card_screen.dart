@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -33,10 +35,10 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   @override
   void dispose() {
     _disposed = true;
-    // Cancelar la lectura en curso antes de apagar el SDK (cancelReadMsr →
-    // tearDown, en ese orden dentro del servicio), para no hacer tearDown con
-    // un readMsr todavía activo.
-    _reader.cancel();
+    // readCard ya liberó el SDK al terminar. cancel() solo aborta una lectura
+    // todavía en curso y, si la sesión ya se cerró, no vuelve a apagar el
+    // hardware (la impresión y la venta siguiente lo necesitan).
+    unawaited(_reader.cancel());
     super.dispose();
   }
 
@@ -92,8 +94,8 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
         title: 'Nueva Operación',
         actions: [UserMenuButton(), SizedBox(width: 8)],
       ),
-      // La flecha "atrás" cancela la operación y la lectura de banda (el pop
-      // dispara dispose() → cancel() del lector).
+      // La flecha "atrás" cancela la operación. Si la lectura sigue en curso,
+      // el pop dispara dispose() → cancel() del lector.
       bottomNavigationBar: AppBottomNavBar(onBack: _onBackPressed),
       body: AppSheetPanel(
         child: WaitingForCardContent(

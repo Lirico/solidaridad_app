@@ -140,6 +140,8 @@ def create_transaction(
         MissingIdempotencyKey,
         MissingTerminalId,
     ) as exc:
+        # Sin cuerpo del request: el mensaje no incluye PAN ni pista.
+        print(f"create transaction rejected: {exc}", flush=True)
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": str(exc)},

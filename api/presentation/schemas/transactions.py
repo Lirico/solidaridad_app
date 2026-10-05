@@ -5,10 +5,12 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from solidaridad_catalog import Product
 
+from domain.money import MAX_AMOUNT_TEXT
+
 
 class CreateTransactionRequest(BaseModel):
     product: Product
-    amount: str = Field(min_length=1, max_length=32)
+    amount: str = Field(min_length=1, max_length=len(MAX_AMOUNT_TEXT))
     card_number: str = Field(min_length=13, max_length=19)
     # CVV opcional: la banda magnética (entry_mode 022) no lo contiene.
     # La validación de CVV se hace en el caso de uso según el entry_mode.

@@ -1,7 +1,15 @@
 """HTTP schemas for authorize / void."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from solidaridad_catalog import ProcessorCode
+
+from domain.amount import AMOUNT_TOO_LARGE, MAX_AMOUNT_MINOR
+
+
+def _reject_amount_above_de4(value: int) -> int:
+    if value > MAX_AMOUNT_MINOR:
+        raise ValueError(AMOUNT_TOO_LARGE)
+    return value
 
 
 class AuthorizeRequest(BaseModel):
@@ -15,6 +23,11 @@ class AuthorizeRequest(BaseModel):
     entry_mode: str = Field(default="012", max_length=3)
     track2: str | None = Field(default=None, max_length=37)
 
+    @field_validator("amount_minor")
+    @classmethod
+    def amount_fits_de4(cls, value: int) -> int:
+        return _reject_amount_above_de4(value)
+
 
 class VoidRequest(BaseModel):
     product_code: ProcessorCode
@@ -25,6 +38,11 @@ class VoidRequest(BaseModel):
     original_ticket: str = Field(min_length=1, max_length=24)
     void_ticket: str = Field(min_length=1, max_length=24)
     expiration_date: str | None = Field(default=None, max_length=4)
+
+    @field_validator("amount_minor")
+    @classmethod
+    def amount_fits_de4(cls, value: int) -> int:
+        return _reject_amount_above_de4(value)
 
 
 class AuthorizeResponse(BaseModel):

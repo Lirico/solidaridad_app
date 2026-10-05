@@ -142,6 +142,17 @@ def test_pack_unpack_optional_fields() -> None:
     assert parsed.field_63 == "OK"
 
 
+def test_pack_rejects_amount_longer_than_de4() -> None:
+    iso = IsoMessage(
+        tpdu="6000030000",
+        mtype="0200",
+        amount_4="1000000000000",
+    )
+    set_present(iso, 4)
+    with pytest.raises(IsoPackError, match="Campo ISO 4"):
+        pack_iso(iso)
+
+
 def test_unpack_rejects_short_and_incomplete() -> None:
     with pytest.raises(IsoPackError):
         unpack_iso(b"\x00")

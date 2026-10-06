@@ -41,6 +41,7 @@ class TransactionItemResponse(BaseModel):
     card_last4: str
     status: str
     user_message: str
+    can_void: bool
     created_at: datetime
 
 

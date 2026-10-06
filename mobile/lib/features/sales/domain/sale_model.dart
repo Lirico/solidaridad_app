@@ -1,4 +1,4 @@
-enum PaymentResult { approved, declined, connectionError, voided }
+enum PaymentResult { approved, declined, connectionError, voided, unknown }
 
 /// Estado de la impresión del ticket en la pantalla de resultado.
 enum PrintStatus { idle, printing, printed, error }
@@ -12,6 +12,7 @@ class OperationModel {
   final PaymentResult result;
   final DateTime date;
   final String? userMessage;
+  final bool canVoid;
 
   const OperationModel({
     required this.id,
@@ -22,6 +23,7 @@ class OperationModel {
     required this.result,
     required this.date,
     this.userMessage,
+    this.canVoid = false,
   });
 
   factory OperationModel.fromJson(Map<String, dynamic> json) {
@@ -36,8 +38,8 @@ class OperationModel {
       date:
           DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal() ??
           DateTime.now(),
-
       userMessage: json['user_message'] as String?,
+      canVoid: json['can_void'] as bool? ?? false,
     );
   }
 
@@ -66,8 +68,9 @@ class OperationModel {
         return PaymentResult.declined;
       case 'VOIDED':
         return PaymentResult.voided;
-      case 'FAILED':
       case 'UNKNOWN':
+        return PaymentResult.unknown;
+      case 'FAILED':
       case 'PENDING':
       default:
         return PaymentResult.connectionError;
@@ -130,6 +133,17 @@ class VoidResult {
       connectionError = false,
       sessionExpired = true,
       message = 'Su sesión ha expirado. Vuelva a iniciar sesión.';
+}
+
+/// Argumentos de la pantalla de resultado de anulación.
+///
+/// Lleva la operación original para poder consultar su estado o reintentar
+/// cuando la anulación quedó sin confirmar.
+class VoidStatusArgs {
+  final VoidResult result;
+  final OperationModel operation;
+
+  const VoidStatusArgs({required this.result, required this.operation});
 }
 
 class SaleResponse {

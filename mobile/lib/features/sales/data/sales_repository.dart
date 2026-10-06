@@ -36,6 +36,18 @@ const _loadUnexpectedMessage = 'Ocurrió un error inesperado. Reintente.';
 ///
 /// La venta genera la clave una sola vez (al abrir la revisión) y la reenvía
 /// en cada intento. La anulación sigue generando una clave por request.
+String _voidErrorMessage(Map<String, dynamic> data) {
+  final message = data['message'];
+  if (message is String && message.trim().isNotEmpty) {
+    return message;
+  }
+  final userMessage = data['user_message'];
+  if (userMessage is String && userMessage.trim().isNotEmpty) {
+    return userMessage;
+  }
+  return 'Anulación rechazada por la entidad emisora.';
+}
+
 String generateIdempotencyKey() {
   final timestamp = DateTime.now().microsecondsSinceEpoch;
   final random = Random().nextInt(99999);
@@ -152,11 +164,7 @@ class SalesRepository {
         return VoidResult.declined(message: message);
       }
 
-      return VoidResult.declined(
-        message:
-            responseData['user_message'] as String? ??
-            'Anulación rechazada por la entidad emisora.',
-      );
+      return VoidResult.declined(message: _voidErrorMessage(responseData));
     } on SessionExpiredException {
       rethrow;
     } on TimeoutException {
@@ -176,6 +184,32 @@ class SalesRepository {
     } catch (e) {
       return VoidResult.declined(message: 'Error inesperado: ${e.toString()}');
     }
+  }
+
+  Future<OperationModel> fetchTransaction({
+    required String token,
+    required String transactionNumber,
+  }) async {
+    final url = Uri.parse('$_baseUrl/transactions/$transactionNumber');
+    final response = await _httpClient
+        .get(
+          url,
+          headers: {
+            HttpHeaders.contentTypeHeader: 'application/json',
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 401) {
+      throw const SessionExpiredException();
+    }
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+      return OperationModel.fromJson(body);
+    }
+    throw const HttpException('No se pudo consultar la operación');
   }
 
   Future<List<OperationModel>> fetchHistory({

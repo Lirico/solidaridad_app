@@ -72,7 +72,7 @@ class _VoidCardScreenState extends State<VoidCardScreen> {
     Navigator.pushReplacementNamed(
       context,
       AppRoutes.voidStatus,
-      arguments: voidResult,
+      arguments: VoidStatusArgs(result: voidResult, operation: args),
     );
   }
 

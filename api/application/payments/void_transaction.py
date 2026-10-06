@@ -15,6 +15,7 @@ from application.payments.ports import (
 from application.payments.response_messages import (
     MSG_VOID_DECLINED,
     MSG_VOID_FAILED,
+    MSG_VOID_SALE_UNCONFIRMED,
     MSG_VOID_UNKNOWN,
     MSG_VOIDED,
     message_for_code,
@@ -97,10 +98,23 @@ class VoidTransaction:
                 user_message=tx.user_message or MSG_VOIDED,
             )
 
-        if tx.status != TransactionStatus.APPROVED:
+        if (
+            tx.status == TransactionStatus.UNKNOWN
+            and tx.void_idempotency_key is None
+        ):
+            raise TransactionNotVoidable(MSG_VOID_SALE_UNCONFIRMED)
+
+        if not tx.can_void():
             raise TransactionNotVoidable()
 
-        if tx.void_idempotency_key is not None and tx.void_idempotency_key == key:
+        # A declined or failed void stays APPROVED and replays the same key.
+        # UNKNOWN must hit the gateway again, even with that key: otherwise
+        # the sale stays stuck with no way to resume the void.
+        if (
+            tx.status == TransactionStatus.APPROVED
+            and tx.void_idempotency_key is not None
+            and tx.void_idempotency_key == key
+        ):
             self._record_idempotent_hit(tx, key)
             return VoidTransactionResult(
                 transaction=tx,

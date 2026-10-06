@@ -61,6 +61,17 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > Tests en `mobile/test/msr_card_data_test.dart`. Ver G-P0-06.
 
 
+> ✅ **Último cambio (2026-09-25, VE-10 anulación sin confirmar):** una anulación
+> que queda `UNKNOWN` (había `void_idempotency_key`) se puede reintentar: el
+> caso de uso vuelve a llamar al gateway aunque la clave coincida. Un cobro
+> `UNKNOWN` sin esa clave sigue sin anularse, con un mensaje que explica que
+> hay que saber si el pago se acreditó. `GET /v1/transactions/{transaction_number}`
+> devuelve el mismo ítem del listado más `can_void`. La app distingue
+> `PaymentResult.unknown`, consulta ese detalle y ofrece reintentar la
+> anulación; el 400 de anulación muestra el `message` de la API. El reverso
+> ISO `0400` (G-P1-09) no entra en este cambio. Ver G-P0-12.
+
+
 > **Último cambio (2026-09-25, VE-09):** la cantidad se valida según la unidad
 > del catálogo. Garrafas y tubos exigen un entero (la app lo bloquea en el
 > formulario y la API responde «La cantidad debe ser un número entero» antes
@@ -463,7 +474,7 @@ Verifone (banda + térmica).
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases_index.md`. |
 | G-P0-16 | `must_change_password` no se forzaba en registros nuevos | done | **Fix aplicado (2026-08-03):** `register_user.py` seteaba `must_change_password=False` siempre, impidiendo forzar el cambio de contraseña en el primer login. Se corrigió a `True` en `api/application/auth/register_user.py` línea 62. Tests actualizados en `test_register_user.py` y `test_auth_register_http.py`. Ver hallazgo #6 en `docs/test_cases_index.md`. |
-| G-P0-12 | Endpoint de detalle de transacción no implementado | open | `GET /v1/transactions/{id}` no existe. Solo hay listado (`GET /v1/transactions`) y creación (`POST /v1/transactions`). La app mobile podría necesitarlo para mostrar detalle desde el historial. Ver hallazgo #9 en `docs/test_cases_index.md`. |
+| G-P0-12 | Endpoint de detalle de transacción no implementado | done | **2026-09-25:** `GET /v1/transactions/{transaction_number}` filtra por terminal y responde el ítem de listado más `can_void` (`GetTransaction` + `Transaction.can_void()`). El listado también incluye `can_void`. La app lo usa desde el resultado de una anulación `UNKNOWN` (CONSULTAR ESTADO) y habilita REINTENTAR ANULACIÓN solo si `can_void` es verdadero. Ver hallazgo #9 en `docs/test_cases_index.md`. |
 | G-P0-13 | Tests automatizados del gateway fallan por código 96 | done | **Fix aplicado (2026-08-04):** los tests `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock` ahora fuerzan el `MockIsoProcessor` vía `dependency_overrides` en `payment-gateway/tests/test_authorize_http.py`, haciéndolos deterministas independientemente del `.env` local (`ISO_TRANSPORT=tcp`). `make check` pasa: lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓. Ver hallazgo #20 en `docs/test_cases_index.md`. |
 | G-P0-14 | Procesador no setea DE39 (código de respuesta) en varios escenarios | open | El procesador C solo setea `respcode_39` en algunos casos (ej: código 05 para TRANS_DENY). En otros escenarios (monto $100, terminal inválida, tarjeta sin saldo, tarjeta vencida) el DE39 queda vacío. El gateway interpreta DE39 vacío como código 96 (`response_mapper.py` línea 22: `code = (iso.respcode_39 or "").strip() or "96"`). Esto causa que el gateway devuelva `FAILED` en lugar de `DECLINED` con el código correcto. Requiere fix en `auth_thread.c` para asegurar que DE39 siempre tenga un código de respuesta válido. |
 | G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | partial | **2026-10-05:** se retiró la adaptación del procesador por la discrepancia entre el PAN del tag Verifone y el Track 2. La app usa el PAN/vencimiento leídos para completar el contrato existente; API/gateway emiten el layout manual histórico (`DE22=0012`, DE2/DE14, sin DE35), de modo que `authkig` no cambia. Pendiente: verificar una venta y una consulta de saldo en V660P contra el procesador restaurado. |
@@ -526,8 +537,9 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 
 | `POST /v1/transactions` + persistencia + llamada a gateway | Implementado en `api/` |
 | `POST /v1/transactions/{tn}/void` (anulación con reingreso de tarjeta) | Implementado en `api/`; status `VOIDED`; DE62 ticket = sufijo de `transaction_number` |
-| UI mobile de anulación con reingreso de tarjeta | Flujo completo: detalle → reingreso tarjeta → resultado → historial actualizado. `voidSale()` solo marca `VOIDED`/`UNKNOWN` en el historial; rechazos dejan la venta en `APPROVED` como hace la API. Ver `sales_history_screen.dart`, `sales_cubit.dart`, `void_card_screen.dart`, `void_result_screen.dart`. |
+| UI mobile de anulación con reingreso de tarjeta | Flujo completo: detalle → reingreso tarjeta → resultado → historial actualizado. `voidSale()` marca `VOIDED` o `unknown` (con `canVoid`) en el historial; rechazos dejan la venta en `APPROVED`. Si la anulación queda sin confirmar, el resultado ofrece consultar el detalle y reintentar. Ver `sales_history_screen.dart`, `sales_cubit.dart`, `void_card_screen.dart`, `void_result_screen.dart`. |
 | `GET /v1/transactions` (listado paginado por terminal) | Implementado en `api/` |
+| `GET /v1/transactions/{transaction_number}` | Detalle de una operación del terminal, con `can_void`. Ver G-P0-12. |
 | Catálogo `GET /v1/products` | Implementado en `api/` con auth Bearer; cada producto incluye `code`, `label` y el objeto `unit` con textos `singular` y `plural`. |
 | Gateway `POST /v1/authorize` → ISO → authkig/mock | Implementado en `payment-gateway/` |
 | Gateway `POST /v1/void` → ISO anulación (`0200`/`020000`) | Implementado en `payment-gateway/` |

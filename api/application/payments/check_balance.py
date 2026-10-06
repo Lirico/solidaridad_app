@@ -1,11 +1,13 @@
 """Consultar saldo para todos los productos de una tarjeta.
 
 El autorizador legacy solo devuelve el saldo de UN producto por consulta
-(DE49), así que este caso de uso itera el catálogo y agrega una respuesta por
-producto. Los productos sin saldo asignado (código 06) se listan con 0.
+(DE49). Las consultas se despachan en paralelo; la respuesta se considera
+fallida si alguna termina con un error técnico terminal. Los productos sin
+saldo asignado (código 06) se listan con 0.
 """
 
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from application.payments.ports import (
@@ -75,62 +77,80 @@ class CheckBalance:
         if not terminal_id:
             raise MissingTerminalId()
 
+        requests = [
+            (
+                info,
+                BalanceRequest(
+                    product_code=processor_product_code(info.code),
+                    card_number=pan,
+                    terminal_id=terminal_id[:8].ljust(8),
+                    stan=f"{secrets.randbelow(1_000_000):06d}",
+                    expiration_date=exp,
+                ),
+            )
+            for info in list_products(active_only=True)
+        ]
+
         balances: list[BalanceItem] = []
         any_success = False
         any_gateway_error = False
         hard_code: str | None = None
 
-        for info in list_products(active_only=True):
-            stan = f"{secrets.randbelow(1_000_000):06d}"
-            result = self._gateway.balance(
-                BalanceRequest(
-                    product_code=processor_product_code(info.code),
-                    card_number=pan,
-                    terminal_id=terminal_id[:8].ljust(8),
-                    stan=stan,
-                    expiration_date=exp,
-                )
-            )
+        # Each gateway result is terminal: the gateway/ISO client owns any
+        # transport retry policy before returning it. Wait for all requests
+        # already started so their resources are released before returning.
+        with ThreadPoolExecutor(max_workers=len(requests)) as executor:
+            futures = [
+                (info, executor.submit(self._gateway.balance, request))
+                for info, request in requests
+            ]
 
-            if (
-                result.outcome == GatewayOutcome.APPROVED
-                and result.available_balance_minor is not None
-            ):
-                any_success = True
-                balances.append(
-                    BalanceItem(
-                        product=info.code.value,
-                        label=info.label,
-                        available_balance_minor=result.available_balance_minor,
-                    )
-                )
-            elif result.response_code == "06":
-                # Producto sin saldo asignado: tarjeta válida, saldo 0.
-                any_success = True
-                balances.append(
-                    BalanceItem(
-                        product=info.code.value,
-                        label=info.label,
-                        available_balance_minor=0,
-                    )
-                )
-            elif result.outcome == GatewayOutcome.DECLINED:
-                hard_code = hard_code or result.response_code
-            else:
-                any_gateway_error = True
+            for info, future in futures:
+                try:
+                    result = future.result()
+                except Exception:
+                    any_gateway_error = True
+                    continue
 
-        if any_success:
-            return CheckBalanceResult(
-                status="APPROVED",
-                user_message=MSG_BALANCE_OK,
-                balances=balances,
-            )
+                if (
+                    result.outcome == GatewayOutcome.APPROVED
+                    and result.available_balance_minor is not None
+                ):
+                    any_success = True
+                    balances.append(
+                        BalanceItem(
+                            product=info.code.value,
+                            label=info.label,
+                            available_balance_minor=result.available_balance_minor,
+                        )
+                    )
+                elif result.response_code == "06":
+                    # Producto sin saldo asignado: tarjeta válida, saldo 0.
+                    any_success = True
+                    balances.append(
+                        BalanceItem(
+                            product=info.code.value,
+                            label=info.label,
+                            available_balance_minor=0,
+                        )
+                    )
+                elif result.outcome == GatewayOutcome.DECLINED:
+                    hard_code = hard_code or result.response_code
+                else:
+                    any_gateway_error = True
 
         if any_gateway_error:
             return CheckBalanceResult(
                 status="FAILED",
                 user_message=MSG_BALANCE_FAILED,
                 balances=[],
+            )
+
+        if any_success:
+            return CheckBalanceResult(
+                status="APPROVED",
+                user_message=MSG_BALANCE_OK,
+                balances=balances,
             )
 
         return CheckBalanceResult(

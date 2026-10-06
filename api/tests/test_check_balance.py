@@ -1,3 +1,4 @@
+from threading import Barrier
 from unittest.mock import MagicMock
 
 import pytest
@@ -51,6 +52,30 @@ def test_check_balance_returns_all_products() -> None:
     assert result.balances[0].available_balance_minor == 10000
 
 
+def test_check_balance_dispatches_all_products_concurrently() -> None:
+    outcomes = {
+        "993": _approved(10000),
+        "994": _approved(20000),
+        "995": _approved(30000),
+        "996": _approved(40000),
+        "997": _approved(50000),
+    }
+    gateway = MagicMock()
+    all_requests_started = Barrier(len(outcomes), timeout=1)
+
+    def balance(request: object) -> BalanceResult:
+        all_requests_started.wait()
+        return outcomes[request.product_code]  # type: ignore[attr-defined]
+
+    gateway.balance.side_effect = balance
+    uc = CheckBalance(_installation_repo(), gateway)
+
+    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+
+    assert result.status == "APPROVED"
+    assert len(result.balances) == 5
+
+
 def test_check_balance_product_without_saldo_is_zero() -> None:
     outcomes = {
         "993": _approved(10000),
@@ -86,6 +111,48 @@ def test_check_balance_gateway_error_returns_failed() -> None:
     }
     uc = CheckBalance(_installation_repo(), _gateway(outcomes))
     result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    assert result.status == "FAILED"
+    assert result.balances == []
+
+
+@pytest.mark.parametrize("outcome", [GatewayOutcome.FAILED, GatewayOutcome.UNKNOWN])
+def test_check_balance_any_terminal_gateway_failure_returns_failed(
+    outcome: GatewayOutcome,
+) -> None:
+    outcomes = {
+        "993": _approved(10000),
+        "994": _approved(20000),
+        "995": BalanceResult(outcome=outcome, response_code="96"),
+        "996": _approved(40000),
+        "997": _approved(50000),
+    }
+    uc = CheckBalance(_installation_repo(), _gateway(outcomes))
+
+    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+
+    assert result.status == "FAILED"
+    assert result.balances == []
+
+
+def test_check_balance_gateway_exception_returns_failed() -> None:
+    outcomes = {
+        "993": _approved(10000),
+        "994": _approved(20000),
+        "996": _approved(40000),
+        "997": _approved(50000),
+    }
+    gateway = MagicMock()
+
+    def balance(request: object) -> BalanceResult:
+        if request.product_code == "995":  # type: ignore[attr-defined]
+            raise RuntimeError("gateway closed the connection")
+        return outcomes[request.product_code]  # type: ignore[attr-defined]
+
+    gateway.balance.side_effect = balance
+    uc = CheckBalance(_installation_repo(), gateway)
+
+    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+
     assert result.status == "FAILED"
     assert result.balances == []
 

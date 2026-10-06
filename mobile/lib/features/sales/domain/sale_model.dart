@@ -1,4 +1,4 @@
-enum PaymentResult { approved, declined, connectionError, voided }
+enum PaymentResult { approved, declined, connectionError, voided, unknown }
 
 /// Estado de la impresión del ticket en la pantalla de resultado.
 enum PrintStatus { idle, printing, printed, error }
@@ -66,9 +66,10 @@ class OperationModel {
         return PaymentResult.declined;
       case 'VOIDED':
         return PaymentResult.voided;
+      case 'PENDING':
+        return PaymentResult.unknown;
       case 'FAILED':
       case 'UNKNOWN':
-      case 'PENDING':
       default:
         return PaymentResult.connectionError;
     }
@@ -139,6 +140,7 @@ class SaleResponse {
   final String errorCode;
   final bool connectionError;
   final bool sessionExpired;
+  final bool isUnknown;
 
   const SaleResponse({
     required this.isApproved,
@@ -147,6 +149,7 @@ class SaleResponse {
     required this.errorCode,
     this.connectionError = false,
     this.sessionExpired = false,
+    this.isUnknown = false,
   });
 }
 
@@ -189,11 +192,7 @@ class ProductInfo {
     } else {
       unit = ProductUnit.forProductCode(code);
     }
-    return ProductInfo(
-      code: code,
-      label: json['label'] as String,
-      unit: unit,
-    );
+    return ProductInfo(code: code, label: json['label'] as String, unit: unit);
   }
 }
 

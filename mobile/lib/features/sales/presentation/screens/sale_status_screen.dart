@@ -118,6 +118,11 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.undo;
         statusTitle = 'Transacción Anulada';
         statusSubtitle = 'La venta fue anulada correctamente.';
+      case PaymentResult.unknown:
+        statusColor = const Color(0xFFB9770E);
+        statusIcon = Icons.help_outline;
+        statusTitle = 'No pudimos confirmar el cobro';
+        statusSubtitle = 'Consulte la operación antes de volver a cobrar.';
     }
 
     return Scaffold(
@@ -142,6 +147,9 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             printMessage: _printMessage,
             onRetryPrint: result == PaymentResult.approved
                 ? _printTicket
+                : null,
+            onViewOperation: result == PaymentResult.unknown
+                ? () => Navigator.pushNamed(context, AppRoutes.salesHistory)
                 : null,
             onRetry: result == PaymentResult.connectionError
                 ? () => _retrySale(context)

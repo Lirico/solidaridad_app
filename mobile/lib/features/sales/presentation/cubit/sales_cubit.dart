@@ -141,7 +141,9 @@ class SalesCubit extends Cubit<SalesState> {
         ? '•••• ${currentCardNumber.replaceAll(' ', '').substring(currentCardNumber.replaceAll(' ', '').length - 4)}'
         : '•••• 4321';
 
-    final PaymentResult paymentResult = response.connectionError
+    final PaymentResult paymentResult = response.isUnknown
+        ? PaymentResult.unknown
+        : response.connectionError
         ? PaymentResult.connectionError
         : response.isApproved
         ? PaymentResult.approved
@@ -172,7 +174,9 @@ class SalesCubit extends Cubit<SalesState> {
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
         result: paymentResult,
-        operationNumber: paymentResult == PaymentResult.approved
+        operationNumber:
+            paymentResult == PaymentResult.approved ||
+                paymentResult == PaymentResult.unknown
             ? response.operationNumber
             : null,
         errorMessage: paymentResult != PaymentResult.approved

@@ -326,8 +326,8 @@ def test_invalid_cvv() -> None:
         )
 
 
-def test_band_magnetic_022_allows_empty_cvv() -> None:
-    """La banda magnética (entry_mode 022) no contiene CVV: se permite vacío."""
+def test_allows_empty_cvv_for_card_capture() -> None:
+    """El CVV es opcional porque no se usa en el flujo legacy."""
     use_case, transactions, _, gateway = _build()
     result = use_case.execute(
         user_id=1,
@@ -337,118 +337,16 @@ def test_band_magnetic_022_allows_empty_cvv() -> None:
         amount="2",
         card_number="6063007014007403",
         cvv="",
-        entry_mode="022",
-        track2="6063007014007403=2912",
+        expiration_date="2912",
     )
     assert result.http_status == CreateTransactionHttpStatus.CREATED
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
     auth_req = gateway.authorize.call_args.args[0]
-    assert auth_req.entry_mode == "022"
-    assert auth_req.track2 == "6063007014007403=2912"
+    assert auth_req.card_number == "6063007014007403"
+    assert auth_req.expiration_date == "2912"
     transactions.create_pending.assert_called_once()
     transactions.update_result.assert_called_once()
-
-
-def test_manual_012_still_validates_cvv() -> None:
-    """El ingreso manual (entry_mode 012) sigue exigiendo CVV válido."""
-    from domain.exceptions import InvalidCvv
-
-    use_case, *_ = _build()
-    with pytest.raises(InvalidCvv):
-        use_case.execute(
-            user_id=1,
-            installation_id="inst-1",
-            idempotency_key="k1",
-            product="GARRAFA_10",
-            amount="2",
-            card_number="4111111111111111",
-            cvv="",
-            entry_mode="012",
-        )
-
-
-def test_band_022_with_expiration_without_track2_approved() -> None:
-    """Banda (022) con vencimiento y sin track2: es el flujo del terminal."""
-    use_case, transactions, _, gateway = _build()
-    result = use_case.execute(
-        user_id=1,
-        installation_id="inst-1",
-        idempotency_key="k1",
-        product="GARRAFA_10",
-        amount="1.50",
-        card_number="6063007014007403",
-        cvv="",
-        expiration_date="1228",
-        entry_mode="022",
-    )
-    assert result.http_status == CreateTransactionHttpStatus.CREATED
-    assert result.transaction.status == TransactionStatus.APPROVED
-    gateway.authorize.assert_called_once()
-    auth_req = gateway.authorize.call_args.args[0]
-    assert auth_req.entry_mode == "022"
-    assert auth_req.track2 is None
-    assert auth_req.expiration_date == "1228"
-    transactions.create_pending.assert_called_once()
-    transactions.update_result.assert_called_once()
-
-
-def test_band_022_without_track2_rejected() -> None:
-    """Banda (022) sin track2 ni vencimiento: inconsistente, se rechaza."""
-    from domain.exceptions import InvalidEntryMode
-
-    use_case, *_ = _build()
-    with pytest.raises(
-        InvalidEntryMode,
-        match="Faltan datos de la tarjeta",
-    ):
-        use_case.execute(
-            user_id=1,
-            installation_id="inst-1",
-            idempotency_key="k1",
-            product="GARRAFA_10",
-            amount="2",
-            card_number="6063007014007403",
-            cvv="",
-            entry_mode="022",
-        )
-
-
-def test_manual_012_with_track2_rejected() -> None:
-    """Manual (012) con track2: inconsistente, se rechaza."""
-    from domain.exceptions import InvalidEntryMode
-
-    use_case, *_ = _build()
-    with pytest.raises(InvalidEntryMode):
-        use_case.execute(
-            user_id=1,
-            installation_id="inst-1",
-            idempotency_key="k1",
-            product="GARRAFA_10",
-            amount="2",
-            card_number="4111111111111111",
-            cvv="123",
-            entry_mode="012",
-            track2="4111111111111111=2912",
-        )
-
-
-def test_unsupported_entry_mode_rejected() -> None:
-    """entry_mode distinto de 012/022 se rechaza."""
-    from domain.exceptions import InvalidEntryMode
-
-    use_case, *_ = _build()
-    with pytest.raises(InvalidEntryMode):
-        use_case.execute(
-            user_id=1,
-            installation_id="inst-1",
-            idempotency_key="k1",
-            product="GARRAFA_10",
-            amount="2",
-            card_number="4111111111111111",
-            cvv="123",
-            entry_mode="999",
-        )
 
 
 

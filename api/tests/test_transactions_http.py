@@ -163,8 +163,8 @@ def test_create_transaction_validation_error() -> None:
     assert response.status_code == 400
 
 
-def test_create_transaction_band_magnetic_empty_cvv() -> None:
-    """La banda magnética (entry_mode 022) no envía CVV: el schema lo acepta."""
+def test_create_transaction_accepts_empty_cvv() -> None:
+    """El schema conserva CVV solo como campo opcional de compatibilidad."""
     use_case = MagicMock(spec=CreateTransaction)
     use_case.execute.return_value = CreateTransactionResult(
         transaction=_tx(),
@@ -176,8 +176,6 @@ def test_create_transaction_band_magnetic_empty_cvv() -> None:
             "/v1/transactions",
             json=_payload(
                 cvv="",
-                entry_mode="022",
-                track2="6063007014007403=2912",
             ),
             headers={"Idempotency-Key": "k1"},
         )
@@ -188,8 +186,6 @@ def test_create_transaction_band_magnetic_empty_cvv() -> None:
     use_case.execute.assert_called_once()
     kwargs = use_case.execute.call_args.kwargs
     assert kwargs["cvv"] == ""
-    assert kwargs["entry_mode"] == "022"
-    assert kwargs["track2"] == "6063007014007403=2912"
 
 
 

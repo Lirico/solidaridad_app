@@ -20,7 +20,6 @@ from application.payments.response_messages import (
 )
 from domain.exceptions import (
     InvalidCardNumber,
-    InvalidEntryMode,
     MissingTerminalId,
 )
 from domain.product import list_products, processor_product_code
@@ -63,12 +62,8 @@ class CheckBalance:
         installation_id: str,
         card_number: str,
         expiration_date: str | None = None,
-        entry_mode: str = "012",
-        track2: str | None = None,
     ) -> CheckBalanceResult:
         pan = _validate_pan(card_number)
-        if entry_mode not in ("012", "022"):
-            raise InvalidEntryMode()
         exp = expiration_date.strip() if expiration_date else None
         if exp == "":
             exp = None
@@ -94,8 +89,6 @@ class CheckBalance:
                     terminal_id=terminal_id[:8].ljust(8),
                     stan=stan,
                     expiration_date=exp,
-                    entry_mode=entry_mode,
-                    track2=track2,
                 )
             )
 

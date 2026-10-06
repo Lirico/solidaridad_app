@@ -39,12 +39,9 @@ class HttpPaymentGateway:
             "terminal_id": request.terminal_id,
             "stan": request.stan,
             "ticket_number": request.ticket_number,
-            "entry_mode": request.entry_mode,
         }
         if request.expiration_date is not None:
             payload["expiration_date"] = request.expiration_date
-        if request.track2 is not None:
-            payload["track2"] = request.track2
         return self._post("/v1/authorize", payload)
 
     def void(self, request: VoidRequest) -> AuthorizeResult:
@@ -67,12 +64,9 @@ class HttpPaymentGateway:
             "card_number": request.card_number,
             "terminal_id": request.terminal_id,
             "stan": request.stan,
-            "entry_mode": request.entry_mode,
         }
         if request.expiration_date is not None:
             payload["expiration_date"] = request.expiration_date
-        if request.track2 is not None:
-            payload["track2"] = request.track2
         return self._post_balance("/v1/balance", payload)
 
     def _post(self, path: str, payload: dict[str, object]) -> AuthorizeResult:

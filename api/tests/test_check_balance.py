@@ -4,7 +4,7 @@ import pytest
 
 from application.payments.check_balance import CheckBalance
 from application.payments.ports import BalanceResult, GatewayOutcome
-from domain.exceptions import InvalidCardNumber, InvalidEntryMode, MissingTerminalId
+from domain.exceptions import InvalidCardNumber, MissingTerminalId
 from persistence.repositories.installation_repository import InstallationRepository
 
 
@@ -94,16 +94,6 @@ def test_check_balance_rejects_invalid_pan() -> None:
     uc = CheckBalance(_installation_repo(), _gateway({}))
     with pytest.raises(InvalidCardNumber):
         uc.execute(installation_id="05000001", card_number="606300101400740X")
-
-
-def test_check_balance_rejects_invalid_entry_mode() -> None:
-    uc = CheckBalance(_installation_repo(), _gateway({}))
-    with pytest.raises(InvalidEntryMode):
-        uc.execute(
-            installation_id="05000001",
-            card_number="4111111111111111",
-            entry_mode="999",
-        )
 
 
 def test_check_balance_rejects_missing_terminal() -> None:

@@ -17,7 +17,6 @@ def test_build_balance_request_sets_fields() -> None:
         terminal_id="TERM0001",
         stan="000001",
         expiration_date="1228",
-        entry_mode="012",
     )
     iso = build_balance_request(
         cmd,
@@ -44,26 +43,6 @@ def test_build_balance_request_sets_fields() -> None:
     parsed = unpack_iso(pack_iso(iso))
     assert parsed.mtype == "0100"
     assert parsed.currcode_49 == "993"
-
-
-def test_build_balance_request_with_track2() -> None:
-    settings = Settings()
-    cmd = BalanceCommand(
-        product_code="993",
-        card_number="6063007014007403",
-        terminal_id="TERM0001",
-        stan="000001",
-        entry_mode="022",
-        track2=";6063007014007403=1228?101",
-    )
-    iso = build_balance_request(
-        cmd,
-        settings,
-        now=datetime(2026, 7, 16, 12, 15, 30),
-    )
-    assert iso.track2_35 == "6063007014007403=1228"
-    assert iso.posentrymode_22 == "0022"
-    assert bitmap_get(iso.bitmap, 35)
 
 
 def test_map_balance_response_approved() -> None:

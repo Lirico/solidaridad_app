@@ -47,7 +47,11 @@ Headers:
 Notas:
 
 - `amount` es cantidad decimal (string); se convierte a unidades menores (exponente 2).
-- `cvv` se valida pero no se reenvía al gateway en v1.
+- `expiration_date` usa el formato `YYMM`.
+- `cvv` es opcional por compatibilidad con clientes anteriores; si viene con
+  contenido se valida su formato, pero no se reenvía al gateway.
+- La captura por banda normaliza PAN y vencimiento antes del request. No existen
+  campos `entry_mode` ni Track 2 en este contrato.
 - El `installation_id` del JWT identifica la terminal configurada; la API lo
   resuelve en `installations` y envía ese valor como `terminal_id` al procesador.
 

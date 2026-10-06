@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
 from application.payments.check_balance import CheckBalance
-from domain.exceptions import InvalidCardNumber, InvalidEntryMode, MissingTerminalId
+from domain.exceptions import InvalidCardNumber, MissingTerminalId
 from domain.money import AMOUNT_EXPONENT
 from presentation.dependencies import (
     CurrentUser,
@@ -46,10 +46,8 @@ def check_balance(
             installation_id=current_user.installation_id,
             card_number=body.card_number,
             expiration_date=body.expiration_date,
-            entry_mode=body.entry_mode,
-            track2=body.track2,
         )
-    except (InvalidCardNumber, InvalidEntryMode, MissingTerminalId) as exc:
+    except (InvalidCardNumber, MissingTerminalId) as exc:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"message": str(exc)},

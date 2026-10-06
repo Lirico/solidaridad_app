@@ -31,7 +31,5 @@ class CheckBalance:
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
             stan=stan.zfill(6),
             expiration_date=command.expiration_date,
-            entry_mode=command.entry_mode,
-            track2=command.track2,
         )
         return self._processor.balance(normalized)

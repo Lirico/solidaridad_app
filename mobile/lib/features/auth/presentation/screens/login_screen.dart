@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/terminal/terminal_id_store.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../widgets/login_form_fields.dart';
@@ -21,6 +22,37 @@ class _LoginScreenState extends State<LoginScreen> {
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  String? _installationId;
+  bool _terminalReady = false;
+  bool _promptedMissing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInstallationId();
+  }
+
+  Future<void> _loadInstallationId({bool promptIfMissing = true}) async {
+    final id = await context.read<TerminalIdStore>().read();
+    if (!mounted) return;
+    setState(() {
+      _installationId = id;
+      _terminalReady = true;
+    });
+    if (id == null && promptIfMissing && !_promptedMissing) {
+      _promptedMissing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openTerminalConfig();
+      });
+    }
+  }
+
+  Future<void> _openTerminalConfig() async {
+    await Navigator.pushNamed(context, AppRoutes.terminalId);
+    if (!mounted) return;
+    await _loadInstallationId(promptIfMissing: false);
+  }
+
   @override
   void dispose() {
     _userController.dispose();
@@ -29,6 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() {
+    if (_installationId == null) return;
     if (!_formKey.currentState!.validate()) return;
 
     context.read<AuthCubit>().login(
@@ -52,6 +85,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: AuthCard(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.md,
+                      AppSpacing.xl,
+                      AppSpacing.xl,
+                    ),
                     child: BlocConsumer<AuthCubit, AuthState>(
                       listener: (context, state) {
                         if (state is AuthSuccess) {
@@ -103,13 +142,47 @@ class _LoginScreenState extends State<LoginScreen> {
                                 userInputController: _userController,
                                 passwordInputController: _passwordController,
                               ),
-                              SizedBox(height: AppSpacing.xxl),
+                              SizedBox(height: AppSpacing.sm),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _installationId == null
+                                          ? 'Terminal sin configurar'
+                                          : 'Terminal $_installationId',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.formLabel.copyWith(
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.padded,
+                                    ),
+                                    onPressed: _terminalReady
+                                        ? _openTerminalConfig
+                                        : null,
+                                    child: Text(
+                                      _installationId == null
+                                          ? 'CONFIGURAR'
+                                          : 'CAMBIAR',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: AppSpacing.sm),
 
                               SizedBox(
                                 width: double.infinity,
                                 height: 60,
                                 child: ElevatedButton(
-                                  onPressed: state is AuthLoading
+                                  onPressed:
+                                      state is AuthLoading ||
+                                          _installationId == null
                                       ? null
                                       : _handleLogin,
                                   child: state is AuthLoading

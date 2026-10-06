@@ -61,6 +61,25 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > Tests en `mobile/test/msr_card_data_test.dart`. Ver G-P0-06.
 
 
+> ✅ **Último cambio (2026-09-30, login en el V660P):** el código de terminal y
+> **CAMBIAR** quedan en la misma fila del login. El padding superior del cajón
+> baja de 24 a 16 para que **INGRESAR** entre en el alto útil del equipo
+> (672 dp, sin la barra de navegación). Ver G-P0-08.
+
+> ✅ **Último cambio (2026-09-28, identidad de terminal en el equipo):** el
+> `installation_id` ya no se fija al compilar ni cae en `05000001`. La app lo
+> guarda en el dispositivo (`SharedPreferencesTerminalIdStore`, clave
+> `installation_id`) y lo pide una vez si no hay valor. El login muestra el
+> código en uso y permite cambiarlo; el cambio vale en el próximo inicio de
+> sesión. Login y registro no llaman al backend sin un código de 1 a 8
+> caracteres. `--dart-define=INSTALLATION_ID` solo precarga el campo de
+> laboratorio y no se envía hasta guardarlo. Evidencia:
+> `mobile/lib/core/terminal/terminal_id_store.dart`,
+> `mobile/lib/features/auth/presentation/screens/terminal_id_screen.dart`,
+> `mobile/test/terminal_id_store_test.dart` y
+> `mobile/test/auth_repository_terminal_id_test.dart`. Ver G-P0-08.
+
+
 > **Último cambio (2026-09-25, VE-09):** la cantidad se valida según la unidad
 > del catálogo. Garrafas y tubos exigen un entero (la app lo bloquea en el
 > formulario y la API responde «La cantidad debe ser un número entero» antes
@@ -535,7 +554,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Validación de PAN compatible con tarjetas MOD-TDF | API y gateway validan únicamente formato numérico y longitud (13–19); no aplican Luhn. Cubierto con el PAN del POC `6063001014007403`. |
 | Procesador valida terminal vigente (DE41) | `payment_processor` / authkig |
 | UI mobile de login, venta, review, status, historial (mock) | `mobile/` — login y nueva venta con tamaños de inputs, selector y botón ajustados a operación POS Verifone; contrato/backend incompletos (ver P0) |
-| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados; falta wiring desde device (G-P0-08) |
+| `installation_id` unificado a terminal id (8 chars) en API | Modelo/seed alineados. La app lo lee del equipo (G-P0-08). |
 | Base URL / ambientes en mobile | `ApiConfig` con `--dart-define` en `mobile/lib/core/config/api_config.dart` |
 | RegisterScreen conectado al backend | `mobile/lib/features/auth/presentation/screens/register_screen.dart` usa `BlocConsumer` + `AuthCubit.register()` |
 | Status screen con 3 estados (aprobado/rechazado/error conexión POSNET) | `PaymentResult` enum + `connectionError` flag en `SaleResponse`; naranja para pérdida de conectividad POSNET |

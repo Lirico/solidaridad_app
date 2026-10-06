@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
+import 'core/terminal/terminal_id_store.dart';
 import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
 import 'features/balance/data/balance_repository.dart';
@@ -13,6 +14,7 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
 
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/auth/presentation/screens/terminal_id_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
 import 'features/auth/presentation/screens/change_password_screen.dart';
 import 'features/sales/presentation/screens/sale_form_screen.dart';
@@ -37,29 +39,33 @@ import 'core/widgets/loading_screen.dart';
 import 'core/widgets/splash_screen.dart';
 
 void main() {
+  final terminalIdStore = SharedPreferencesTerminalIdStore();
   final salesRepository = SalesRepository();
   final balanceRepository = BalanceRepository();
   final batchCloseRepository = BatchCloseRepository();
-  final authRepository = AuthRepository();
+  final authRepository = AuthRepository(terminalIdStore: terminalIdStore);
 
   runApp(
-    MultiBlocProvider(
-      providers: [
-        BlocProvider<SalesCubit>(
-          create: (context) => SalesCubit(salesRepository: salesRepository),
-        ),
-        BlocProvider<BalanceCubit>(
-          create: (context) => BalanceCubit(repository: balanceRepository),
-        ),
-        BlocProvider<BatchCloseCubit>(
-          create: (context) =>
-              BatchCloseCubit(repository: batchCloseRepository),
-        ),
-        BlocProvider<AuthCubit>(
-          create: (context) => AuthCubit(authRepository: authRepository),
-        ),
-      ],
-      child: const MyApp(),
+    RepositoryProvider<TerminalIdStore>(
+      create: (_) => terminalIdStore,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<SalesCubit>(
+            create: (context) => SalesCubit(salesRepository: salesRepository),
+          ),
+          BlocProvider<BalanceCubit>(
+            create: (context) => BalanceCubit(repository: balanceRepository),
+          ),
+          BlocProvider<BatchCloseCubit>(
+            create: (context) =>
+                BatchCloseCubit(repository: batchCloseRepository),
+          ),
+          BlocProvider<AuthCubit>(
+            create: (context) => AuthCubit(authRepository: authRepository),
+          ),
+        ],
+        child: const MyApp(),
+      ),
     ),
   );
 }
@@ -76,6 +82,7 @@ class MyApp extends StatelessWidget {
       initialRoute: AppRoutes.splash,
       routes: {
         AppRoutes.login: (context) => const LoginScreen(),
+        AppRoutes.terminalId: (context) => const TerminalIdScreen(),
         AppRoutes.register: (context) => const RegisterScreen(),
         AppRoutes.changePassword: (context) => const ChangePasswordScreen(),
         AppRoutes.saleForm: (context) => const SaleFormScreen(),

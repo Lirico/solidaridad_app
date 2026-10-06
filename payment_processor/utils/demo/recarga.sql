@@ -8,7 +8,7 @@
 --   make recarga
 -- ============================================================
 
--- Extender vigencia de las tarjetas de demo (DE14 = 1228).
+-- Extender vigencia de las tarjetas de demo (DE14 = 2812, formato YYMM).
 UPDATE sgas_usuario
    SET vigencia_hasta = '2028-12-30'
  WHERE nro_tarjeta IN ('6063007014007401', '6063007014007403');
@@ -31,5 +31,4 @@ VALUES
     ('18846764', '6063007014007403', CURDATE(), 2, -100000.00, 100000.00, '995', -1, NOW()),
     ('18846764', '6063007014007403', CURDATE(), 2, -100000.00, 100000.00, '996', -1, NOW()),
     ('18846764', '6063007014007403', CURDATE(), 2, -100000.00, 100000.00, '997', -1, NOW());
-
 

@@ -53,6 +53,43 @@ void main() {
     expect(find.text('No hay datos de la operación disponibles'), findsNothing);
     expect(find.text('¡Transacción Aprobada!'), findsNothing);
   });
+
+  testWidgets('un cobro en curso avisa sin confirmar y no ofrece reintentar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(720, 1600);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    await _openStatus(
+      tester,
+      arguments: OperationModel(
+        id: 'OP-9',
+        productCode: 'GARRAFA_10',
+        productLabel: 'Garrafa 10 kg',
+        amount: 4,
+        cardNumber: '**** **** **** 7403',
+        result: PaymentResult.unknown,
+        date: DateTime(2026, 10, 6),
+        userMessage: 'Operación en curso, reintente en unos segundos',
+      ),
+    );
+
+    expect(find.text('No pudimos confirmar el cobro'), findsOneWidget);
+    expect(
+      find.text('Consulte la operación antes de volver a cobrar.'),
+      findsOneWidget,
+    );
+    expect(find.text('VER OPERACIÓN'), findsOneWidget);
+    expect(find.text('REINTENTAR'), findsNothing);
+    expect(find.text('Transacción Rechazada'), findsNothing);
+    expect(
+      find.text('Operación en curso, reintente en unos segundos'),
+      findsNothing,
+    );
+    expect(find.text('Sin confirmar'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _openStatus(WidgetTester tester, {Object? arguments}) async {

@@ -259,10 +259,12 @@ class SalesRepository {
       if (response.statusCode == 200 ||
           response.statusCode == 201 ||
           response.statusCode == 202) {
-        final bool approved = responseData['status'] == 'APPROVED';
+        final String status = (responseData['status'] as String? ?? '')
+            .toUpperCase();
 
         return SaleResponse(
-          isApproved: approved,
+          isApproved: status == 'APPROVED',
+          isUnknown: status == 'PENDING',
           operationNumber: responseData['transaction_number'] ?? 'OP-UNKNOWN',
           message: responseData['user_message'] ?? 'Operación procesada',
           errorCode: '00',

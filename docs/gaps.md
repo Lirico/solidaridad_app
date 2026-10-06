@@ -6,6 +6,12 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-06
 
+> ✅ **Último cambio (2026-10-06, VE-16):** un reintento que recibe HTTP 202
+> con `status` `PENDING` ya no se muestra como «Transacción Rechazada». La
+> app lo trata como cobro sin confirmar («No pudimos confirmar el cobro»,
+> VER OPERACIÓN, sin REINTENTAR) y conserva la `Idempotency-Key`. Un replay
+> 201 con estado final sigue mostrando ese estado. Ver G-P1-02.
+
 > ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
 > lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
 > (`YYMM`) en Flutter. API y gateway ya no definen ni propagan `entry_mode` ni
@@ -127,7 +133,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > en el reintento por error de red. `CONFIRMAR COBRO` queda deshabilitado
 > mientras el estado es `SalesProcessing`, y un segundo `sendIsoMessage` no
 > dispara otro `POST`. El servidor ya devolvía la venta existente ante la misma
-> clave. Sigue pendiente el manejo de HTTP 202. Ver G-P1-02.
+> clave. El HTTP 202 `PENDING` quedó cubierto el 2026-10-06 (VE-16). Ver G-P1-02.
 
 > ✅ **Último cambio (2026-09-28, VE-11):** `SaleStatusScreen` ya no asume
 > `PaymentResult.approved` cuando la ruta no trae un `OperationModel`. Muestra
@@ -481,7 +487,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. El endpoint `POST /v1/auth/register` se mantiene para que la empresa pueda registrar usuarios vía Postman. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. **Pendiente:** manejar HTTP 202 (ACCEPTED). Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. **2026-10-06 (VE-16):** un HTTP 202 con `PENDING` se muestra como cobro sin confirmar y no cambia la clave; un 201 con estado final muestra ese estado. Ver TC-069 en `docs/test_cases_index.md`. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |

@@ -16,7 +16,6 @@ void main() {
   test('toma el vencimiento aunque el service code siga pegado', () {
     final data = read(track2: ';6063007014007403=3012101?');
     expect(data.expiryYyMm, '3012');
-    expect(data.expiryMmYy, '1230');
   });
 
   test(
@@ -30,13 +29,11 @@ void main() {
   test('sin separador, toma los 4 dígitos que siguen al PAN', () {
     final data = read(track2: '60630070140074033012101?');
     expect(data.expiryYyMm, '3012');
-    expect(data.expiryMmYy, '1230');
   });
 
   test('si el = no deja 4 dígitos, toma los 4 que siguen al PAN', () {
     final data = read(track2: '60630070140074033012101=');
     expect(data.expiryYyMm, '3012');
-    expect(data.expiryMmYy, '1230');
   });
 
   test('sin separador y sin 4 dígitos después del PAN, queda vacío', () {
@@ -52,6 +49,5 @@ void main() {
   test('sin vencimiento en el tag ni en la pista, queda vacío', () {
     final data = read(track2: ';6063007014007403=?');
     expect(data.expiryYyMm, isEmpty);
-    expect(data.expiryMmYy, isEmpty);
   });
 }

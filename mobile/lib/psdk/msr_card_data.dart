@@ -28,12 +28,6 @@ class MsrCardData {
   /// Service code de la banda (ej. "101").
   final String serviceCode;
 
-  /// Vencimiento en formato MMYY (ej. "3012" → "1230"), listo para la API.
-  String get expiryMmYy {
-    if (expiryYyMm.length != 4) return expiryYyMm;
-    return expiryYyMm.substring(2) + expiryYyMm.substring(0, 2);
-  }
-
   /// Parsea el payload crudo del bridge y devuelve un [MsrCardData].
   ///
   /// El bridge nativo setea `ok` solo cuando `code == OK`, pero en esta

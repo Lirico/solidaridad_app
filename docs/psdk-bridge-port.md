@@ -158,8 +158,8 @@ pero todavía nadie le dice que lo haga. El plan completo es de **4 ramas**:
 |------|----------|:------:|
 | **Rama 1** | Portar el bridge PSDK | ✅ Hecha |
 | **Rama 2** | Conectar `WaitingForCardScreen` al PSDK + navegación "Tarjeta" | ⏳ Pendiente |
-| **Rama 3** | Gateway con `entry_mode` dinámico + API con `entry_mode`/`track2` | ⏳ Pendiente |
-| **Rama 4** | Mobile `registerSale` con `entry_mode` + actualizar `docs/gaps.md` | ⏳ Pendiente |
+| **Rama 3** | Contrato de captura PAN + vencimiento `YYMM` y layout ISO legacy fijo | ✅ Hecha (2026-10-05) |
+| **Rama 4** | Mobile normaliza lectura por banda y carga manual al mismo contrato | ✅ Hecha (2026-10-05) |
 
 ---
 

@@ -6,6 +6,16 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-05
 
+> ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
+> lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
+> (`YYMM`) en Flutter. API y gateway ya no definen ni propagan `entry_mode` ni
+> Track 2; el gateway usa el ISO histórico (`DE22=0012`, DE2 y DE14) para
+> ventas y saldo. Se revirtieron las adaptaciones en `auth_mycli.c` que hacían
+> que el procesador leyera PAN/vencimiento de campos distintos para banda, así
+> como la relajación de la regla de última recarga. La política y bitácora de
+> excepciones del C están en `AGENTS.md` y
+> `payment_processor/LEGACY_CHANGELOG.md`. Ver G-P0-15 y G-P1-06.
+
 > ✅ **Último cambio (2026-09-28, VE-12):** cada `readCard` de
 > `PsdkCardReader` libera el PSDK (`cancelReadMsr` → `tearDown`) antes de
 > devolver el resultado, y `cancel()` es idempotente por sesión. El `dispose`
@@ -50,17 +60,9 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > decimal se rechaza en el formulario. El mapa de DE39 de la API y del gateway
 > incluye el código `13` (monto inválido) y los códigos `12`, `17`, `19`, `25`,
 > `30`, `89` y `95`. Ver G-P2-07.
-Última revisión: 2026-09-23 (VE-01 venta por banda sin track2)
-
-> ✅ **Último cambio (2026-09-23, VE-01):** la venta por banda vuelve a llegar al
-> procesador. `CreateTransaction._validate_entry_mode` acepta `entry_mode`
-> `"022"` con vencimiento y **sin** track2 (PAN + DE14, que es lo que envía el
-> terminal). El 400 `InvalidEntryMode` queda solo cuando faltan ambos, con el
-> mensaje "Faltan datos de la tarjeta: la banda no incluyó vencimiento". La app
-> muestra ese `message` en el error de `registerSale` cuando no hay
-> `user_message`. No se reenvía el track2 (el PAN de la banda de este terminal
-> no coincide con el registrado; ver G-P0-15). Tests en
-> `test_create_transaction.py`. Ver G-P1-06.
+> ⚠️ **Historial sustituido (2026-10-05):** la solución provisional basada en
+> `entry_mode` quedó retirada. El contrato vigente es PAN + vencimiento `YYMM`,
+> sin Track 2, y se describe al inicio de este documento y en G-P1-06.
 Última revisión: 2026-09-23 (Cierre de Lote sin cierre local)
 
 > ✅ **Último cambio (2026-09-23, Cierre de Lote sin cierre local):** la pantalla
@@ -136,8 +138,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > `getStatus` + stream), `readCard()` (initialize → ready → `readMsr` → parseo,
 > con resultado tipado `CardReadSuccess`/`CardReadFailure`) y `cancel()`
 > (`cancelReadMsr` → `tearDown`, en ese orden). Se preservan los fixes previos:
-> éxito por `hasClearData`, guardas `mounted`/`_disposed`, `entry_mode` `022` sin
-> track2 y el mock `USE_MSR_MOCK`. `ReceiptPrinter` también consume
+> éxito por `hasClearData`, guardas `mounted`/`_disposed`, normalización de PAN
+> + vencimiento y el mock `USE_MSR_MOCK`. `ReceiptPrinter` también consume
 > `ensureReady(initializeIfNeeded: true)`, eliminando la tercera copia de la
 > espera de `sdiReady`. `MsrCardData` se movió de
 > `mobile/lib/features/sales/domain/` a `mobile/lib/psdk/msr_card_data.dart`.
@@ -271,7 +273,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
 > `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
 > creó `mobile/lib/features/sales/domain/msr_card_data.dart` (`MsrCardData` con
-> `fromBridge`, `expiryYyMm`/`expiryMmYy`) y `SalesCubit.showReviewFromMsr()`;
+> `fromBridge`, `expiryYyMm`) y `SalesCubit.showReviewFromMsr()`;
 > la pantalla ya no parsea `tags`/`msr` ni convierte fechas. (2) **Reintento:**
 > botón "REINTENTAR" en `WaitingForCardContent` visible tras error/timeout que
 > vuelve a llamar a `_startReading()`. (3) **Cancelación de lectura:** se agregó
@@ -456,7 +458,7 @@ Verifone (banda + térmica).
 | G-P0-12 | Endpoint de detalle de transacción no implementado | open | `GET /v1/transactions/{id}` no existe. Solo hay listado (`GET /v1/transactions`) y creación (`POST /v1/transactions`). La app mobile podría necesitarlo para mostrar detalle desde el historial. Ver hallazgo #9 en `docs/test_cases_index.md`. |
 | G-P0-13 | Tests automatizados del gateway fallan por código 96 | done | **Fix aplicado (2026-08-04):** los tests `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock` ahora fuerzan el `MockIsoProcessor` vía `dependency_overrides` en `payment-gateway/tests/test_authorize_http.py`, haciéndolos deterministas independientemente del `.env` local (`ISO_TRANSPORT=tcp`). `make check` pasa: lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓. Ver hallazgo #20 en `docs/test_cases_index.md`. |
 | G-P0-14 | Procesador no setea DE39 (código de respuesta) en varios escenarios | open | El procesador C solo setea `respcode_39` en algunos casos (ej: código 05 para TRANS_DENY). En otros escenarios (monto $100, terminal inválida, tarjeta sin saldo, tarjeta vencida) el DE39 queda vacío. El gateway interpreta DE39 vacío como código 96 (`response_mapper.py` línea 22: `code = (iso.respcode_39 or "").strip() or "96"`). Esto causa que el gateway devuelva `FAILED` en lugar de `DECLINED` con el código correcto. Requiere fix en `auth_thread.c` para asegurar que DE39 siempre tenga un código de respuesta válido. |
-| G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | **2026-08-13 (corrección de diagnóstico):** el rechazo por banda magnética en V660p NO era "fondos insuficientes" (51) sino código **14 "Tarjeta inválida"** (`TIT_DES_SUP`). El log `authkig.log` mostraba `TRACK II DATA: 4606300701400740...` (banda) mientras la pantalla leía el PAN correcto `6063007014007403`: el track2 (DE35) de esta terminal trae un PAN distinto al registrado y `getCardNumber()` copiaba los primeros 16 chars del track2 para `entry_mode='022'`, por lo que `valida_usuario_existe()` no encontraba la tarjeta → 14. **Fix en 3 capas:** (1) `getCardNumber()` prefiere DE2 (PAN) cuando viene presente y usa track2 solo si no hay DE2 (`auth_mycli.c`); (2) `WaitingForCardScreen` envía PAN + vencimiento con `entry_mode='022'` y ya no manda track2; (3) **gateway `build_purchase_request` ahora SIEMPRE envía DE2 (PAN) + DE14 y agrega DE35 (track2) solo si viene, en lugar de enviar DE35 EN LUGAR de DE2** (`payment-gateway/infrastructure/iso/message_builder.py`). El punto (3) es el que faltaba: con el APK viejo (que sí manda track2) el gateway descartaba DE2 y el autorizador caía al track2 → 14. Verificado con curl al gateway enviando `track2` (simula APK viejo): `{"status":"APPROVED","response_code":"00",...}` y log con `PRIMARY ACCOUNT NUMBER: 6063007014007403` + `TRACK II DATA: 4606300701400740...` + `RESPONSE CODE: 00` + `FIELD 63: MONTO A PAGAR BENEFICIARIO 400.00` (llegó a `venta_cupon()`). `make check` OK en gateway (55 tests, cobertura 98.96%). Ver hallazgo #21 en `docs/test_cases_index.md`. |
+| G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | partial | **2026-10-05:** se retiró la adaptación del procesador por la discrepancia entre el PAN del tag Verifone y el Track 2. La app usa el PAN/vencimiento leídos para completar el contrato existente; API/gateway emiten el layout manual histórico (`DE22=0012`, DE2/DE14, sin DE35), de modo que `authkig` no cambia. Pendiente: verificar una venta y una consulta de saldo en V660P contra el procesador restaurado. |
 
 | G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases_index.md`. |
 
@@ -477,7 +479,7 @@ Verifone (banda + térmica).
 | G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
 | G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
-| G-P1-06 | Entry mode ISO acorde al modo de captura | done | **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `WaitingForCardScreen` pasa `entry_mode: '022'` + `track2`; `SaleManualCardScreen` pasa `entry_mode: '012'`. `flutter analyze` OK. **Rama 5 (2026-11-08):** la banda no contiene CVV; la API ahora acepta `cvv` vacío para `entry_mode='022'` (schema `cvv` opcional + validación condicional en `create_transaction.py`). El gateway/procesador no usan CVV. `make check` OK (118 tests, cobertura 95%). |
+| G-P1-06 | Captura de tarjeta y layout ISO | done | **2026-10-05:** se descartó el diseño de `entry_mode`/Track 2 dinámicos porque adaptaba el C legacy al cliente. La banda y el ingreso manual comparten el contrato API de PAN + vencimiento `YYMM`; el CVV queda opcional por compatibilidad y no se reenvía. El gateway siempre arma el formato histórico (`DE22=0012`, DE2/DE14, sin DE35) y el procesador queda sin adaptaciones de captura. |
 
 
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
@@ -492,7 +494,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P2-01 | UX: manual solo como fallback | partial | La opción **Tarjeta** ya navega a `WaitingForCardScreen` (UI de espera). Sigue sin lectura real de banda/chip/NFC (G-P0-06). **Ingreso manual** sigue siendo el único camino que completa el cobro. QR muestra aviso “disponible pronto” (G-P2-03). |
-| G-P2-02 | Track2 en authorize cuando hay swipe | open | Packer puede soportar DE35 en tests; el builder de purchase no envía track desde swipe. |
+| G-P2-02 | Track2 en authorize cuando hay swipe | invalidated | **2026-10-05:** se decidió no transportar Track 2 fuera de la capa de captura. El procesador recibe el layout manual histórico con PAN y vencimiento; ver G-P1-06. |
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |

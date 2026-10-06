@@ -31,10 +31,12 @@ class _BalanceManualCardScreenState extends State<BalanceManualCardScreen> {
 
   void _onContinue() {
     if (_formKey.currentState!.validate()) {
+      final expiry = _expiryController.text.replaceAll('/', '');
       context.read<BalanceCubit>().setCardData(
         cardNumber: _cardNumberController.text,
-        expirationDate: _expiryController.text.replaceAll('/', ''),
-        entryMode: '012',
+        expirationDate: expiry.length == 4
+            ? '${expiry.substring(2)}${expiry.substring(0, 2)}'
+            : expiry,
       );
       Navigator.pushNamed(context, AppRoutes.balanceReview);
     }

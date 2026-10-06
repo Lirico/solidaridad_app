@@ -33,8 +33,8 @@ entregar solo el flujo de celular del MVP:
   entregable principal de comprobante es el **ticket impreso**.
 
 El backend (API → gateway ISO → procesador) sigue siendo la columna vertebral;
-el cambio de producto impacta sobre todo la **capa de app / nativa** y el
-**modo de entrada** hacia el mensaje ISO.
+el cambio de producto impacta sobre todo la **capa de app / nativa**. La
+lectura de banda completa PAN y vencimiento; no cambia el contrato ISO legado.
 
 ---
 
@@ -159,8 +159,8 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - Timeouts y errores de comunicación.
 - Respuesta normalizada hacia la API.
 - Registro técnico request/response para soporte, sin PAN/CVV/track completos.
-- Entry mode coherente con la captura real (manual vs banda / track cuando
-  aplique).
+- Para ventas y consultas, usa el layout histórico del procesador: `DE22=0012`,
+  PAN en `DE2` y vencimiento en `DE14`. No recibe ni reenvía Track 2.
 
 ### 2.4 Procesador existente (on-premises)
 
@@ -194,6 +194,7 @@ App Flutter (Verifone)
 | Alta de terminal | La valida el procesador en la autorización. |
 | Captura principal | Lectura de banda en Verifone. |
 | Captura fallback | Ingreso manual. |
+| Contrato de captura | Ambos flujos envían PAN y vencimiento (`YYMM`) a la API. La banda es un mecanismo de autocompletar esos datos; `entry_mode` y Track 2 no forman parte del contrato HTTP ni del mensaje ISO. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
 | Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |

@@ -210,8 +210,6 @@ class SalesRepository {
     required String cardNumber,
     required String cvv,
     required String expirationDate,
-    String entryMode = '012',
-    String? track2,
     required String token,
     required String idempotencyKey,
   }) async {
@@ -222,13 +220,9 @@ class SalesRepository {
       'amount': amount,
       'card_number': cardNumber.replaceAll(' ', ''),
       'cvv': cvv,
-      'entry_mode': entryMode,
     };
     if (expirationDate.isNotEmpty) {
       bodyPayload['expiration_date'] = expirationDate;
-    }
-    if (track2 != null && track2.isNotEmpty) {
-      bodyPayload['track2'] = track2;
     }
 
     try {

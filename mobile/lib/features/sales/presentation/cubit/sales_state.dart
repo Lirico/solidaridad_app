@@ -9,8 +9,6 @@ sealed class SalesState {
   final String cardNumber;
   final String cvv;
   final String expirationDate;
-  final String entryMode;
-  final String? track2;
   final List<OperationModel> history;
 
   /// Identificador de la operación. Se genera al abrir la revisión y se
@@ -24,8 +22,6 @@ sealed class SalesState {
     required this.cardNumber,
     required this.cvv,
     required this.expirationDate,
-    this.entryMode = '012',
-    this.track2,
     required this.history,
     this.idempotencyKey = '',
   });
@@ -76,8 +72,6 @@ class SalesReviewing extends SalesState {
     required super.cardNumber,
     required super.cvv,
     required super.expirationDate,
-    super.entryMode,
-    super.track2,
     required super.history,
     super.idempotencyKey,
   });
@@ -91,8 +85,6 @@ class SalesProcessing extends SalesState {
     required super.cardNumber,
     required super.cvv,
     required super.expirationDate,
-    super.entryMode,
-    super.track2,
     required super.history,
     super.idempotencyKey,
   });
@@ -111,8 +103,6 @@ class SalesCompleted extends SalesState {
     required super.cardNumber,
     required super.cvv,
     required super.expirationDate,
-    super.entryMode,
-    super.track2,
     required super.history,
     super.idempotencyKey,
     required this.result,

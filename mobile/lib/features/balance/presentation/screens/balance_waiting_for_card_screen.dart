@@ -62,14 +62,11 @@ class _BalanceWaitingForCardScreenState
 
       switch (result) {
         case CardReadSuccess(:final data):
-          // Guardar los datos en el cubit y navegar a la revisión. La lectura
-          // fue por banda magnética: entry_mode "022" y sin track2 (se envían
-          // PAN + vencimiento explícitos).
+          // La banda completa PAN y vencimiento; el contrato de pagos es el
+          // mismo que para el ingreso manual.
           context.read<BalanceCubit>().setCardData(
             cardNumber: data.pan,
-            expirationDate: data.expiryMmYy,
-            entryMode: '022',
-            track2: null,
+            expirationDate: data.expiryYyMm,
           );
           Navigator.pushNamed(context, AppRoutes.balanceReview);
         case CardReadFailure(:final message):

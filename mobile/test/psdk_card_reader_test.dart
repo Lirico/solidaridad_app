@@ -42,7 +42,7 @@ void main() {
 
   group('PsdkCardReader.readCard', () {
     test(
-      'éxito: devuelve CardReadSuccess con PAN y vencimiento MMYY',
+      'éxito: devuelve CardReadSuccess con PAN y vencimiento YYMM',
       () async {
         stubInitialize();
         stubReadyStatus();
@@ -55,8 +55,7 @@ void main() {
         expect(result, isA<CardReadSuccess>());
         final data = (result as CardReadSuccess).data;
         expect(data.pan, PsdkMsrMock.pan);
-        // "3012" (YYMM) → "1230" (MMYY) para la API.
-        expect(data.expiryMmYy, '1230');
+        expect(data.expiryYyMm, '3012');
         verifyReleasedOnce();
       },
     );

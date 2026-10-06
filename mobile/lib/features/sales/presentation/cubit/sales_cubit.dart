@@ -61,8 +61,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String cardNumber,
     required String cvv,
     required String expirationDate,
-    String entryMode = '012',
-    String? track2,
   }) {
     emit(
       SalesReviewing(
@@ -72,8 +70,6 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: cardNumber,
         cvv: cvv,
         expirationDate: expirationDate,
-        entryMode: entryMode,
-        track2: track2,
         history: state.history,
         idempotencyKey: generateIdempotencyKey(),
       ),
@@ -83,22 +79,9 @@ class SalesCubit extends Cubit<SalesState> {
   /// Prepara la pantalla de revisión a partir de una lectura de banda
   /// magnética (MSR), sin pasar por el ingreso manual.
   ///
-  /// La banda magnética NO contiene CVV: se envía vacío. El vencimiento viene
-  /// en formato YYMM (ej. "3012") y la API espera MMYY (ej. "1230"), por eso
-  /// se usa [MsrCardData.expiryMmYy].
-  ///
-  /// La lectura fue por banda magnética: entry_mode "022". Se envía el PAN
-  /// (DE2) + vencimiento (DE14) en lugar del track2 (DE35), porque el track2
-  /// que devuelve esta terminal trae un PAN que no coincide con el registrado
-  /// (ej. "4606300701400740" en vez de "6063007014007403"). El autorizador usa
-  /// el PAN explícito cuando viene presente.
+  /// La banda magnética no contiene CVV. La lectura completa los mismos datos
+  /// que el ingreso manual y el vencimiento ya está en formato YYMM.
   void showReviewFromMsr(MsrCardData data) {
-    final int eq = data.track2.indexOf('=');
-    debugPrint(
-      'msr review hasEquals=${eq >= 0} '
-      'digitsAfterEquals=${_digitsAfterEquals(data.track2)} '
-      'expiryLen=${data.expiryMmYy.length}',
-    );
     emit(
       SalesReviewing(
         productCode: state.productCode,
@@ -106,9 +89,7 @@ class SalesCubit extends Cubit<SalesState> {
         amount: state.amount,
         cardNumber: data.pan,
         cvv: '',
-        expirationDate: data.expiryMmYy,
-        entryMode: '022',
-        track2: null,
+        expirationDate: data.expiryYyMm,
         history: state.history,
         idempotencyKey: generateIdempotencyKey(),
       ),
@@ -124,8 +105,6 @@ class SalesCubit extends Cubit<SalesState> {
     final currentCardNumber = state.cardNumber;
     final currentCvv = state.cvv;
     final currentExpirationDate = state.expirationDate;
-    final currentEntryMode = state.entryMode;
-    final currentTrack2 = state.track2;
     final currentIdempotencyKey = state.idempotencyKey;
 
     final currentHistory = List<OperationModel>.from(state.history);
@@ -138,8 +117,6 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: currentCardNumber,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
-        entryMode: currentEntryMode,
-        track2: currentTrack2,
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
       ),
@@ -151,8 +128,6 @@ class SalesCubit extends Cubit<SalesState> {
       cardNumber: currentCardNumber,
       cvv: currentCvv,
       expirationDate: currentExpirationDate,
-      entryMode: currentEntryMode,
-      track2: currentTrack2,
       token: token,
       idempotencyKey: currentIdempotencyKey,
     );
@@ -194,8 +169,6 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: currentCardNumber,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
-        entryMode: currentEntryMode,
-        track2: currentTrack2,
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
         result: paymentResult,
@@ -277,23 +250,4 @@ class SalesCubit extends Cubit<SalesState> {
   void appendHistory(List<OperationModel> items) {
     emit(SalesInitialWithHistory(history: [...state.history, ...items]));
   }
-}
-
-/// Dígitos seguidos después del `=`, salteando centinelas del inicio.
-///
-/// Devuelve solo la cantidad. No incluye el vencimiento ni la pista.
-int _digitsAfterEquals(String track2) {
-  final int eq = track2.indexOf('=');
-  if (eq < 0) return 0;
-  var count = 0;
-  for (final int rune in track2.substring(eq + 1).runes) {
-    final String ch = String.fromCharCode(rune);
-    final bool isDigit = ch.compareTo('0') >= 0 && ch.compareTo('9') <= 0;
-    if (!isDigit) {
-      if (count > 0) break;
-      continue;
-    }
-    count++;
-  }
-  return count;
 }

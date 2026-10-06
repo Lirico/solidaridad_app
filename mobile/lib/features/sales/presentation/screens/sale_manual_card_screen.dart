@@ -64,6 +64,7 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
       body: AppSheetPanel(
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: ManualCardContent(
             cardNumberController: _cardNumberController,
             expiryController: _expiryController,

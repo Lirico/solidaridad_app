@@ -6,6 +6,16 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-06
 
+> ✅ **Último cambio (2026-10-06, errores de formulario en vivo):** los
+> mensajes rojos de los inputs ya no quedan fijos después del primer envío.
+> Los formularios de login, registro, cambio de contraseña, nueva operación,
+> ingreso manual de venta, ingreso manual de saldo y anulación usan
+> `AutovalidateMode.onUserInteraction`. Al corregir un campo se revalida el
+> formulario: el error desaparece si el dato ya es válido y se actualiza si
+> sigue siendo inválido, también en validaciones cruzadas como confirmar
+> contraseña. El error puede aparecer mientras se escribe, antes de enviar.
+> Test en `mobile/test/login_form_validation_test.dart`.
+
 > ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
 > lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
 > (`YYMM`) en Flutter. API y gateway ya no definen ni propagan `entry_mode` ni
@@ -544,6 +554,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Aviso al fallar la carga de productos o historial | `DataLoadException` en lugar del catálogo fijo o del historial vacío. Aviso con REINTENTAR en el formulario y en el historial; la paginación no borra lo ya cargado. Cantidad con la unidad del catálogo. Ver G-P1-07. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
+| Errores de formulario que se actualizan al escribir | Los `Form` de login, registro, cambio de contraseña, venta, ingreso manual (venta y saldo) y anulación usan `AutovalidateMode.onUserInteraction`. El mensaje rojo se recalcula al corregir el campo, sin volver a enviar. Test en `mobile/test/login_form_validation_test.dart`. |
 | UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo navega al flujo de saldo, Cerrar Lote deshabilitado + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 

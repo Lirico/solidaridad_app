@@ -82,6 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       builder: (context, state) {
                         return Form(
                           key: _formKey,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [

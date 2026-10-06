@@ -79,6 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       builder: (context, state) {
                         return Form(
                           key: _formKey,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [

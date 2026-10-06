@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-05
+Última revisión: 2026-10-06
 
 > ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
 > lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
@@ -15,6 +15,14 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > como la relajación de la regla de última recarga. La política y bitácora de
 > excepciones del C están en `AGENTS.md` y
 > `payment_processor/LEGACY_CHANGELOG.md`. Ver G-P0-15 y G-P1-06.
+
+> ✅ **Último cambio (2026-10-06, consulta de saldo completa):** la API despacha
+> en paralelo las cinco consultas ISO de saldo (una por producto 993–997). La
+> agregación espera el resultado terminal del cliente gateway/ISO —incluidos los
+> reintentos que este implemente— y devuelve `FAILED`, sin filas parciales, si
+> cualquiera falla técnicamente (`FAILED`, `UNKNOWN` o excepción). El código
+> ISO `06` sigue siendo una respuesta de negocio válida y se representa como
+> saldo `0.00`. Tests cubren concurrencia y fallos parciales; ver G-P1-14.
 
 > ✅ **Último cambio (2026-09-28, VE-12):** cada `readCard` de
 > `PsdkCardReader` libera el PSDK (`cancelReadMsr` → `tearDown`) antes de
@@ -167,8 +175,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > saldo end-to-end sin tocar el procesador (usa su `consulta_saldo`/MTI `0100`
 > existente). Gateway: `POST /v1/balance` (construye `0100`, DE3 `310000`, lee el
 > saldo de DE4 y los productos de DE63) con `BalanceCommand`/`BalanceResult` y
-> `make check` OK. API: `POST /v1/balance` (sin producto en body) itera el
-> catálogo (993–997), agrega una fila por producto y lista con `0.00` los que
+> `make check` OK. API: `POST /v1/balance` (sin producto en body) despacha en
+> paralelo el catálogo (993–997), agrega una fila por producto y lista con `0.00` los que
 > responden `06` (sin saldo asignado); `make check` OK. Mobile: se habilitó la
 > opción "Consultar saldo" del menú "⋯ Más" (antes deshabilitada) y se agregó el
 > flujo completo con la misma visual que la venta (captura Tarjeta/Ingreso manual
@@ -486,6 +494,7 @@ Verifone (banda + térmica).
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
+| G-P1-14 | Consulta de saldo parcial presentada como completa | done | **2026-10-06:** antes la API llamaba los cinco productos en serie y devolvía `APPROVED` con las filas que alcanzaban a responder. Ahora las despacha concurrentemente, espera los resultados terminales del gateway/cliente ISO y devuelve `FAILED` sin saldos si cualquiera tuvo un fallo técnico terminal (`FAILED`, `UNKNOWN` o excepción). El código `06` no es fallo técnico: conserva la fila en `0.00`. Tests en `api/tests/test_check_balance.py`. |
 
 ---
 

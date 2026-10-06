@@ -28,6 +28,14 @@ const _approved = SaleResponse(
   errorCode: '00',
 );
 
+const _pending = SaleResponse(
+  isApproved: false,
+  operationNumber: 'OP-9',
+  message: 'Operación en curso, reintente en unos segundos',
+  errorCode: '00',
+  isUnknown: true,
+);
+
 void main() {
   late MockSalesRepository repository;
   late SalesCubit cubit;
@@ -130,6 +138,22 @@ void main() {
       ),
     ).called(2);
   });
+
+  test(
+    'un cobro todavía en curso conserva la clave y no es un rechazo',
+    () async {
+      openReview();
+      final key = cubit.state.idempotencyKey;
+      stubRegisterSale(_pending);
+
+      await cubit.sendIsoMessage(token: 'tok');
+
+      final completed = cubit.state as SalesCompleted;
+      expect(completed.result, PaymentResult.unknown);
+      expect(completed.idempotencyKey, key);
+      expect(completed.operationNumber, 'OP-9');
+    },
+  );
 
   testWidgets('CONFIRMAR COBRO está deshabilitado mientras se envía', (
     tester,

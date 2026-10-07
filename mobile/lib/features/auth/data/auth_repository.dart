@@ -3,46 +3,45 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
+import '../../../core/device/device_identity_service.dart';
 import '../domain/auth_model.dart';
-
-/// Simple in-memory installation ID generator.
-///
-/// In a production app this would be persisted (e.g. SharedPreferences).
-String _resolveInstallationId() {
-  // Use a compile-time constant or fall back to the default terminal id.
-  // NOTE: 05000001 is a real terminal (GOBIERNO) used for the local demo,
-  // not a throwaway dev-only value.
-  const fromDefine = String.fromEnvironment(
-    'INSTALLATION_ID',
-    defaultValue: '05000001',
-  );
-  return fromDefine;
-}
 
 class AuthRepository {
   final http.Client _httpClient;
   final String _baseUrl;
+  final DeviceIdentityService _deviceIdentity;
 
-  AuthRepository({http.Client? httpClient, String? baseUrl})
-    : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+  AuthRepository({
+    http.Client? httpClient,
+    String? baseUrl,
+    DeviceIdentityService? deviceIdentity,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _baseUrl = baseUrl ?? ApiConfig.baseUrl,
+        _deviceIdentity = deviceIdentity ?? DeviceIdentityService();
 
   Future<AuthResponse> login({
     required String usernameOrEmail,
     required String password,
   }) async {
     final url = Uri.parse('$_baseUrl/auth/login');
+    final identity = await _deviceIdentity.resolve();
+
+    final Map<String, dynamic> body = {
+      'username': usernameOrEmail,
+      'password': password,
+      'installation_id': identity.installationId,
+      // Contrato fijo: las tres claves siempre presentes. Cuando no hay dato
+      // real (terminal sin provisionar / sin hardware) van como cadena vacía.
+      'serial_number': identity.serialNumber ?? '',
+      'logical_device_id': identity.logicalDeviceId ?? '',
+    };
 
     try {
       final response = await _httpClient
           .post(
             url,
             headers: {HttpHeaders.contentTypeHeader: 'application/json'},
-            body: jsonEncode({
-              'username': usernameOrEmail,
-              'password': password,
-              'installation_id': _resolveInstallationId(),
-            }),
+            body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 15));
 
@@ -101,7 +100,7 @@ class AuthRepository {
               'name': name,
               'email': email,
               'password': password,
-              'installation_id': _resolveInstallationId(),
+              'installation_id': _deviceIdentity.installationId,
             }),
           )
           .timeout(const Duration(seconds: 15));

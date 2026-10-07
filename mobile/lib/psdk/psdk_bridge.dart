@@ -59,6 +59,9 @@ class PsdkBridge {
   }
 
   Future<Map<String, dynamic>> getDeviceInfo() async {
+    if (kUseMsrMock) {
+      return PsdkMsrMock.deviceInfoSuccess();
+    }
     final result = await _methods.invokeMethod<dynamic>('getDeviceInfo');
     return _asStringKeyMap(result);
   }

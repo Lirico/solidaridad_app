@@ -11,7 +11,6 @@ import 'helpers/mock_http_client.dart';
 
 const String _baseUrl = 'http://test/v1';
 
-final DateTime _now = DateTime(2026, 9, 22, 15, 30);
 final DateTime _today = DateTime(2026, 9, 22, 13, 0);
 final DateTime _yesterday = DateTime(2026, 9, 21, 23, 0);
 
@@ -84,10 +83,7 @@ void main() {
       ),
     );
 
-    final BatchCloseLoadResult result = await repository.loadOperations(
-      token: 'tok',
-      now: _now,
-    );
+    final BatchCloseLoadResult result = await repository.loadOperations(token: 'tok');
 
     expect(result.sessionExpired, isFalse);
     expect(result.connectionError, isFalse);
@@ -165,13 +161,13 @@ void main() {
     );
   });
 
-  test('pagina mientras la ventana del lote siga abierta', () async {
+  test('pagina hasta obtener todas las operaciones del lote actual', () async {
     _stubGet(client, (offset) {
       if (offset == 0) {
         return jsonMapResponse(
           _page(
             items: List<Map<String, dynamic>>.generate(100, (_) => _item()),
-            total: 250,
+            total: 200,
           ),
         );
       }
@@ -181,24 +177,20 @@ void main() {
             100,
             (index) => _item(date: index == 99 ? _yesterday : _today),
           ),
-          total: 250,
+          total: 200,
         ),
       );
     });
 
-    final BatchCloseLoadResult result = await repository.loadOperations(
-      token: 'tok',
-      now: _now,
-    );
+    final BatchCloseLoadResult result = await repository.loadOperations(token: 'tok');
 
-    // La segunda página entra completa, pero su último ítem ya es de ayer:
-    // no hace falta pedir la tercera.
+    // La fecha no corta el resumen: el servidor ya delimitó el lote.
     expect(result.operations.length, 200);
     expect(result.isPartial, isFalse);
     verify(() => client.get(any(), headers: any(named: 'headers'))).called(2);
   });
 
-  test('una ventana desplazada no repite la venta ya cargada', () async {
+  test('la paginación con altas concurrentes no repite la venta ya cargada', () async {
     final List<Map<String, dynamic>> firstPage =
         List<Map<String, dynamic>>.generate(100, (_) => _item());
     final Map<String, dynamic> repeated = firstPage.last;
@@ -216,10 +208,7 @@ void main() {
       );
     });
 
-    final BatchCloseLoadResult result = await repository.loadOperations(
-      token: 'tok',
-      now: _now,
-    );
+    final BatchCloseLoadResult result = await repository.loadOperations(token: 'tok');
 
     // 100 de la primera página + 1 nueva: la repetida se descarta.
     expect(result.operations.length, 101);
@@ -242,10 +231,7 @@ void main() {
       ),
     );
 
-    final BatchCloseLoadResult result = await repository.loadOperations(
-      token: 'tok',
-      now: _now,
-    );
+    final BatchCloseLoadResult result = await repository.loadOperations(token: 'tok');
 
     expect(result.operations.length, 1000);
     expect(result.isPartial, isTrue);
@@ -255,13 +241,60 @@ void main() {
   test('una lista vacía no genera más pedidos', () async {
     _stubGet(client, (_) => jsonMapResponse(_page(items: const [], total: 0)));
 
-    final BatchCloseLoadResult result = await repository.loadOperations(
-      token: 'tok',
-      now: _now,
-    );
+    final BatchCloseLoadResult result = await repository.loadOperations(token: 'tok');
 
     expect(result.operations, isEmpty);
     expect(result.isPartial, isFalse);
     verify(() => client.get(any(), headers: any(named: 'headers'))).called(1);
+  });
+
+  test('cierra el lote y conserva sus operaciones para imprimirlo', () async {
+    when(
+      () => client.post(any(), headers: any(named: 'headers')),
+    ).thenAnswer(
+      (_) async => jsonMapResponse(
+        <String, dynamic>{
+          'batch_close_id': 42,
+          'closed_at': _today.toIso8601String(),
+          'items': [_item(amount: 3)],
+          'total': 1,
+        },
+        statusCode: 201,
+      ),
+    );
+
+    final BatchCloseSubmitResult result = await repository.closeCurrentBatch(
+      token: 'tok',
+      idempotencyKey: 'close-1',
+    );
+
+    expect(result.connectionError, isFalse);
+    expect(result.batchCloseId, 42);
+    expect(result.operations.single.amount, 3);
+    verify(
+      () => client.post(
+        Uri.parse('$_baseUrl/transactions/batch-close'),
+        headers: any(named: 'headers'),
+      ),
+    ).called(1);
+  });
+
+  test('informa el rechazo de cierre sin perder el mensaje de la API', () async {
+    when(
+      () => client.post(any(), headers: any(named: 'headers')),
+    ).thenAnswer(
+      (_) async => jsonResponse(
+        '{"message":"Hay transacciones en curso"}',
+        statusCode: 409,
+      ),
+    );
+
+    final BatchCloseSubmitResult result = await repository.closeCurrentBatch(
+      token: 'tok',
+      idempotencyKey: 'close-1',
+    );
+
+    expect(result.connectionError, isTrue);
+    expect(result.errorMessage, 'Hay transacciones en curso');
   });
 }

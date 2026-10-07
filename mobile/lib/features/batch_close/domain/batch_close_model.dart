@@ -65,13 +65,12 @@ class BatchProductItem {
 
 /// Resumen del lote actual: lo que la pantalla de Cierre de Lote muestra.
 ///
-/// Se calcula en el cliente a partir de `GET /v1/transactions` porque hoy la API
-/// no expone un concepto de lote/cierre (ver `docs/gaps.md`, G-P2-10).
+/// Se calcula en el cliente a partir del lote actual que entrega
+/// `GET /v1/transactions`.
 class BatchSummary {
   /// Número de lote mostrado en la pantalla.
   ///
-  /// **Provisorio:** lo aporta la app mientras la API no exponga el lote real
-  /// (ver `docs/gaps.md`, G-P2-10).
+  /// Es una etiqueta de presentación del lote administrativo actual.
   final String batchNumber;
 
   /// Cantidad de ventas aprobadas del lote.
@@ -100,29 +99,18 @@ class BatchSummary {
 
   /// Agrupa las ventas aprobadas de la ventana del lote.
   ///
-  /// Ventana = desde el inicio del día local ([now]): mientras no exista el
-  /// contrato de cierre no hay otro corte posible (ver `docs/gaps.md`,
-  /// G-P2-10).
+  /// La API ya limita [operations] al lote administrativo actual.
   factory BatchSummary.fromOperations({
     required List<OperationModel> operations,
     required String batchNumber,
-    DateTime? now,
     bool isPartial = false,
   }) {
-    final DateTime reference = now ?? DateTime.now();
-    final DateTime cutoff = DateTime(
-      reference.year,
-      reference.month,
-      reference.day,
-    );
-
     final Map<String, BatchProductItem> byProduct =
         <String, BatchProductItem>{};
     int salesCount = 0;
 
     for (final OperationModel operation in operations) {
       if (operation.result != PaymentResult.approved) continue;
-      if (!operation.date.isAfter(cutoff)) continue;
 
       salesCount++;
       final double quantity =

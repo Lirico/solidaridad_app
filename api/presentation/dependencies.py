@@ -14,6 +14,7 @@ from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
+from application.payments.close_batch import CloseBatch
 from application.payments.create_transaction import CreateTransaction
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
@@ -94,6 +95,15 @@ def get_list_transactions(
     db: Annotated[Session, Depends(get_db)],
 ) -> ListTransactions:
     return ListTransactions(
+        transactions=TransactionRepository(db),
+    )
+
+
+def get_close_batch(
+    db: Annotated[Session, Depends(get_db)],
+) -> CloseBatch:
+    return CloseBatch(
+        session=db,
         transactions=TransactionRepository(db),
     )
 

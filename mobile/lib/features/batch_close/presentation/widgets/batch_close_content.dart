@@ -7,12 +7,7 @@ import '../../domain/batch_close_model.dart';
 /// Contenido de la pantalla de Cierre de Lote (UI pura).
 ///
 /// Muestra el resumen del lote actual y el botón CERRAR LOTE. No conoce el
-/// cubit: recibe el resumen ya calculado y avisa con [onCloseBatch], igual
-/// criterio que `BalanceStatusContent`.
-///
-/// El botón se dibuja igual que en el mockup (visible y habilitado), pero el
-/// cierre todavía no tiene contrato con el procesador: quien lo monta le pasa
-/// un callback inerte. Ver `docs/gaps.md` (G-P2-10).
+/// cubit: recibe el resumen ya calculado y avisa con [onCloseBatch].
 ///
 /// Layout: el resumen puede crecer (una fila por producto), así que la lista
 /// scrollea y el botón queda fijo abajo, siempre visible y sin desbordar en
@@ -20,11 +15,13 @@ import '../../domain/batch_close_model.dart';
 class BatchCloseContent extends StatelessWidget {
   final BatchSummary summary;
   final VoidCallback onCloseBatch;
+  final bool isClosing;
 
   const BatchCloseContent({
     super.key,
     required this.summary,
     required this.onCloseBatch,
+    this.isClosing = false,
   });
 
   @override
@@ -72,7 +69,7 @@ class BatchCloseContent extends StatelessWidget {
             width: double.infinity,
             height: 60,
             child: ElevatedButton(
-              onPressed: onCloseBatch,
+              onPressed: isClosing ? null : onCloseBatch,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryOrange,
                 foregroundColor: Colors.white,
@@ -82,14 +79,23 @@ class BatchCloseContent extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 elevation: 0,
               ),
-              child: const Text(
-                'CERRAR LOTE',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
-              ),
+              child: isClosing
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'CERRAR LOTE',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
             ),
           ),
         ),

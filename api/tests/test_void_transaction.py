@@ -12,6 +12,7 @@ from domain.exceptions import (
     CardMismatch,
     InvalidCardNumber,
     MissingIdempotencyKey,
+    TransactionBatchClosed,
     TransactionNotFound,
     TransactionNotVoidable,
 )
@@ -144,6 +145,18 @@ def test_void_not_approved() -> None:
             idempotency_key="void-1",
             card_number="4111111111111111",
         )
+
+
+def test_void_rejects_transaction_from_closed_batch() -> None:
+    use_case, _, gateway = _build(existing=_tx(batch_close_id=9))
+    with pytest.raises(TransactionBatchClosed):
+        use_case.execute(
+            terminal_id="05000001",
+            transaction_number="OP-260716-00000001",
+            idempotency_key="void-1",
+            card_number="4111111111111111",
+        )
+    gateway.void.assert_not_called()
 
 
 def test_void_card_mismatch() -> None:

@@ -26,12 +26,29 @@ class BatchCloseLoadResult {
   });
 }
 
+/// Resultado de confirmar el corte administrativo del lote actual.
+class BatchCloseSubmitResult {
+  final List<OperationModel> operations;
+  final int? batchCloseId;
+  final bool sessionExpired;
+  final bool connectionError;
+  final String? errorMessage;
+
+  const BatchCloseSubmitResult({
+    this.operations = const <OperationModel>[],
+    this.batchCloseId,
+    this.sessionExpired = false,
+    this.connectionError = false,
+    this.errorMessage,
+  });
+}
+
 /// Operaciones del terminal para armar el resumen del lote.
 ///
 /// Usa `GET /v1/transactions` (el mismo endpoint del historial) paginando
 /// porque la API devuelve hasta 100 ítems por página y ordena de más nuevo a
-/// más viejo: alcanza con cortar la paginación cuando aparece una venta anterior
-/// al inicio de la ventana del lote.
+/// más viejo. La API ya limita el resultado al lote vigente, por eso se cargan
+/// todas sus páginas.
 ///
 /// A propósito **no** reutiliza `SalesRepository.fetchHistory`: ese método
 /// convierte cualquier error en una lista vacía (antipatrón registrado como
@@ -54,20 +71,11 @@ class BatchCloseRepository {
 
   /// Carga las operaciones de la ventana del lote.
   ///
-  /// La ventana arranca al inicio del día de [now]: mientras no exista el
-  /// contrato de cierre no hay otro corte posible (ver `docs/gaps.md`,
-  /// G-P2-10).
+  /// La API devuelve únicamente el lote administrativo actual: las
+  /// transacciones ya cerradas no aparecen en este listado.
   Future<BatchCloseLoadResult> loadOperations({
     required String token,
-    DateTime? now,
   }) async {
-    final DateTime reference = now ?? DateTime.now();
-    final DateTime cutoff = DateTime(
-      reference.year,
-      reference.month,
-      reference.day,
-    );
-
     final List<OperationModel> collected = <OperationModel>[];
 
     // La paginación por offset sobre una lista que crece (ventas nuevas) puede
@@ -127,14 +135,11 @@ class BatchCloseRepository {
         collected.addAll(pageItems.where((item) => seenIds.add(item.id)));
         offset += pageItems.length;
 
-        // La lista viene de más nuevo a más viejo: si el último ítem ya quedó
-        // fuera de la ventana, no hay nada más que sumar.
-        final bool reachedCutoff = !pageItems.last.date.isAfter(cutoff);
         final bool loadedEverything =
             offset >= total || pageItems.length < pageSize;
-        if (reachedCutoff || loadedEverything) break;
+        if (loadedEverything) break;
 
-        // Quedan páginas dentro de la ventana: si se agotó el tope de
+        // Quedan páginas dentro del lote: si se agotó el tope de
         // seguridad, el resumen se marca parcial en lugar de ocultarse.
         if (page == maxPages - 1) isPartial = true;
       }
@@ -170,6 +175,84 @@ class BatchCloseRepository {
         connectionError: true,
         errorMessage: 'Ocurrió un error inesperado. Reintente.',
       );
+    }
+  }
+
+  /// Confirma el corte administrativo y devuelve sus operaciones para una
+  /// futura impresión de comprobante.
+  Future<BatchCloseSubmitResult> closeCurrentBatch({
+    required String token,
+    required String idempotencyKey,
+  }) async {
+    try {
+      final response = await _httpClient
+          .post(
+            Uri.parse('$_baseUrl/transactions/batch-close'),
+            headers: <String, String>{
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+              'Idempotency-Key': idempotencyKey,
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 401) {
+        return const BatchCloseSubmitResult(sessionExpired: true);
+      }
+
+      final Map<String, dynamic>? body = _tryDecodeObject(response.body);
+      if (response.statusCode != 201) {
+        return BatchCloseSubmitResult(
+          connectionError: true,
+          errorMessage:
+              (body?['message'] as String?) ??
+              'No se pudo cerrar el lote (HTTP ${response.statusCode}).',
+        );
+      }
+
+      final List<dynamic> items = body?['items'] as List<dynamic>? ??
+          const <dynamic>[];
+      return BatchCloseSubmitResult(
+        batchCloseId: (body?['batch_close_id'] as num?)?.toInt(),
+        operations: items
+            .map(
+              (item) => OperationModel.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+      );
+    } on TimeoutException {
+      return const BatchCloseSubmitResult(
+        connectionError: true,
+        errorMessage: 'Tiempo de espera agotado. Reintente.',
+      );
+    } on SocketException {
+      return const BatchCloseSubmitResult(
+        connectionError: true,
+        errorMessage: 'No se pudo conectar con el servidor. Verifique su red.',
+      );
+    } on HttpException {
+      return const BatchCloseSubmitResult(
+        connectionError: true,
+        errorMessage: 'Error de comunicación con el servidor. Reintente.',
+      );
+    } on FormatException {
+      return const BatchCloseSubmitResult(
+        connectionError: true,
+        errorMessage: 'Respuesta inesperada del servidor. Reintente.',
+      );
+    } catch (_) {
+      return const BatchCloseSubmitResult(
+        connectionError: true,
+        errorMessage: 'Ocurrió un error inesperado. Reintente.',
+      );
+    }
+  }
+
+  Map<String, dynamic>? _tryDecodeObject(String raw) {
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } on FormatException {
+      return null;
     }
   }
 }

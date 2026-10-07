@@ -8,10 +8,12 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Identity,
+    Index,
     Integer,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +27,13 @@ class Transaction(Base):
             "user_id",
             "idempotency_key",
             name="uq_transactions_user_idempotency",
+        ),
+        Index(
+            "ix_transactions_terminal_current",
+            "terminal_id",
+            "created_at",
+            "id",
+            postgresql_where=text("batch_close_id IS NULL"),
         ),
     )
 
@@ -65,6 +74,11 @@ class Transaction(Base):
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     void_idempotency_key: Mapped[str | None] = mapped_column(
         String(128),
+        nullable=True,
+    )
+    batch_close_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("batch_closes.id"),
         nullable=True,
     )
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)

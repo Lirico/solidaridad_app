@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
+from application.payments.close_batch import CloseBatch, CloseBatchResult
 from application.payments.create_transaction import (
     CreateTransaction,
     CreateTransactionHttpStatus,
@@ -17,7 +18,9 @@ from application.payments.void_transaction import (
     VoidTransactionHttpStatus,
     VoidTransactionResult,
 )
+from domain.batch_close import BatchClose
 from domain.exceptions import (
+    BatchCloseHasInFlightTransactions,
     CardMismatch,
     IdempotencyConflict,
     InvalidCardNumber,
@@ -29,6 +32,7 @@ from domain.transaction_status import TransactionStatus
 from main import app
 from presentation.dependencies import (
     CurrentUser,
+    get_close_batch,
     get_create_transaction,
     get_current_user,
     get_list_transactions,
@@ -82,6 +86,15 @@ def _override_list(use_case: MagicMock) -> None:
     )
 
 
+def _override_close(use_case: MagicMock) -> None:
+    app.dependency_overrides[get_close_batch] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+
+
 def _clear() -> None:
     app.dependency_overrides.clear()
 
@@ -95,6 +108,17 @@ def _payload(**overrides: object) -> dict[str, object]:
     }
     body.update(overrides)
     return body
+
+
+def _batch_close() -> BatchClose:
+    return BatchClose(
+        id=3,
+        installation_id=1,
+        terminal_id="inst-1",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+        closed_at=datetime(2026, 10, 6, 18, 0, tzinfo=UTC),
+    )
 
 
 def test_create_transaction_201() -> None:
@@ -203,6 +227,50 @@ def test_create_transaction_domain_400() -> None:
         _clear()
     assert response.status_code == 400
     assert response.json()["message"] == "Número de tarjeta inválido"
+
+
+def test_close_batch_201_returns_receipt_operations() -> None:
+    use_case = MagicMock(spec=CloseBatch)
+    use_case.execute.return_value = CloseBatchResult(
+        batch_close=_batch_close(),
+        transactions=[_tx()],
+    )
+    _override_close(use_case)
+    try:
+        response = client.post(
+            "/v1/transactions/batch-close",
+            headers={"Idempotency-Key": "close-1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 201
+    assert response.json()["batch_close_id"] == 3
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["transaction_number"] == _tx().transaction_number
+    use_case.execute.assert_called_once_with(
+        installation_id="inst-1",
+        user_id=1,
+        idempotency_key="close-1",
+    )
+
+
+def test_close_batch_rejects_in_flight_operations() -> None:
+    use_case = MagicMock(spec=CloseBatch)
+    use_case.execute.side_effect = BatchCloseHasInFlightTransactions()
+    _override_close(use_case)
+    try:
+        response = client.post(
+            "/v1/transactions/batch-close",
+            headers={"Idempotency-Key": "close-1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 409
+    assert response.json()["message"] == (
+        "Hay transacciones en curso o sin resultado definitivo"
+    )
 
 
 def test_list_transactions_200() -> None:

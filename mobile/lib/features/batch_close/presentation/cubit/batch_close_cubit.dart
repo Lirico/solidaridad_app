@@ -4,16 +4,10 @@ import '../../data/batch_close_repository.dart';
 import '../../domain/batch_close_model.dart';
 import 'batch_close_state.dart';
 
-/// Arma el resumen del lote actual.
-///
-/// **Sin cierre:** la pantalla es informativa. La app todavía no cierra nada
-/// porque no existe el contrato de cierre contra el procesador, y el Nº de lote
-/// es provisorio ([provisionalBatchNumber]). Cuando el backend exponga el lote
-/// real, este valor se reemplaza por la respuesta de la API sin tocar la UI.
-/// Ver `docs/gaps.md` (G-P2-10).
+/// Arma y cierra el lote administrativo actual.
 class BatchCloseCubit extends Cubit<BatchCloseState> {
-  /// Nº de lote provisorio mientras la API no exponga el lote real.
-  static const String provisionalBatchNumber = '000001';
+  /// Etiqueta del lote activo: el corte real queda identificado por la API.
+  static const String currentBatchNumber = 'ACTUAL';
 
   final BatchCloseRepository repository;
 
@@ -48,9 +42,49 @@ class BatchCloseCubit extends Cubit<BatchCloseState> {
       BatchCloseLoaded(
         summary: BatchSummary.fromOperations(
           operations: result.operations,
-          batchNumber: provisionalBatchNumber,
+          batchNumber: currentBatchNumber,
           isPartial: result.isPartial,
         ),
+      ),
+    );
+  }
+
+  /// Cierra el lote actual. La misma clave se conserva para reintentar una
+  /// respuesta ambigua sin crear otro corte.
+  Future<void> closeCurrentBatch({
+    required String token,
+    required String idempotencyKey,
+  }) async {
+    final BatchCloseState current = state;
+    final BatchSummary? summary = switch (current) {
+      BatchCloseLoaded(:final summary) => summary,
+      BatchCloseCloseFailed(:final summary) => summary,
+      _ => null,
+    };
+    if (summary == null) return;
+
+    emit(BatchCloseClosing(summary: summary));
+    final BatchCloseSubmitResult result = await repository.closeCurrentBatch(
+      token: token,
+      idempotencyKey: idempotencyKey,
+    );
+    if (result.sessionExpired) {
+      emit(const BatchCloseSessionExpired());
+      return;
+    }
+    if (result.connectionError) {
+      emit(
+        BatchCloseCloseFailed(
+          summary: summary,
+          message: result.errorMessage ?? 'No se pudo cerrar el lote.',
+        ),
+      );
+      return;
+    }
+    emit(
+      BatchCloseClosed(
+        batchCloseId: result.batchCloseId,
+        operations: result.operations,
       ),
     );
   }

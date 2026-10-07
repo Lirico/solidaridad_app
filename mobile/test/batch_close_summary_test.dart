@@ -3,8 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:solidaridad_app/features/batch_close/domain/batch_close_model.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 
-/// Fecha "de hoy" usada como referencia en todos los casos.
-final DateTime _now = DateTime(2026, 9, 22, 15, 30);
 final DateTime _todayMorning = DateTime(2026, 9, 22, 9, 0);
 final DateTime _todayAfternoon = DateTime(2026, 9, 22, 14, 0);
 final DateTime _yesterday = DateTime(2026, 9, 21, 23, 59);
@@ -32,7 +30,6 @@ void main() {
     test('agrupa las ventas aprobadas y calcula kg por producto', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000123',
-        now: _now,
         operations: [
           _operation(
             productCode: 'GARRAFA_10',
@@ -78,7 +75,6 @@ void main() {
     test('acumula varias ventas del mismo producto', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
-        now: _now,
         operations: [
           _operation(productCode: 'GARRAFA_15', amount: 3, date: _todayMorning),
           _operation(
@@ -98,7 +94,6 @@ void main() {
     test('ignora ventas rechazadas, anuladas y con error de conexión', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
-        now: _now,
         operations: [
           _operation(
             productCode: 'GARRAFA_10',
@@ -126,24 +121,22 @@ void main() {
       expect(summary.totalKg, 0);
     });
 
-    test('ignora las ventas de días anteriores', () {
+    test('incluye ventas de cualquier fecha del lote actual', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
-        now: _now,
         operations: [
           _operation(productCode: 'GARRAFA_10', amount: 5, date: _yesterday),
           _operation(productCode: 'GARRAFA_10', amount: 2, date: _todayMorning),
         ],
       );
 
-      expect(summary.salesCount, 1);
-      expect(summary.products.single.quantity, 2);
+      expect(summary.salesCount, 2);
+      expect(summary.products.single.quantity, 7);
     });
 
     test('ordena los productos según el catálogo', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
-        now: _now,
         operations: [
           _operation(productCode: 'GRANEL', amount: 1, date: _todayMorning),
           _operation(productCode: 'TUBO_45', amount: 1, date: _todayMorning),
@@ -165,7 +158,6 @@ void main() {
     test('un producto fuera del catálogo usa kg 1:1 y queda al final', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
-        now: _now,
         operations: [
           _operation(productCode: 'OTRO', amount: 3, date: _todayMorning),
           _operation(productCode: 'GARRAFA_10', amount: 1, date: _todayMorning),
@@ -180,7 +172,6 @@ void main() {
     test('conserva el número de lote y la marca de resumen parcial', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000007',
-        now: _now,
         isPartial: true,
         operations: [
           _operation(productCode: 'GARRAFA_10', amount: 1, date: _todayMorning),

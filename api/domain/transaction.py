@@ -30,3 +30,4 @@ class Transaction:
     updated_at: datetime
     processor_ticket: str | None = None
     void_idempotency_key: str | None = None
+    batch_close_id: int | None = None

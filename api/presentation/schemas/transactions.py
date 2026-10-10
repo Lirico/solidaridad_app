@@ -49,3 +49,12 @@ class TransactionListResponse(BaseModel):
 
     items: list[TransactionItemResponse]
     total: int
+
+
+class BatchCloseResponse(BaseModel):
+    """Immutable receipt data for an administrative terminal cut."""
+
+    batch_close_id: int
+    closed_at: datetime
+    items: list[TransactionItemResponse]
+    total: int

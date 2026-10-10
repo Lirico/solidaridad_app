@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from domain.batch_close import BatchClose
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -12,6 +13,7 @@ from domain.transaction_status_event import (
     TransactionStatusActorType,
     TransactionStatusEventType,
 )
+from persistence.models.batch_close import BatchClose as BatchCloseModel
 from persistence.models.transaction import Transaction as TransactionModel
 from persistence.models.transaction import TransactionNumberCounter
 from persistence.models.transaction_status_event import TransactionStatusEvent
@@ -45,6 +47,18 @@ def _to_domain(row: TransactionModel) -> Transaction:
         updated_at=row.updated_at,
         processor_ticket=row.processor_ticket,
         void_idempotency_key=row.void_idempotency_key,
+        batch_close_id=row.batch_close_id,
+    )
+
+
+def _to_batch_close(row: BatchCloseModel) -> BatchClose:
+    return BatchClose(
+        id=row.id,
+        installation_id=row.installation_id,
+        terminal_id=row.terminal_id,
+        closed_by_user_id=row.closed_by_user_id,
+        idempotency_key=row.idempotency_key,
+        closed_at=row.closed_at,
     )
 
 
@@ -197,8 +211,11 @@ class TransactionRepository:
         """Return transactions for a terminal, newest first, plus total count."""
         stmt = (
             select(TransactionModel)
-            .where(TransactionModel.terminal_id == terminal_id)
-            .order_by(TransactionModel.created_at.desc())
+            .where(
+                TransactionModel.terminal_id == terminal_id,
+                TransactionModel.batch_close_id.is_(None),
+            )
+            .order_by(TransactionModel.created_at.desc(), TransactionModel.id.desc())
             .limit(limit)
             .offset(offset)
         )
@@ -206,10 +223,98 @@ class TransactionRepository:
 
         count_stmt = select(func.count()).select_from(TransactionModel).where(
             TransactionModel.terminal_id == terminal_id,
+            TransactionModel.batch_close_id.is_(None),
         )
         total = self._session.scalar(count_stmt) or 0
 
         return [_to_domain(r) for r in rows], total
+
+    def close_current_batch(
+        self,
+        *,
+        terminal_id: str,
+        closed_by_user_id: int,
+        idempotency_key: str,
+    ) -> tuple[BatchClose, list[Transaction]] | str | None:
+        """Atomically move the terminal's current operations into a close.
+
+        New operations inserted after this locked snapshot stay in the next
+        current batch. Pending or ambiguous processor outcomes block the close
+        so a later approval cannot alter an already printed summary.
+        """
+        existing = self._session.scalar(
+            select(BatchCloseModel).where(
+                BatchCloseModel.terminal_id == terminal_id,
+                BatchCloseModel.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is not None:
+            rows = list(
+                self._session.scalars(
+                    select(TransactionModel)
+                    .where(TransactionModel.batch_close_id == existing.id)
+                    .order_by(
+                        TransactionModel.created_at.asc(),
+                        TransactionModel.id.asc(),
+                    )
+                ).all()
+            )
+            return _to_batch_close(existing), [_to_domain(row) for row in rows]
+
+        current = list(
+            self._session.scalars(
+                select(TransactionModel)
+                .where(
+                    TransactionModel.terminal_id == terminal_id,
+                    TransactionModel.batch_close_id.is_(None),
+                )
+                .order_by(TransactionModel.created_at.asc(), TransactionModel.id.asc())
+                .with_for_update()
+            ).all()
+        )
+        if not current:
+            return None
+
+        if any(
+            row.status
+            in {TransactionStatus.PENDING.value, TransactionStatus.UNKNOWN.value}
+            for row in current
+        ):
+            return "in_flight"
+
+        installation_id = current[0].installation_id
+        existing = self._session.scalar(
+            select(BatchCloseModel).where(
+                BatchCloseModel.installation_id == installation_id,
+                BatchCloseModel.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is not None:
+            rows = list(
+                self._session.scalars(
+                    select(TransactionModel)
+                    .where(TransactionModel.batch_close_id == existing.id)
+                    .order_by(
+                        TransactionModel.created_at.asc(),
+                        TransactionModel.id.asc(),
+                    )
+                ).all()
+            )
+            return _to_batch_close(existing), [_to_domain(row) for row in rows]
+
+        close = BatchCloseModel(
+            installation_id=installation_id,
+            terminal_id=terminal_id,
+            closed_by_user_id=closed_by_user_id,
+            idempotency_key=idempotency_key,
+            closed_at=datetime.now(UTC),
+        )
+        self._session.add(close)
+        self._session.flush()
+        for row in current:
+            row.batch_close_id = close.id
+        self._session.flush()
+        return _to_batch_close(close), [_to_domain(row) for row in current]
 
     def update_result(
         self,

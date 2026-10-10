@@ -23,6 +23,7 @@ from domain.exceptions import (
     CardMismatch,
     InvalidCardNumber,
     MissingIdempotencyKey,
+    TransactionBatchClosed,
     TransactionNotFound,
     TransactionNotVoidable,
 )
@@ -88,6 +89,9 @@ class VoidTransaction:
         )
         if tx is None:
             raise TransactionNotFound()
+
+        if tx.batch_close_id is not None:
+            raise TransactionBatchClosed()
 
         if tx.status == TransactionStatus.VOIDED:
             self._record_idempotent_hit(tx, key)

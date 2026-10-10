@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, status
 from fastapi.responses import JSONResponse
 
+from application.payments.close_batch import CloseBatch
 from application.payments.create_transaction import (
     CreateTransaction,
     CreateTransactionHttpStatus,
@@ -13,6 +14,8 @@ from application.payments.create_transaction import (
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
 from domain.exceptions import (
+    BatchCloseHasInFlightTransactions,
+    BatchIsEmpty,
     CardMismatch,
     IdempotencyConflict,
     InvalidAmount,
@@ -20,6 +23,7 @@ from domain.exceptions import (
     InvalidCvv,
     MissingIdempotencyKey,
     MissingTerminalId,
+    TransactionBatchClosed,
     TransactionNotFound,
     TransactionNotVoidable,
     UnsupportedProduct,
@@ -27,12 +31,14 @@ from domain.exceptions import (
 from domain.money import AMOUNT_EXPONENT
 from presentation.dependencies import (
     CurrentUser,
+    get_close_batch,
     get_create_transaction,
     get_current_user,
     get_list_transactions,
     get_void_transaction,
 )
 from presentation.schemas.transactions import (
+    BatchCloseResponse,
     CreateTransactionRequest,
     TransactionItemResponse,
     TransactionListResponse,
@@ -163,6 +169,61 @@ def create_transaction(
 
 
 @router.post(
+    "/batch-close",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BatchCloseResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Missing idempotency key",
+        },
+        status.HTTP_409_CONFLICT: {
+            "description": "Empty batch or payment still in progress",
+        },
+    },
+)
+def close_batch(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[CloseBatch, Depends(get_close_batch)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> BatchCloseResponse | JSONResponse:
+    try:
+        result = use_case.execute(
+            installation_id=current_user.installation_id,
+            user_id=current_user.user_id,
+            idempotency_key=idempotency_key,
+        )
+    except MissingIdempotencyKey as exc:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": str(exc)},
+        )
+    except (BatchIsEmpty, BatchCloseHasInFlightTransactions) as exc:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"message": str(exc)},
+        )
+
+    items = [
+        TransactionItemResponse(
+            transaction_number=t.transaction_number,
+            product=t.product.value,
+            amount=str(Decimal(t.amount_minor) / (10**AMOUNT_EXPONENT)),
+            card_last4=t.card_last4,
+            status=t.status.value,
+            user_message=t.user_message or "",
+            created_at=t.created_at,
+        )
+        for t in result.transactions
+    ]
+    return BatchCloseResponse(
+        batch_close_id=result.batch_close.id,
+        closed_at=result.batch_close.closed_at,
+        items=items,
+        total=len(items),
+    )
+
+
+@router.post(
     "/{transaction_number}/void",
     status_code=status.HTTP_200_OK,
     response_model=TransactionResponse,
@@ -202,6 +263,7 @@ def void_transaction(
         InvalidCardNumber,
         MissingIdempotencyKey,
         TransactionNotVoidable,
+        TransactionBatchClosed,
         CardMismatch,
     ) as exc:
         return JSONResponse(

@@ -4,7 +4,14 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-06
+Última revisión: 2026-10-12
+
+> ⚠️ **Último cambio (2026-10-12, RA-00):** se caracterizó el reverso legacy
+> con tramas sintéticas y ejecución real. `0410 / DE39=00` aparece tanto con
+> venta existente como inexistente; repetir el `0400` agrega filas y un reverso
+> anticipado no impide aprobar el `0200` posterior. Por seguridad, `00` se
+> clasifica como ambiguo y no habilita publicar `FAILED`. Ver G-P1-09 y
+> `payment-gateway/docs/legacy-reversal-contract.md`.
 
 > ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
 > lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
@@ -502,7 +509,7 @@ Verifone (banda + térmica).
 
 
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
-| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
+| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias, cuatro tests y ejecución contra `authkig` + MySQL locales. Venta existente, inexistente y reverso duplicado responden `0410 / DE39=00`; el duplicado agrega una fila y el reverso anticipado no impide un `0200` posterior aprobado. Ninguna respuesta observada permite afirmar `REVERSED_CONFIRMED` u `ORIGINAL_NOT_FOUND`, por lo que `00` debe quedar `INDETERMINATE` y no puede publicar `FAILED`. Evidencia y reproducción: `payment-gateway/docs/legacy-reversal-contract.md`, `payment-gateway/tests/{fixtures/legacy_reversal_contract.json,test_legacy_reversal_contract.py,manual/record_legacy_reversal_contract.py}`. **Pendiente/bloqueante (RA-00B):** agregar una garantía autoritativa (código diferenciado, consulta, clave única o tombstone) antes de exponer recuperación automática; gateway/API todavía no implementan `/v1/reverse` ni jobs. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
 | G-P1-14 | Consulta de saldo parcial presentada como completa | done | **2026-10-06:** antes la API llamaba los cinco productos en serie y devolvía `APPROVED` con las filas que alcanzaban a responder. Ahora las despacha concurrentemente, espera los resultados terminales del gateway/cliente ISO y devuelve `FAILED` sin saldos si cualquiera tuvo un fallo técnico terminal (`FAILED`, `UNKNOWN` o excepción). El código `06` no es fallo técnico: conserva la fila en `0.00`. Tests en `api/tests/test_check_balance.py`. |

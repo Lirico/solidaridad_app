@@ -8,7 +8,7 @@ from domain.authorization import (
     VoidCommand,
 )
 from domain.balance import BalanceCommand, BalanceResult
-from domain.reversal import ReverseCommand, ReversalResult
+from domain.reversal import ReversalResult, ReverseCommand
 
 
 class IsoProcessor(Protocol):

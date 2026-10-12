@@ -415,7 +415,10 @@ UNIQUE(transaction_id, reversal_stan)
 ```
 
 El `reversal_stan` se genera una sola vez y se reutiliza en todos los
-reintentos. No se debe crear un reverso nuevo por intento.
+reintentos. No se debe crear un reverso nuevo por intento. Es la identidad
+estable del trabajo de orquestación; en el contrato legacy caracterizado por
+RA-00 no reemplaza al STAN original en DE11, porque hacerlo impediría la
+coincidencia con la venta.
 
 ### 8.1 Reclamo concurrente
 

@@ -7,7 +7,7 @@ from domain.authorization import (
     VoidCommand,
 )
 from domain.balance import BalanceCommand, BalanceResult
-from domain.reversal import ReverseCommand, ReversalResult, ReversalStatus
+from domain.reversal import ReversalResult, ReversalStatus, ReverseCommand
 
 
 class MockIsoProcessor:

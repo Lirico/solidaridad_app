@@ -3,8 +3,8 @@
 > Documento de ejecución basado en
 > [`plan-reversos-automaticos.md`](plan-reversos-automaticos.md).
 >
-> Estado: RA-00 completada. RA-01 puede construir el vector validado; RA-02 y
-> la convergencia automática requieren resolver RA-00B.
+> Estado: RA-00 y RA-01 completadas. RA-02 y la convergencia automática
+> requieren resolver RA-00B.
 >
 > Última revisión: 2026-10-12.
 
@@ -198,6 +198,11 @@ que una venta tardía no queda activa después de un reverso confirmado.
 
 **Branch:** `codex/reversal-ra-01-gateway-iso`
 
+**Estado:** completada el 2026-10-12. Contrato en
+`payment-gateway/domain/reversal.py`, construcción `0400` y transporte en
+`payment-gateway/infrastructure/iso/`, y cobertura byte a byte en
+`payment-gateway/tests/test_reversal_iso.py`.
+
 **Objetivo:** modelar y construir el `0400` sin exponer todavía un endpoint
 HTTP.
 
@@ -206,7 +211,9 @@ HTTP.
 - agregar `ReverseCommand` y resultado tipado;
 - extender el puerto `IsoProcessor` con `reverse`;
 - construir el mensaje con PAN, vencimiento, importe, terminal, identificadores
-  originales y `reversal_stan` estables;
+  originales y un `reversal_stan` estable en el contrato de orquestación; por
+  el contrato probado en RA-00, DE11 conserva el STAN original y el legacy no
+  ofrece un DE separado donde transmitir `reversal_stan`;
 - mantener separado `build_void_request` del nuevo
   `build_reversal_request`;
 - extender mock y transporte TCP sin reintentos internos.

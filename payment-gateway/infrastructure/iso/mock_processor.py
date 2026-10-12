@@ -7,6 +7,7 @@ from domain.authorization import (
     VoidCommand,
 )
 from domain.balance import BalanceCommand, BalanceResult
+from domain.reversal import ReverseCommand, ReversalResult, ReversalStatus
 
 
 class MockIsoProcessor:
@@ -46,6 +47,21 @@ class MockIsoProcessor:
             user_message="Aprobada",
             auth_id="MOCKVD",
             retrieval_reference=command.stan.zfill(12),
+        )
+
+    def reverse(self, command: ReverseCommand) -> ReversalResult:
+        if command.card_number == self.DECLINE_PAN:
+            return ReversalResult(
+                status=ReversalStatus.PROCESSOR_DECLINED,
+                response_code="05",
+                user_message="Denegada",
+            )
+        # The current legacy 0410/00 cannot prove whether an original sale was
+        # found and neutralized. The mock preserves that safe classification.
+        return ReversalResult(
+            status=ReversalStatus.INDETERMINATE,
+            response_code="00",
+            user_message="Resultado de reverso indeterminado",
         )
 
     def balance(self, command: BalanceCommand) -> BalanceResult:

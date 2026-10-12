@@ -16,13 +16,20 @@ from domain.exceptions import (
     ProcessorUnavailable,
     ProcessorUnreachable,
 )
+from domain.reversal import ReversalResult, ReverseCommand
 from infrastructure.iso.message_builder import (
     build_balance_request,
     build_purchase_request,
+    build_reversal_request,
     build_void_request,
 )
 from infrastructure.iso.packer import IsoMessage, pack_iso, unpack_iso
-from infrastructure.iso.response_mapper import map_balance_response, map_iso_response
+from infrastructure.iso.response_mapper import (
+    invalid_reversal_result,
+    map_balance_response,
+    map_iso_response,
+    map_reversal_response,
+)
 
 
 class TcpIsoProcessor:
@@ -37,11 +44,15 @@ class TcpIsoProcessor:
         request = build_void_request(command, self._settings)
         return self._send(request, map_iso_response, _invalid_authorization)
 
+    def reverse(self, command: ReverseCommand) -> ReversalResult:
+        request = build_reversal_request(command, self._settings)
+        return self._send(request, map_reversal_response, invalid_reversal_result)
+
     def balance(self, command: BalanceCommand) -> BalanceResult:
         request = build_balance_request(command, self._settings)
         return self._send(request, map_balance_response, _invalid_balance)
 
-    def _send[T: (AuthorizationResult, BalanceResult)](
+    def _send[T: (AuthorizationResult, BalanceResult, ReversalResult)](
         self,
         request: IsoMessage,
         mapper: Callable[[IsoMessage], T],

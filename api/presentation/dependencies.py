@@ -16,6 +16,7 @@ from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
 from application.payments.close_batch import CloseBatch
 from application.payments.create_transaction import CreateTransaction
+from application.payments.get_transaction_status import GetTransactionStatus
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
 from config import Settings, get_settings
@@ -100,6 +101,15 @@ def get_list_transactions(
 ) -> ListTransactions:
     return ListTransactions(
         transactions=TransactionRepository(db),
+    )
+
+
+def get_transaction_status(
+    db: Annotated[Session, Depends(get_db)],
+) -> GetTransactionStatus:
+    return GetTransactionStatus(
+        transactions=TransactionRepository(db),
+        jobs=ProcessorJobRepository(db),
     )
 
 

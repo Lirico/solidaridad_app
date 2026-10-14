@@ -11,6 +11,7 @@ from application.payments.create_transaction import (
     CreateTransaction,
     CreateTransactionHttpStatus,
 )
+from application.payments.get_transaction_status import GetTransactionStatus
 from application.payments.list_transactions import ListTransactions
 from application.payments.public_transaction_status import (
     project_public_transaction_status,
@@ -40,12 +41,15 @@ from presentation.dependencies import (
     get_list_transactions,
     get_void_transaction,
 )
+from presentation.dependencies import (
+    get_transaction_status as get_transaction_status_use_case,
+)
 from presentation.schemas.transactions import (
     BatchCloseResponse,
     CreateTransactionRequest,
+    PublicTransactionResponse,
     TransactionItemResponse,
     TransactionListResponse,
-    PublicTransactionResponse,
     TransactionResponse,
     VoidTransactionRequest,
 )
@@ -86,6 +90,60 @@ def list_transactions(
         for t in result.transactions
     ]
     return TransactionListResponse(items=items, total=result.total)
+
+
+@router.get(
+    "/{transaction_number}",
+    response_model=PublicTransactionResponse,
+    responses={
+        status.HTTP_202_ACCEPTED: {
+            "description": "Authorization recovery is still processing",
+            "model": PublicTransactionResponse,
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing/invalid token",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Transaction not found for the authenticated terminal",
+        },
+    },
+)
+def get_transaction(
+    transaction_number: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[
+        GetTransactionStatus,
+        Depends(get_transaction_status_use_case),
+    ],
+) -> PublicTransactionResponse | JSONResponse:
+    try:
+        result = use_case.execute(
+            terminal_id=current_user.installation_id,
+            transaction_number=transaction_number,
+        )
+    except TransactionNotFound as exc:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": str(exc)},
+        )
+
+    public_status = result.public_status
+    payload = PublicTransactionResponse(
+        transaction_number=result.transaction.transaction_number,
+        status=public_status.status,
+        reason=public_status.reason,
+        user_message=public_status.user_message,
+        poll_after_seconds=public_status.poll_after_seconds,
+        may_start_new_sale=public_status.may_start_new_sale,
+        created_at=result.transaction.created_at,
+    )
+    if public_status.poll_after_seconds is not None:
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=payload.model_dump(mode="json"),
+            headers={"Retry-After": str(public_status.poll_after_seconds)},
+        )
+    return payload
 
 
 @router.post(

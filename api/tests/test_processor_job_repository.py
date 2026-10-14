@@ -156,6 +156,61 @@ def test_claim_ignores_when_no_due_reverse_job_is_available() -> None:
     session.flush.assert_not_called()
 
 
+def test_moves_one_stale_processing_job_to_manual_review() -> None:
+    session = MagicMock()
+    row = _row(ProcessorJobState.PROCESSING)
+    row.worker_id = "worker-1"
+    row.claim_token = uuid4()
+    row.processing_started_at = datetime(2026, 10, 14, 11, 59, tzinfo=UTC)
+    session.scalar.return_value = row
+    reviewed_at = datetime(2026, 10, 14, 12, tzinfo=UTC)
+
+    moved = ProcessorJobRepository(
+        session
+    ).move_next_stale_processing_to_manual_review(
+        processing_started_before=reviewed_at,
+        reviewed_at=reviewed_at,
+    )
+
+    assert moved is not None
+    assert moved.state is ProcessorJobState.MANUAL_REVIEW
+    assert moved.last_error_code == "PROCESSING_TIMEOUT"
+    statement = session.scalar.call_args.args[0]
+    assert "FOR UPDATE" in str(statement)
+    assert statement._for_update_arg.skip_locked is True
+    session.flush.assert_called_once()
+
+
+def test_competing_monitors_only_move_one_stale_processing_job() -> None:
+    first_session = MagicMock()
+    second_session = MagicMock()
+    row = _row(ProcessorJobState.PROCESSING)
+    row.worker_id = "worker-1"
+    row.claim_token = uuid4()
+    row.processing_started_at = datetime(2026, 10, 14, 11, 59, tzinfo=UTC)
+    first_session.scalar.return_value = row
+    second_session.scalar.return_value = None
+    reviewed_at = datetime(2026, 10, 14, 12, tzinfo=UTC)
+
+    first = ProcessorJobRepository(
+        first_session
+    ).move_next_stale_processing_to_manual_review(
+        processing_started_before=reviewed_at,
+        reviewed_at=reviewed_at,
+    )
+    second = ProcessorJobRepository(
+        second_session
+    ).move_next_stale_processing_to_manual_review(
+        processing_started_before=reviewed_at,
+        reviewed_at=reviewed_at,
+    )
+
+    assert first is not None
+    assert second is None
+    first_session.flush.assert_called_once()
+    second_session.flush.assert_not_called()
+
+
 def test_two_competing_sessions_only_one_claims_the_same_job() -> None:
     first_session = MagicMock()
     second_session = MagicMock()
@@ -199,6 +254,23 @@ def test_finalize_claim_requires_the_current_processing_token() -> None:
     statement = session.execute.call_args.args[0]
     assert "processor_jobs.state" in str(statement)
     assert "processor_jobs.claim_token" in str(statement)
+
+
+def test_late_completion_cannot_overwrite_manual_review() -> None:
+    session = MagicMock()
+    session.execute.return_value.scalar_one_or_none.return_value = None
+
+    finalized = ProcessorJobRepository(session).finalize_claim(
+        job_id=7,
+        claim_token=uuid4(),
+        target=ProcessorJobState.COMPLETED,
+        finalized_at=datetime.now(UTC),
+        result="REVERSED_CONFIRMED",
+    )
+
+    assert finalized is False
+    statement = session.execute.call_args.args[0]
+    assert "processor_jobs.state" in str(statement)
 
 
 def test_invalid_or_incomplete_job_transitions_are_rejected() -> None:

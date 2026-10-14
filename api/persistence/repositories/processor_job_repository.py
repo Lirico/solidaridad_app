@@ -128,6 +128,40 @@ class ProcessorJobRepository:
         self._session.flush()
         return _to_domain(row)
 
+    def move_next_stale_processing_to_manual_review(
+        self,
+        *,
+        processing_started_before: datetime,
+        reviewed_at: datetime,
+    ) -> ProcessorJob | None:
+        """Stop one abandoned job without making another processor request.
+
+        The caller owns the transaction.  ``SKIP LOCKED`` lets concurrent
+        watchdog instances inspect other work instead of blocking on a job
+        whose original worker may be finishing at the same time.
+        """
+        row = self._session.scalar(
+            select(ProcessorJobModel)
+            .where(
+                ProcessorJobModel.state == ProcessorJobState.PROCESSING.value,
+                ProcessorJobModel.processing_started_at <= processing_started_before,
+            )
+            .order_by(ProcessorJobModel.processing_started_at, ProcessorJobModel.id)
+            .with_for_update(skip_locked=True)
+        )
+        if row is None:
+            return None
+
+        validate_processor_job_transition(
+            ProcessorJobState(row.state), ProcessorJobState.MANUAL_REVIEW
+        )
+        row.state = ProcessorJobState.MANUAL_REVIEW.value
+        row.updated_at = reviewed_at
+        row.last_error_code = "PROCESSING_TIMEOUT"
+        row.last_error_detail_sanitized = None
+        self._session.flush()
+        return _to_domain(row)
+
     def finalize_claim(
         self,
         *,

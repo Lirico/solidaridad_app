@@ -12,6 +12,7 @@ from application.payments.ports import (
     ReversalOutcome,
     ReverseRequest,
 )
+from application.payments.recovery_alert_events import log_recovery_alert_opened
 from application.payments.response_messages import MSG_FAILED
 from application.payments.reversal_retry import ReversalRetryPolicy
 from domain.authorization_outcome import AuthorizationOutcome
@@ -22,6 +23,7 @@ from persistence.repositories.payment_processing_config_repository import (
     PaymentProcessingConfigRepository,
 )
 from persistence.repositories.processor_job_repository import ProcessorJobRepository
+from persistence.repositories.recovery_alert_repository import RecoveryAlertRepository
 from persistence.repositories.transaction_repository import TransactionRepository
 
 
@@ -35,6 +37,7 @@ class ReversalJobWorker:
         session: Session,
         transactions: TransactionRepository,
         jobs: ProcessorJobRepository,
+        alerts: RecoveryAlertRepository,
         configs: PaymentProcessingConfigRepository,
         gateway: PaymentGateway,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -47,6 +50,7 @@ class ReversalJobWorker:
         self._session = session
         self._transactions = transactions
         self._jobs = jobs
+        self._alerts = alerts
         self._configs = configs
         self._gateway = gateway
         self._now = now
@@ -193,7 +197,18 @@ class ReversalJobWorker:
             last_error_code=error_code,
             last_error_detail_sanitized=error_detail,
         ):
+            alert_opened = self._alerts.open_for_job(
+                processor_job_id=claimed.id,
+                cause=error_code,
+                opened_at=finalized_at or self._now(),
+            )
             self._commit_outcome()
+            if alert_opened:
+                log_recovery_alert_opened(
+                    processor_job_id=claimed.id,
+                    transaction_id=claimed.transaction_id,
+                    cause=error_code,
+                )
         else:
             self._session.rollback()
 

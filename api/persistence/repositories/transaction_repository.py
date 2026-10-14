@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from domain.authorization_outcome import AuthorizationOutcome
 from domain.batch_close import BatchClose
 from domain.product import Product
 from domain.transaction import Transaction
@@ -36,6 +37,14 @@ def _to_domain(row: TransactionModel) -> Transaction:
         amount_minor=row.amount_minor,
         status=TransactionStatus(row.status),
         card_last4=row.card_last4,
+        card_number=row.card_number,
+        expiration_date=row.expiration_date,
+        authorization_outcome=(
+            AuthorizationOutcome(row.authorization_outcome)
+            if row.authorization_outcome is not None
+            else None
+        ),
+        authorization_attempt_count=row.authorization_attempt_count,
         stan=row.stan,
         auth_id=row.auth_id,
         retrieval_reference=row.retrieval_reference,
@@ -161,6 +170,8 @@ class TransactionRepository:
         processor_product_code: str,
         amount_minor: int,
         card_last4: str,
+        card_number: str,
+        expiration_date: str | None,
         stan: str,
         processor_ticket: str,
         idempotency_key: str,
@@ -178,6 +189,10 @@ class TransactionRepository:
             amount_minor=amount_minor,
             status=TransactionStatus.PENDING.value,
             card_last4=card_last4,
+            card_number=card_number,
+            expiration_date=expiration_date,
+            authorization_outcome=AuthorizationOutcome.PENDING.value,
+            authorization_attempt_count=1,
             stan=stan,
             processor_ticket=processor_ticket,
             user_message=user_message,
@@ -321,6 +336,7 @@ class TransactionRepository:
         *,
         transaction_id: int,
         status: TransactionStatus,
+        authorization_outcome: AuthorizationOutcome,
         user_message: str,
         processor_response_code: str | None = None,
         auth_id: str | None = None,
@@ -331,6 +347,7 @@ class TransactionRepository:
             raise LookupError(f"transaction {transaction_id} not found")
         from_status = row.status
         row.status = status.value
+        row.authorization_outcome = authorization_outcome.value
         row.user_message = user_message
         row.processor_response_code = processor_response_code
         row.auth_id = auth_id

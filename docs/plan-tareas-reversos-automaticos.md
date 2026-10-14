@@ -3,8 +3,8 @@
 > Documento de ejecución basado en
 > [`plan-reversos-automaticos.md`](plan-reversos-automaticos.md).
 >
-> Estado: RA-00, RA-01 y RA-02 completadas. RA-03 es la siguiente tarea del
-> orden de integración.
+> Estado: RA-00 a RA-03 completadas. RA-04 es la siguiente tarea del orden de
+> integración.
 >
 > Última revisión: 2026-10-13.
 
@@ -259,6 +259,11 @@ respuesta permite distinguir con certeza `NOT_SENT` de `INDETERMINATE`.
 ## RA-03 — Persistir datos de recuperación en la transacción
 
 **Branch:** `codex/reversal-ra-03-transaction-recovery-data`
+
+**Estado:** completada el 2026-10-13. Migración
+`20261013_0008_transaction_recovery_data.py`, outcome interno tipado y
+persistencia previa al efecto externo en la API. Las filas históricas conservan
+PAN/outcome nulos y no son recuperables automáticamente.
 
 **Objetivo:** guardar antes del efecto externo todo lo necesario para recuperar
 una autorización después de reiniciar la API.

@@ -21,6 +21,7 @@ from application.payments.response_messages import (
     MSG_UNKNOWN,
     message_for_code,
 )
+from domain.authorization_outcome import AuthorizationOutcome
 from domain.exceptions import (
     IdempotencyConflict,
     InvalidAmount,
@@ -60,14 +61,14 @@ def _fingerprint(
     *,
     product: Product,
     amount_minor: int,
-    card_last4: str,
+    card_number: str,
     expiration_date: str | None,
 ) -> str:
     raw = "|".join(
         [
             product.value,
             str(amount_minor),
-            card_last4,
+            card_number,
             expiration_date or "",
         ]
     )
@@ -133,12 +134,10 @@ class CreateTransaction:
         # lo manda, solo se valida su formato y nunca se persiste ni reenvía.
         if cvv and cvv.strip():
             _validate_cvv(cvv)
-        card_last4 = pan[-4:]
-
         fingerprint = _fingerprint(
             product=parsed_product,
             amount_minor=money.amount_minor,
-            card_last4=card_last4,
+            card_number=pan,
             expiration_date=exp,
         )
 
@@ -171,7 +170,9 @@ class CreateTransaction:
                 product=parsed_product,
                 processor_product_code=proc_code,
                 amount_minor=money.amount_minor,
-                card_last4=card_last4,
+                card_last4=pan[-4:],
+                card_number=pan,
+                expiration_date=exp,
                 stan=stan,
                 processor_ticket=processor_ticket,
                 idempotency_key=key,
@@ -242,20 +243,25 @@ class CreateTransaction:
     ) -> Transaction:
         if result.outcome == GatewayOutcome.APPROVED:
             status = TransactionStatus.APPROVED
+            authorization_outcome = AuthorizationOutcome.APPROVED
             message = message_for_code(result.response_code, approved=True)
         elif result.outcome == GatewayOutcome.DECLINED:
             status = TransactionStatus.DECLINED
+            authorization_outcome = AuthorizationOutcome.DECLINED
             message = message_for_code(result.response_code, approved=False)
         elif result.outcome == GatewayOutcome.FAILED:
             status = TransactionStatus.FAILED
+            authorization_outcome = AuthorizationOutcome.NOT_SENT
             message = MSG_FAILED
         else:
             status = TransactionStatus.UNKNOWN
+            authorization_outcome = AuthorizationOutcome.INDETERMINATE
             message = MSG_UNKNOWN
 
         return self._transactions.update_result(
             transaction_id=transaction_id,
             status=status,
+            authorization_outcome=authorization_outcome,
             user_message=message,
             processor_response_code=result.response_code,
             auth_id=result.auth_id,

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from domain.authorization_outcome import AuthorizationOutcome
 from domain.product import Product
 from domain.transaction_status import TransactionStatus
 from domain.transaction_status_event import (
@@ -31,6 +32,10 @@ def test_to_domain_maps_fields() -> None:
     row.amount_minor = 150
     row.status = "APPROVED"
     row.card_last4 = "1111"
+    row.card_number = "4111111111111111"
+    row.expiration_date = "3012"
+    row.authorization_outcome = "APPROVED"
+    row.authorization_attempt_count = 1
     row.stan = "1"
     row.processor_ticket = "00000007"
     row.auth_id = "A"
@@ -46,6 +51,76 @@ def test_to_domain_maps_fields() -> None:
     assert tx.id == 7
     assert tx.product == Product.GARRAFA_10
     assert tx.status == TransactionStatus.APPROVED
+    assert tx.card_number == "4111111111111111"
+    assert tx.expiration_date == "3012"
+    assert tx.authorization_outcome == AuthorizationOutcome.APPROVED
+    assert "4111111111111111" not in repr(tx)
+    assert "3012" not in repr(tx)
+
+
+def test_to_domain_keeps_historical_rows_without_pan_unrecoverable() -> None:
+    row = MagicMock(spec=TransactionModel)
+    for name, value in {
+        "id": 7,
+        "transaction_number": "OP-260716-00000007",
+        "user_id": 1,
+        "installation_id": 10,
+        "terminal_id": "05000001",
+        "product": "GARRAFA_10",
+        "processor_product_code": "993",
+        "amount_minor": 150,
+        "status": "APPROVED",
+        "card_last4": "1111",
+        "card_number": None,
+        "expiration_date": None,
+        "authorization_outcome": None,
+        "authorization_attempt_count": 0,
+        "stan": "1",
+        "processor_ticket": "00000007",
+        "auth_id": "A",
+        "retrieval_reference": "R",
+        "processor_response_code": "00",
+        "user_message": "ok",
+        "idempotency_key": "k",
+        "void_idempotency_key": None,
+        "batch_close_id": None,
+        "request_fingerprint": "fp",
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }.items():
+        setattr(row, name, value)
+
+    transaction = _to_domain(row)
+
+    assert transaction.card_number is None
+    assert transaction.authorization_outcome is None
+    assert transaction.authorization_attempt_count == 0
+
+
+def test_orm_repr_never_contains_recovery_card_data() -> None:
+    row = TransactionModel(
+        transaction_number="OP-261014-00000001",
+        user_id=1,
+        installation_id=1,
+        terminal_id="05000001",
+        product="GARRAFA_10",
+        processor_product_code="993",
+        amount_minor=100,
+        status="PENDING",
+        card_last4="1111",
+        card_number="4111111111111111",
+        expiration_date="3012",
+        authorization_outcome="PENDING",
+        authorization_attempt_count=1,
+        idempotency_key="key",
+        request_fingerprint="a" * 64,
+    )
+
+    rendered = repr(row)
+
+    assert "4111111111111111" not in rendered
+    assert "3012" not in rendered
+    assert "1111" in rendered
 
 
 def test_get_by_idempotency_none() -> None:
@@ -108,6 +183,8 @@ def test_create_pending_and_update_result() -> None:
         processor_product_code="993",
         amount_minor=150,
         card_last4="1111",
+        card_number="4111111111111111",
+        expiration_date="3012",
         stan="000001",
         processor_ticket="00000001",
         idempotency_key="k",
@@ -115,6 +192,10 @@ def test_create_pending_and_update_result() -> None:
         user_message="pending",
     )
     assert created.status == TransactionStatus.PENDING
+    assert created.card_number == "4111111111111111"
+    assert created.expiration_date == "3012"
+    assert created.authorization_outcome == AuthorizationOutcome.PENDING
+    assert created.authorization_attempt_count == 1
     assert created.id == 1
     create_events = [e for e in added if isinstance(e, TransactionStatusEvent)]
     assert len(create_events) == 1
@@ -134,6 +215,10 @@ def test_create_pending_and_update_result() -> None:
     row.amount_minor = 150
     row.status = "PENDING"
     row.card_last4 = "1111"
+    row.card_number = "4111111111111111"
+    row.expiration_date = "3012"
+    row.authorization_outcome = "PENDING"
+    row.authorization_attempt_count = 1
     row.stan = "000001"
     row.processor_ticket = "00000001"
     row.auth_id = None
@@ -150,6 +235,7 @@ def test_create_pending_and_update_result() -> None:
     updated = repo.update_result(
         transaction_id=1,
         status=TransactionStatus.APPROVED,
+        authorization_outcome=AuthorizationOutcome.APPROVED,
         user_message="Pago aprobado",
         processor_response_code="00",
         auth_id="A",
@@ -157,6 +243,7 @@ def test_create_pending_and_update_result() -> None:
     )
     assert updated.status == TransactionStatus.APPROVED
     assert row.status == "APPROVED"
+    assert row.authorization_outcome == AuthorizationOutcome.APPROVED.value
     gateway_events = [
         e
         for e in added
@@ -177,6 +264,7 @@ def test_update_result_missing() -> None:
         repo.update_result(
             transaction_id=99,
             status=TransactionStatus.FAILED,
+            authorization_outcome=AuthorizationOutcome.NOT_SENT,
             user_message="x",
         )
 
@@ -195,6 +283,10 @@ def test_apply_void_result_appends_event() -> None:
     row.amount_minor = 150
     row.status = "APPROVED"
     row.card_last4 = "1111"
+    row.card_number = "4111111111111111"
+    row.expiration_date = "3012"
+    row.authorization_outcome = "APPROVED"
+    row.authorization_attempt_count = 1
     row.stan = "000001"
     row.processor_ticket = "00000001"
     row.auth_id = "A"

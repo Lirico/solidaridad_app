@@ -124,7 +124,10 @@ def _batch_close() -> BatchClose:
 def test_create_transaction_201() -> None:
     use_case = MagicMock(spec=CreateTransaction)
     use_case.execute.return_value = CreateTransactionResult(
-        transaction=_tx(),
+        transaction=_tx(
+            card_number="4111111111111111",
+            expiration_date="3012",
+        ),
         http_status=CreateTransactionHttpStatus.CREATED,
     )
     _override(use_case)
@@ -144,6 +147,9 @@ def test_create_transaction_201() -> None:
     assert data["user_message"] == "Pago aprobado"
     assert "card_number" not in data
     assert "cvv" not in data
+    assert "expiration_date" not in data
+    assert "4111111111111111" not in response.text
+    assert "3012" not in response.text
 
 
 def test_create_transaction_202_pending() -> None:

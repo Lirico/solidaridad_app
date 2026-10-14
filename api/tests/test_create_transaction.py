@@ -8,6 +8,7 @@ from application.payments.create_transaction import (
     CreateTransactionHttpStatus,
 )
 from application.payments.ports import AuthorizeResult, GatewayOutcome
+from domain.authorization_outcome import AuthorizationOutcome
 from domain.exceptions import (
     IdempotencyConflict,
     InvalidAmount,
@@ -92,7 +93,6 @@ def _build(
     return use_case, transactions, installations, gateway
 
 
-
 def test_create_approves() -> None:
     use_case, transactions, _, gateway = _build()
     result = use_case.execute(
@@ -112,7 +112,12 @@ def test_create_approves() -> None:
     transactions.create_pending.assert_called_once()
     create_kwargs = transactions.create_pending.call_args.kwargs
     assert create_kwargs["processor_ticket"] == "00000001"
+    assert create_kwargs["card_number"] == "4111111111111111"
+    assert create_kwargs["expiration_date"] is None
+    assert "cvv" not in create_kwargs
     transactions.update_result.assert_called_once()
+    update_kwargs = transactions.update_result.call_args.kwargs
+    assert update_kwargs["authorization_outcome"] == AuthorizationOutcome.APPROVED
 
 
 def test_missing_idempotency_key() -> None:
@@ -181,7 +186,7 @@ def test_replay_pending_returns_202() -> None:
     fp = _fingerprint(
         product=Product.GARRAFA_10,
         amount_minor=200,
-        card_last4="1111",
+        card_number="4111111111111111",
         expiration_date=None,
     )
     existing = _tx(status=TransactionStatus.PENDING, request_fingerprint=fp)
@@ -211,7 +216,7 @@ def test_replay_approved_returns_201_without_gateway() -> None:
     fp = _fingerprint(
         product=Product.GARRAFA_10,
         amount_minor=200,
-        card_last4="1111",
+        card_number="4111111111111111",
         expiration_date=None,
     )
     existing = _tx(status=TransactionStatus.APPROVED, request_fingerprint=fp)
@@ -270,6 +275,7 @@ def test_gateway_timeout_maps_to_unknown() -> None:
     assert result.transaction.status == TransactionStatus.UNKNOWN
     kwargs = transactions.update_result.call_args.kwargs
     assert kwargs["status"] == TransactionStatus.UNKNOWN
+    assert kwargs["authorization_outcome"] == AuthorizationOutcome.INDETERMINATE
 
 
 def test_gateway_connect_failure_maps_to_failed() -> None:
@@ -287,6 +293,8 @@ def test_gateway_connect_failure_maps_to_failed() -> None:
         cvv="123",
     )
     assert result.transaction.status == TransactionStatus.FAILED
+    kwargs = transactions.update_result.call_args.kwargs
+    assert kwargs["authorization_outcome"] == AuthorizationOutcome.NOT_SENT
 
 
 def test_gateway_declined() -> None:
@@ -308,6 +316,51 @@ def test_gateway_declined() -> None:
         expiration_date="2912",
     )
     assert result.transaction.status == TransactionStatus.DECLINED
+    kwargs = transactions.update_result.call_args.kwargs
+    assert kwargs["authorization_outcome"] == AuthorizationOutcome.DECLINED
+
+
+def test_pending_recovery_data_is_committed_before_gateway_call() -> None:
+    use_case, transactions, _, gateway = _build()
+
+    def authorize_after_commit(request: object) -> AuthorizeResult:
+        use_case._session.commit.assert_called_once()
+        create_kwargs = transactions.create_pending.call_args.kwargs
+        assert create_kwargs["card_number"] == "6063007014007403"
+        assert create_kwargs["expiration_date"] == "2912"
+        assert "cvv" not in create_kwargs
+        return AuthorizeResult(outcome=GatewayOutcome.APPROVED, response_code="00")
+
+    gateway.authorize.side_effect = authorize_after_commit
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="6063007014007403",
+        cvv="123",
+        expiration_date="2912",
+    )
+
+
+def test_fingerprint_uses_full_normalized_pan_not_only_last4() -> None:
+    from application.payments.create_transaction import _fingerprint
+
+    first = _fingerprint(
+        product=Product.GARRAFA_10,
+        amount_minor=200,
+        card_number="4111111111111111",
+        expiration_date="3012",
+    )
+    second = _fingerprint(
+        product=Product.GARRAFA_10,
+        amount_minor=200,
+        card_number="5555555555551111",
+        expiration_date="3012",
+    )
+
+    assert first != second
 
 
 def test_invalid_cvv() -> None:
@@ -349,7 +402,6 @@ def test_allows_empty_cvv_for_card_capture() -> None:
     transactions.update_result.assert_called_once()
 
 
-
 def test_empty_terminal_string() -> None:
     use_case, *_ = _build(installation_code="   ")
     with pytest.raises(MissingTerminalId):
@@ -372,7 +424,7 @@ def test_integrity_error_replays_existing() -> None:
     fp = _fingerprint(
         product=Product.GARRAFA_10,
         amount_minor=200,
-        card_last4="1111",
+        card_number="4111111111111111",
         expiration_date=None,
     )
     existing = _tx(status=TransactionStatus.APPROVED, request_fingerprint=fp)

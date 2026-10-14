@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from persistence.models.base import Base
@@ -30,6 +30,11 @@ class TransactionStatusEvent(Base):
         String(8),
         nullable=True,
     )
+    authorization_outcome: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+    attempt_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     user_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
     idempotency_key: Mapped[str | None] = mapped_column(
         String(128),

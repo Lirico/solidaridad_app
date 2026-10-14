@@ -38,6 +38,7 @@ class AuthorizeRequest:
     terminal_id: str
     stan: str
     ticket_number: str
+    idempotency_key: str
     expiration_date: str | None = None
 
 

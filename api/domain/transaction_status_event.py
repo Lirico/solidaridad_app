@@ -5,6 +5,7 @@ from enum import StrEnum
 
 class TransactionStatusEventType(StrEnum):
     CREATED = "CREATED"
+    AUTHORIZATION_ATTEMPT = "AUTHORIZATION_ATTEMPT"
     GATEWAY_RESULT = "GATEWAY_RESULT"
     VOID_RESULT = "VOID_RESULT"
     IDEMPOTENT_HIT = "IDEMPOTENT_HIT"

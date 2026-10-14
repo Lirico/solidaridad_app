@@ -3,7 +3,7 @@
 > Documento de ejecución basado en
 > [`plan-reversos-automaticos.md`](plan-reversos-automaticos.md).
 >
-> Estado: RA-00 a RA-03 completadas. RA-04 es la siguiente tarea del orden de
+> Estado: RA-00 a RA-04 completadas. RA-05 es la siguiente tarea del orden de
 > integración.
 >
 > Última revisión: 2026-10-13.
@@ -305,6 +305,11 @@ instancia puede reconstruir el request al procesador usando solo Postgres.
 ## RA-04 — Crear jobs y configuración persistida
 
 **Branch:** `codex/reversal-ra-04-jobs-config`
+
+**Estado:** completada el 2026-10-13. La migración `20261013_0009` incorpora
+ambas tablas, la política `default` y sus constraints; los modelos de dominio y
+repositorios permiten crear/consultar jobs y rechazan transiciones inválidas,
+sin iniciar ejecución en background.
 
 **Objetivo:** incorporar las estructuras durables sin ejecutar aún el worker.
 

@@ -10,7 +10,7 @@ def test_worker_runs_in_a_dedicated_thread_and_stops_while_idle() -> None:
     completed = Event()
     calls = 0
 
-    def run_iteration() -> float:
+    def run_iteration(_should_stop: object) -> float:
         nonlocal calls
         calls += 1
         completed.set()
@@ -30,7 +30,7 @@ def test_worker_waits_for_an_in_progress_iteration_during_shutdown() -> None:
     started = Event()
     release = Event()
 
-    def run_iteration() -> float:
+    def run_iteration(_should_stop: object) -> float:
         started.set()
         release.wait(timeout=1)
         return 60
@@ -47,7 +47,9 @@ def test_worker_waits_for_an_in_progress_iteration_during_shutdown() -> None:
 
 def test_fatal_iteration_error_degrades_readiness() -> None:
     worker = EmbeddedRecoveryWorker(
-        run_iteration=lambda: (_ for _ in ()).throw(RuntimeError("database down"))
+        run_iteration=lambda _should_stop: (_ for _ in ()).throw(
+            RuntimeError("database down")
+        )
     )
     worker.start()
 
@@ -59,7 +61,7 @@ def test_fatal_iteration_error_degrades_readiness() -> None:
 
 def test_disabled_worker_is_ready_without_starting_a_thread() -> None:
     worker = EmbeddedRecoveryWorker(
-        run_iteration=lambda: 1,
+        run_iteration=lambda _should_stop: 1,
         enabled=False,
     )
 

@@ -36,7 +36,7 @@ class EmbeddedRecoveryWorker:
     def __init__(
         self,
         *,
-        run_iteration: Callable[[], float],
+        run_iteration: Callable[[Callable[[], bool]], float],
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
         enabled: bool = True,
     ) -> None:
@@ -98,12 +98,18 @@ class EmbeddedRecoveryWorker:
                 last_error=self._last_error,
             )
 
+    def stop_requested(self) -> bool:
+        """Let an in-flight iteration decline to claim new work."""
+        return self._stop_requested.is_set()
+
     def _run(self) -> None:
         try:
             while not self._stop_requested.is_set():
-                poll_seconds = self._run_iteration()
+                poll_seconds = self._run_iteration(self.stop_requested)
                 if poll_seconds <= 0:
-                    raise ValueError("embedded recovery worker poll interval must be positive")
+                    raise ValueError(
+                        "embedded recovery worker poll interval must be positive"
+                    )
                 with self._lock:
                     self._last_iteration_at = self._now()
                 self._stop_requested.wait(timeout=poll_seconds)

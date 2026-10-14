@@ -527,6 +527,22 @@ processing_timeout_seconds > 0
 worker_poll_interval_seconds > 0
 ```
 
+Los valores iniciales acordados para esa fila son:
+
+| Campo | Valor |
+|---|---:|
+| `max_authorization_attempts` | `3` |
+| `authorization_initial_delay_ms` | `100` |
+| `authorization_max_delay_ms` | `500` |
+| `authorization_backoff_multiplier` | `2` |
+| `max_reversal_attempts` | `5` |
+| `reversal_initial_delay_seconds` | `5` |
+| `reversal_max_delay_seconds` | `300` |
+| `reversal_backoff_multiplier` | `2` |
+| `jitter_percentage` | `20` |
+| `processing_timeout_seconds` | `60` |
+| `worker_poll_interval_seconds` | `1` |
+
 La API consulta la configuración `default` al comenzar una autorización y usa
 ese snapshot durante sus intentos síncronos. Los cambios aplican a nuevas
 autorizaciones sin reiniciar el proceso. El worker consulta la fila al
@@ -1095,8 +1111,7 @@ Como mínimo deben cubrirse:
 - ¿El procesador debe registrar un tombstone para una venta que todavía no
   existe?
 - ¿Qué política de retención y purga se adoptará en una etapa futura?
-- ¿Cuáles son los valores iniciales de intentos, delays, multiplicador, jitter,
-  `processing_timeout_seconds` y SLA de alerta para la fila `default`?
+- ¿Cuál será el SLA de alerta operativo para recuperaciones demoradas?
 - ¿Cómo se reconcilian operaciones que permanezcan abiertas al cierre del día?
 
 ## 19. Criterio de finalización

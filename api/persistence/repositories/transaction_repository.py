@@ -85,6 +85,8 @@ class TransactionRepository:
         actor_type: TransactionStatusActorType,
         actor_user_id: int | None = None,
         processor_response_code: str | None = None,
+        authorization_outcome: AuthorizationOutcome | None = None,
+        attempt_number: int | None = None,
         user_message: str | None = None,
         idempotency_key: str | None = None,
     ) -> None:
@@ -97,6 +99,12 @@ class TransactionRepository:
                 actor_type=actor_type.value,
                 actor_user_id=actor_user_id,
                 processor_response_code=processor_response_code,
+                authorization_outcome=(
+                    authorization_outcome.value
+                    if authorization_outcome is not None
+                    else None
+                ),
+                attempt_number=attempt_number,
                 user_message=user_message,
                 idempotency_key=idempotency_key,
                 created_at=datetime.now(UTC),
@@ -117,6 +125,41 @@ class TransactionRepository:
         if row is None:
             return None
         return _to_domain(row)
+
+    def start_authorization_retry(self, *, transaction_id: int) -> int:
+        """Persist the next attempt number before its external effect."""
+        row = self._session.get(TransactionModel, transaction_id)
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        row.authorization_attempt_count += 1
+        row.updated_at = datetime.now(UTC)
+        self._session.flush()
+        return row.authorization_attempt_count
+
+    def record_authorization_attempt(
+        self,
+        *,
+        transaction_id: int,
+        attempt_number: int,
+        outcome: AuthorizationOutcome,
+        processor_response_code: str | None = None,
+    ) -> None:
+        """Append a sanitized outcome for one authorization attempt."""
+        row = self._session.get(TransactionModel, transaction_id)
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        self._append_status_event(
+            transaction_id=row.id,
+            from_status=row.status,
+            to_status=row.status,
+            event_type=TransactionStatusEventType.AUTHORIZATION_ATTEMPT,
+            actor_type=TransactionStatusActorType.SYSTEM,
+            actor_user_id=row.user_id,
+            processor_response_code=processor_response_code,
+            authorization_outcome=outcome,
+            attempt_number=attempt_number,
+        )
+        self._session.flush()
 
     def get_by_transaction_number(
         self,

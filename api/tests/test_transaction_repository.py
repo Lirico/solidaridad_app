@@ -256,6 +256,60 @@ def test_create_pending_and_update_result() -> None:
     assert gateway_events[0].actor_type == TransactionStatusActorType.SYSTEM.value
 
 
+def test_records_authorization_retry_and_sanitized_attempt_outcome() -> None:
+    session, added = _session_with_identity()
+    repo = TransactionRepository(session)
+    row = MagicMock(spec=TransactionModel)
+    row.id = 1
+    row.user_id = 1
+    row.status = TransactionStatus.PENDING.value
+    row.authorization_attempt_count = 1
+    session.get.return_value = row
+
+    attempt_number = repo.start_authorization_retry(transaction_id=1)
+    repo.record_authorization_attempt(
+        transaction_id=1,
+        attempt_number=attempt_number,
+        outcome=AuthorizationOutcome.NOT_SENT,
+    )
+
+    assert attempt_number == 2
+    assert row.authorization_attempt_count == 2
+    events = [
+        event
+        for event in added
+        if isinstance(event, TransactionStatusEvent)
+        and event.event_type
+        == TransactionStatusEventType.AUTHORIZATION_ATTEMPT.value
+    ]
+    assert len(events) == 1
+    assert events[0].attempt_number == 2
+    assert events[0].authorization_outcome == AuthorizationOutcome.NOT_SENT.value
+    assert events[0].processor_response_code is None
+    assert events[0].user_message is None
+    assert events[0].idempotency_key is None
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    ["start_authorization_retry", "record_authorization_attempt"],
+)
+def test_authorization_attempt_methods_require_transaction(method_name: str) -> None:
+    session = MagicMock()
+    session.get.return_value = None
+    repo = TransactionRepository(session)
+
+    with pytest.raises(LookupError):
+        if method_name == "start_authorization_retry":
+            repo.start_authorization_retry(transaction_id=99)
+        else:
+            repo.record_authorization_attempt(
+                transaction_id=99,
+                attempt_number=1,
+                outcome=AuthorizationOutcome.NOT_SENT,
+            )
+
+
 def test_update_result_missing() -> None:
     session = MagicMock()
     session.get.return_value = None

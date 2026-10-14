@@ -115,6 +115,92 @@ def test_valid_job_state_transitions_are_persisted() -> None:
     assert retry.last_error_code == "NOT_SENT"
 
 
+def test_claims_one_due_reverse_job_with_a_fresh_processing_claim() -> None:
+    session = MagicMock()
+    row = _row(ProcessorJobState.RETRY)
+    row.attempt_count = 1
+    session.scalar.return_value = row
+    repo = ProcessorJobRepository(session)
+    claimed_at = datetime(2026, 10, 14, 12, tzinfo=UTC)
+    token = uuid4()
+
+    claimed = repo.claim_next_due_reverse(
+        worker_id="worker-1",
+        claim_token=token,
+        claimed_at=claimed_at,
+    )
+
+    assert claimed is not None
+    assert claimed.state is ProcessorJobState.PROCESSING
+    assert claimed.worker_id == "worker-1"
+    assert claimed.claim_token == token
+    assert claimed.processing_started_at == claimed_at
+    assert claimed.attempt_count == 2
+    statement = session.scalar.call_args.args[0]
+    assert "FOR UPDATE" in str(statement)
+    assert statement._for_update_arg.skip_locked is True
+    session.flush.assert_called_once()
+
+
+def test_claim_ignores_when_no_due_reverse_job_is_available() -> None:
+    session = MagicMock()
+    session.scalar.return_value = None
+
+    claimed = ProcessorJobRepository(session).claim_next_due_reverse(
+        worker_id="worker-1",
+        claim_token=uuid4(),
+        claimed_at=datetime.now(UTC),
+    )
+
+    assert claimed is None
+    session.flush.assert_not_called()
+
+
+def test_two_competing_sessions_only_one_claims_the_same_job() -> None:
+    first_session = MagicMock()
+    second_session = MagicMock()
+    row = _row()
+    first_session.scalar.return_value = row
+    # PostgreSQL SKIP LOCKED makes the second session skip the locked row.
+    second_session.scalar.return_value = None
+    claimed_at = datetime.now(UTC)
+
+    first = ProcessorJobRepository(first_session).claim_next_due_reverse(
+        worker_id="worker-1",
+        claim_token=uuid4(),
+        claimed_at=claimed_at,
+    )
+    second = ProcessorJobRepository(second_session).claim_next_due_reverse(
+        worker_id="worker-2",
+        claim_token=uuid4(),
+        claimed_at=claimed_at,
+    )
+
+    assert first is not None
+    assert first.state is ProcessorJobState.PROCESSING
+    assert second is None
+    first_session.flush.assert_called_once()
+    second_session.flush.assert_not_called()
+
+
+def test_finalize_claim_requires_the_current_processing_token() -> None:
+    session = MagicMock()
+    session.execute.return_value.scalar_one_or_none.return_value = None
+    token = uuid4()
+    finalized = ProcessorJobRepository(session).finalize_claim(
+        job_id=7,
+        claim_token=token,
+        target=ProcessorJobState.MANUAL_REVIEW,
+        finalized_at=datetime.now(UTC),
+        last_error_code="INDETERMINATE",
+    )
+
+    assert finalized is False
+    statement = session.execute.call_args.args[0]
+    assert "processor_jobs.state" in str(statement)
+    assert "processor_jobs.claim_token" in str(statement)
+
+
 def test_invalid_or_incomplete_job_transitions_are_rejected() -> None:
     session = MagicMock()
     row = _row()
@@ -148,4 +234,3 @@ def test_completed_jobs_are_terminal_and_missing_job_is_ignored() -> None:
 
     session.get.return_value = None
     assert repo.transition(job_id=999, target=ProcessorJobState.MANUAL_REVIEW) is None
-

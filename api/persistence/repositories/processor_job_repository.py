@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from domain.processor_job import (
@@ -86,6 +86,92 @@ class ProcessorJobRepository:
         self._session.flush()
         return _to_domain(row)
 
+    def claim_next_due_reverse(
+        self,
+        *,
+        worker_id: str,
+        claim_token: UUID,
+        claimed_at: datetime,
+    ) -> ProcessorJob | None:
+        """Claim one due reversal job without competing with other workers.
+
+        The caller owns the surrounding database transaction and must commit it
+        before making the processor request.  PostgreSQL keeps the row lock
+        until that commit, while ``SKIP LOCKED`` lets another worker continue
+        looking for a different ready job instead of waiting.
+        """
+        row = self._session.scalar(
+            select(ProcessorJobModel)
+            .where(
+                ProcessorJobModel.operation_type
+                == ProcessorOperationType.REVERSE.value,
+                ProcessorJobModel.state.in_(
+                    (ProcessorJobState.READY.value, ProcessorJobState.RETRY.value)
+                ),
+                ProcessorJobModel.next_attempt_at <= claimed_at,
+            )
+            .order_by(ProcessorJobModel.next_attempt_at, ProcessorJobModel.id)
+            .with_for_update(skip_locked=True)
+        )
+        if row is None:
+            return None
+
+        validate_processor_job_transition(
+            ProcessorJobState(row.state), ProcessorJobState.PROCESSING
+        )
+        row.state = ProcessorJobState.PROCESSING.value
+        row.worker_id = worker_id
+        row.claim_token = claim_token
+        row.processing_started_at = claimed_at
+        row.attempt_count += 1
+        row.updated_at = claimed_at
+        self._session.flush()
+        return _to_domain(row)
+
+    def finalize_claim(
+        self,
+        *,
+        job_id: int,
+        claim_token: UUID,
+        target: ProcessorJobState,
+        finalized_at: datetime,
+        next_attempt_at: datetime | None = None,
+        result: str | None = None,
+        last_error_code: str | None = None,
+        last_error_detail_sanitized: str | None = None,
+    ) -> bool:
+        """Persist one claimed outcome only while its claim is still current."""
+        validate_processor_job_transition(ProcessorJobState.PROCESSING, target)
+        if target is ProcessorJobState.RETRY and next_attempt_at is None:
+            raise ValueError("RETRY requires next_attempt_at")
+        if target is ProcessorJobState.COMPLETED and result is None:
+            raise ValueError("COMPLETED requires result")
+
+        values: dict[str, object] = {
+            "state": target.value,
+            "updated_at": finalized_at,
+            "last_error_code": last_error_code,
+            "last_error_detail_sanitized": last_error_detail_sanitized,
+        }
+        if next_attempt_at is not None:
+            values["next_attempt_at"] = next_attempt_at
+        if result is not None:
+            values["result"] = result
+        if target is ProcessorJobState.COMPLETED:
+            values["completed_at"] = finalized_at
+
+        outcome = self._session.execute(
+            update(ProcessorJobModel)
+            .where(
+                ProcessorJobModel.id == job_id,
+                ProcessorJobModel.state == ProcessorJobState.PROCESSING.value,
+                ProcessorJobModel.claim_token == claim_token,
+            )
+            .values(**values)
+            .returning(ProcessorJobModel.id)
+        )
+        return outcome.scalar_one_or_none() is not None
+
     def transition(
         self,
         *,
@@ -106,9 +192,7 @@ class ProcessorJobRepository:
 
         validate_processor_job_transition(ProcessorJobState(row.state), target)
         if target is ProcessorJobState.PROCESSING and (
-            worker_id is None
-            or claim_token is None
-            or processing_started_at is None
+            worker_id is None or claim_token is None or processing_started_at is None
         ):
             raise ValueError(
                 "PROCESSING requires worker_id, claim_token and start time"

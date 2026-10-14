@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from threading import Event
 
+import pytest
+
 from application.payments.embedded_recovery_worker import EmbeddedRecoveryWorker
 
 NOW = datetime(2026, 10, 14, 12, tzinfo=UTC)
@@ -69,3 +71,20 @@ def test_disabled_worker_is_ready_without_starting_a_thread() -> None:
 
     assert worker.health().ready is True
     assert worker.health().alive is False
+
+
+def test_worker_can_only_be_started_once() -> None:
+    worker = EmbeddedRecoveryWorker(run_iteration=lambda _should_stop: 60)
+    worker.start()
+
+    with pytest.raises(RuntimeError, match="already started"):
+        worker.start()
+
+    assert worker.stop(grace_seconds=1) is True
+
+
+def test_shutdown_grace_must_not_be_negative() -> None:
+    worker = EmbeddedRecoveryWorker(run_iteration=lambda _should_stop: 60)
+
+    with pytest.raises(ValueError, match="grace_seconds"):
+        worker.stop(grace_seconds=-1)

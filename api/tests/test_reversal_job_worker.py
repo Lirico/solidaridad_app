@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
@@ -103,6 +104,7 @@ def _build(
     claimed: ProcessorJob | None = None,
     transaction: Transaction | None = None,
     outcome: ReversalOutcome = ReversalOutcome.REVERSED_CONFIRMED,
+    should_stop: Callable[[], bool] = lambda: False,
 ) -> tuple[
     ReversalJobWorker,
     MagicMock,
@@ -133,6 +135,7 @@ def _build(
         now=lambda: NOW,
         random_value=lambda: 0.5,
         claim_token_factory=lambda: TOKEN,
+        should_stop=should_stop,
     )
     return worker, session, transactions, jobs, alerts, gateway
 
@@ -280,6 +283,19 @@ def test_run_once_returns_false_without_due_work() -> None:
     assert worker.run_once() is False
 
     session.commit.assert_called_once()
+    transactions.get_by_id.assert_not_called()
+    gateway.reverse.assert_not_called()
+
+
+def test_worker_does_not_claim_new_work_after_shutdown_is_requested() -> None:
+    worker, session, transactions, jobs, _, gateway = _build(
+        should_stop=lambda: True
+    )
+
+    assert worker.run_once() is False
+
+    jobs.claim_next_due_reverse.assert_not_called()
+    session.commit.assert_not_called()
     transactions.get_by_id.assert_not_called()
     gateway.reverse.assert_not_called()
 

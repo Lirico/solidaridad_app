@@ -68,6 +68,8 @@ def _build(
     installations = MagicMock()
     gateway = MagicMock()
     configs = MagicMock()
+    jobs = MagicMock()
+    jobs.get_by_transaction.return_value = None
     sleeper = MagicMock()
 
     transactions.get_by_idempotency.return_value = existing
@@ -83,9 +85,14 @@ def _build(
         else None
     )
     transactions.next_transaction_number.return_value = "OP-260716-00000001"
-    pending = _tx(status=TransactionStatus.PENDING, user_message="pending")
+    pending = _tx(
+        status=TransactionStatus.PENDING,
+        user_message="pending",
+        processor_ticket="00000001",
+    )
     # fingerprint filled by use case after create; for create path we stub update
     transactions.create_pending.return_value = pending
+    transactions.get_by_id_for_update.return_value = pending
     final = _tx(status=TransactionStatus.APPROVED)
     transactions.update_result.return_value = final
     default_result = gateway_result or AuthorizeResult(
@@ -126,6 +133,7 @@ def _build(
         installations=installations,
         gateway=gateway,
         configs=configs,
+        jobs=jobs,
         sleep=sleeper,
         monotonic=monotonic or MagicMock(return_value=0.0),
         random_value=lambda: 0.5,
@@ -298,13 +306,13 @@ def test_replay_conflict_on_different_body() -> None:
         )
 
 
-def test_gateway_timeout_maps_to_unknown() -> None:
+def test_gateway_timeout_enqueues_reverse_and_returns_pending() -> None:
     use_case, transactions, _, _ = _build(
         gateway_result=AuthorizeResult(
             outcome=AuthorizationGatewayOutcome.INDETERMINATE
         ),
     )
-    transactions.update_result.return_value = _tx(status=TransactionStatus.UNKNOWN)
+    transactions.update_result.return_value = _tx(status=TransactionStatus.PENDING)
     result = use_case.execute(
         user_id=1,
         installation_id="inst-1",
@@ -314,10 +322,65 @@ def test_gateway_timeout_maps_to_unknown() -> None:
         card_number="4111111111111111",
         cvv="123",
     )
-    assert result.transaction.status == TransactionStatus.UNKNOWN
+    assert result.http_status == CreateTransactionHttpStatus.ACCEPTED
+    assert result.transaction.status == TransactionStatus.PENDING
     kwargs = transactions.update_result.call_args.kwargs
-    assert kwargs["status"] == TransactionStatus.UNKNOWN
+    assert kwargs["status"] == TransactionStatus.PENDING
     assert kwargs["authorization_outcome"] == AuthorizationOutcome.INDETERMINATE
+    use_case._jobs.create_reverse.assert_called_once()
+    create_job = use_case._jobs.create_reverse.call_args.kwargs
+    assert create_job["transaction_id"] == 1
+    assert create_job["original_stan"] == "000001"
+    assert create_job["original_ticket"] == "00000001"
+    assert len(create_job["reversal_stan"]) == 6
+    use_case._gateway.reverse.assert_not_called()
+    use_case._transactions.record_reversal_enqueued.assert_called_once_with(
+        transaction_id=1
+    )
+
+
+def test_ambiguous_enqueue_failure_rolls_back_everything_after_gateway() -> None:
+    use_case, _, _, _ = _build(
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.INDETERMINATE
+        ),
+    )
+    use_case._jobs.create_reverse.side_effect = RuntimeError("job insert failed")
+
+    with pytest.raises(RuntimeError, match="job insert failed"):
+        use_case.execute(
+            user_id=1,
+            installation_id="inst-1",
+            idempotency_key="k1",
+            product="GARRAFA_10",
+            amount="2",
+            card_number="4111111111111111",
+        )
+
+    use_case._session.rollback.assert_called_once()
+
+
+def test_ambiguous_authorization_reuses_the_existing_reverse_job() -> None:
+    use_case, transactions, _, _ = _build(
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.INDETERMINATE
+        ),
+    )
+    transactions.update_result.return_value = _tx(status=TransactionStatus.PENDING)
+    use_case._jobs.get_by_transaction.return_value = MagicMock()
+
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    assert result.http_status == CreateTransactionHttpStatus.ACCEPTED
+    use_case._jobs.create_reverse.assert_not_called()
+    use_case._transactions.record_reversal_enqueued.assert_not_called()
 
 
 def test_gateway_connect_failure_maps_to_failed() -> None:

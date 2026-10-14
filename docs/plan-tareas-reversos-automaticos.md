@@ -3,10 +3,10 @@
 > Documento de ejecución basado en
 > [`plan-reversos-automaticos.md`](plan-reversos-automaticos.md).
 >
-> Estado: RA-00 y RA-01 completadas. RA-02 y la convergencia automática
-> requieren resolver RA-00B.
+> Estado: RA-00 y RA-01 completadas. RA-02 es la siguiente tarea del camino
+> crítico.
 >
-> Última revisión: 2026-10-12.
+> Última revisión: 2026-10-13.
 
 ## 1. Objetivo
 
@@ -102,9 +102,8 @@ En `api/` y `payment-gateway/` la cobertura total debe permanecer en al menos
 | Tarea | Resultado | Depende de | Puede avanzar en paralelo con |
 |---|---|---|---|
 | RA-00 | Evidencia ejecutable del `0400` legacy | — | RA-03, RA-04 |
-| RA-00B | Garantía autoritativa para confirmar neutralización | RA-00 | RA-01, RA-03, RA-04 |
 | RA-01 | Construcción ISO del reverso | RA-00 | RA-03, RA-04 |
-| RA-02 | Endpoint `/v1/reverse` del gateway | RA-01, RA-00B | RA-03, RA-04 |
+| RA-02 | Endpoint `/v1/reverse` del gateway | RA-01 | RA-03, RA-04 |
 | RA-03 | Datos de recuperación en `transactions` | — | RA-00 a RA-02, RA-04 |
 | RA-04 | Jobs y configuración persistida | — | RA-00 a RA-03 |
 | RA-05 | Puerto API ↔ gateway y taxonomía de resultados | RA-02 | — |
@@ -124,8 +123,7 @@ En `api/` y `payment-gateway/` la cobertura total debe permanecer en al menos
 Camino crítico aproximado:
 
 ```text
-RA-00 → RA-01 ─┐
-        RA-00B ─┴→ RA-02 → RA-05 → RA-06 → RA-07 → RA-09
+RA-00 → RA-01 → RA-02 → RA-05 → RA-06 → RA-07 → RA-09
                                                    └────→ RA-10 → RA-11
                                       RA-08 → RA-14 ─────→ RA-15
                                                    └────→ RA-12
@@ -168,29 +166,9 @@ garantías reales del procesador antes de implementar recuperación automática.
 - `make check` en `payment-gateway/`.
 
 **Criterio de aceptación:** existe una matriz de resultados reproducible que
-permite decidir qué respuesta habilita `REVERSED_CONFIRMED`, cuál representa
-`ORIGINAL_NOT_FOUND` y cuál debe tratarse como ambigua. Si el procesador no
-puede dar esa garantía, el documento lo declara como bloqueo para publicar
-`FAILED`, no como supuesto.
-
----
-
-## RA-00B — Resolver la garantía de neutralización
-
-**Estado:** bloqueante, pendiente de decisión técnica y de una tarea separada.
-
-**Objetivo:** incorporar una señal autoritativa que distinga una venta
-neutralizada de una original inexistente y que proteja la carrera reverso →
-venta tardía.
-
-**Alternativas admisibles:** respuesta diferenciada según filas afectadas,
-consulta de estado, clave idempotente con restricción única o tombstone de
-reverso. Si la solución exige cambiar el C legacy, debe tratarse como bug
-explícito y acotado y actualizar `payment_processor/LEGACY_CHANGELOG.md`.
-
-**Criterio de aceptación:** existe al menos un resultado verificable que
-habilita `REVERSED_CONFIRMED` o `ORIGINAL_NOT_FOUND`, y una prueba demuestra
-que una venta tardía no queda activa después de un reverso confirmado.
+permite fijar el contrato operativo. Por decisión de producto, el `0400` solo
+se emite para un `0200` previamente enviado y `0410/00` se acepta como
+`REVERSED_CONFIRMED`; una fila `0400` sin original no afecta el saldo.
 
 ---
 
@@ -249,8 +227,7 @@ intento de reverso.
 - agregar schema, controller y caso de uso `ReversePayment`;
 - validar sin loguear PAN ni request body;
 - mapear el transporte a resultados explícitos:
-  `REVERSED_CONFIRMED`, `ORIGINAL_NOT_FOUND`, `PROCESSOR_DECLINED`,
-  `NOT_SENT` y `INDETERMINATE`;
+  `REVERSED_CONFIRMED`, `PROCESSOR_DECLINED`, `NOT_SENT` e `INDETERMINATE`;
 - usar HTTP `503` solo cuando existe certeza de no envío y `502` cuando el
   resultado es ambiguo;
 - no hacer reintentos dentro del gateway.
@@ -642,8 +619,7 @@ casos `MANUAL_REVIEW`.
   ese rol;
 - endpoint interno para listar/ver jobs y alertas sin devolver PAN completo;
 - acciones auditadas para resolver como:
-  `REVERSED_CONFIRMED`, `ORIGINAL_NOT_FOUND`, `PROCESSOR_DECLINED` o
-  `ACTIVE_APPROVAL_CONFIRMED`;
+  `REVERSED_CONFIRMED`, `PROCESSOR_DECLINED` o `ACTIVE_APPROVAL_CONFIRMED`;
 - proyección final a `FAILED`, `DECLINED` o `APPROVED` según evidencia;
 - conservar `authorization_outcome = INDETERMINATE` como hecho histórico;
 - guardar operador, timestamp, motivo y referencia externa;

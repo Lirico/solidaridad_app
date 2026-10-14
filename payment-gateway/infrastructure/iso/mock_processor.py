@@ -56,12 +56,10 @@ class MockIsoProcessor:
                 response_code="05",
                 user_message="Denegada",
             )
-        # The current legacy 0410/00 cannot prove whether an original sale was
-        # found and neutralized. The mock preserves that safe classification.
         return ReversalResult(
-            status=ReversalStatus.INDETERMINATE,
+            status=ReversalStatus.REVERSED_CONFIRMED,
             response_code="00",
-            user_message="Resultado de reverso indeterminado",
+            user_message="Reverso aceptado",
         )
 
     def balance(self, command: BalanceCommand) -> BalanceResult:

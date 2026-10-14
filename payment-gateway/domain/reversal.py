@@ -8,7 +8,6 @@ class ReversalStatus(StrEnum):
     """Safe outcome of one reversal attempt."""
 
     REVERSED_CONFIRMED = "REVERSED_CONFIRMED"
-    ORIGINAL_NOT_FOUND = "ORIGINAL_NOT_FOUND"
     PROCESSOR_DECLINED = "PROCESSOR_DECLINED"
     NOT_SENT = "NOT_SENT"
     INDETERMINATE = "INDETERMINATE"

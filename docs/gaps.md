@@ -4,12 +4,13 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-12
+Última revisión: 2026-10-13
 
-> ⚠️ **Último cambio (2026-10-12, RA-01):** el gateway ya modela, construye y
+> ✅ **Último cambio (2026-10-13, RA-01):** el gateway ya modela, construye y
 > transporta el reverso `0400` exacto caracterizado en RA-00, sin endpoint HTTP
-> ni reintentos internos. `0410 / DE39=00` permanece `INDETERMINATE`; RA-00B
-> sigue bloqueando una confirmación autoritativa. Ver G-P1-09.
+> ni reintentos internos. Por decisión de producto, `0410/DE39=00` confirma el
+> reverso: una fila `0400` sin original no afecta saldo, reportes ni cierre.
+> Ver G-P1-09.
 
 > ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
 > lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
@@ -507,7 +508,7 @@ Verifone (banda + térmica).
 
 
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
-| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias y ejecución contra `authkig` + MySQL locales. Venta existente, inexistente y duplicada responden `0410 / DE39=00`; no existe garantía de neutralización. **RA-01 (2026-10-12):** se agregaron `ReverseCommand`, `ReversalResult`, el puerto `IsoProcessor.reverse`, mock, transporte TCP de un solo intento y `build_reversal_request` separado de la anulación. El packer reproduce byte a byte la fixture RA-00, usa exclusivamente DE2/3/4/11/12/13/14/22/24/25/41/49/62 y mapea `0410/00` a `INDETERMINATE`. Evidencia: `payment-gateway/domain/reversal.py`, `payment-gateway/infrastructure/iso/{message_builder,response_mapper,tcp_processor}.py` y `payment-gateway/tests/test_reversal_iso.py`. **Pendiente/bloqueante (RA-00B):** señal autoritativa antes de confirmar neutralización. Aún faltan `/v1/reverse`, orquestación API y jobs (RA-02+). |
+| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias y ejecución contra `authkig` + MySQL locales. **Decisión 2026-10-13:** el `0400` solo se genera para un `0200` previamente enviado y `0410/00` se acepta como confirmación; un `0400` sin original no interviene en el cálculo de saldo, reportes ni cierre. **RA-01:** se agregaron `ReverseCommand`, `ReversalResult`, `IsoProcessor.reverse`, mock, transporte TCP de un solo intento y `build_reversal_request` separado de la anulación. El packer reproduce byte a byte la fixture RA-00, usa exclusivamente DE2/3/4/11/12/13/14/22/24/25/41/49/62 y mapea `0410/00` a `REVERSED_CONFIRMED`; respuesta inválida queda `INDETERMINATE`. Evidencia: `payment-gateway/domain/reversal.py`, `payment-gateway/infrastructure/iso/{message_builder,response_mapper,tcp_processor}.py` y `payment-gateway/tests/test_reversal_iso.py`. **Pendiente:** `/v1/reverse`, orquestación API y jobs (RA-02+). |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
 | G-P1-14 | Consulta de saldo parcial presentada como completa | done | **2026-10-06:** antes la API llamaba los cinco productos en serie y devolvía `APPROVED` con las filas que alcanzaban a responder. Ahora las despacha concurrentemente, espera los resultados terminales del gateway/cliente ISO y devuelve `FAILED` sin saldos si cualquiera tuvo un fallo técnico terminal (`FAILED`, `UNKNOWN` o excepción). El código `06` no es fallo técnico: conserva la fila en `0.00`. Tests en `api/tests/test_check_balance.py`. |

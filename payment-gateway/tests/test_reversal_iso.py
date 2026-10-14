@@ -129,10 +129,10 @@ def test_reversal_builder_is_distinct_from_void_builder() -> None:
     assert build_void_request is not build_reversal_request
 
 
-def test_map_reversal_00_is_indeterminate() -> None:
+def test_map_reversal_00_is_confirmed() -> None:
     result = map_reversal_response(unpack_iso(_response_frame()))
 
-    assert result.status == ReversalStatus.INDETERMINATE
+    assert result.status == ReversalStatus.REVERSED_CONFIRMED
     assert result.response_code == "00"
 
 
@@ -160,7 +160,7 @@ def test_tcp_reverse_sends_one_characterized_request() -> None:
         sock.recv.side_effect = [response[:2], response[2:]]
         result = processor.reverse(_command())
 
-    assert result.status == ReversalStatus.INDETERMINATE
+    assert result.status == ReversalStatus.REVERSED_CONFIRMED
     sock.sendall.assert_called_once()
     sent = unpack_iso(sock.sendall.call_args.args[0])
     assert sent.mtype == "0400"
@@ -181,11 +181,11 @@ def test_tcp_reverse_invalid_response_is_indeterminate() -> None:
     sock.sendall.assert_called_once()
 
 
-def test_mock_reverse_preserves_safe_legacy_classification() -> None:
+def test_mock_reverse_uses_the_accepted_legacy_classification() -> None:
     processor = MockIsoProcessor()
 
     result = processor.reverse(_command())
     declined = processor.reverse(_command(card_number=processor.DECLINE_PAN))
 
-    assert result.status == ReversalStatus.INDETERMINATE
+    assert result.status == ReversalStatus.REVERSED_CONFIRMED
     assert declined.status == ReversalStatus.PROCESSOR_DECLINED

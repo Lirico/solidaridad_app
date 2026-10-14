@@ -72,15 +72,15 @@ def map_balance_response(iso: IsoMessage) -> BalanceResult:
 
 
 def map_reversal_response(iso: IsoMessage) -> ReversalResult:
-    """Map a 0410 without claiming guarantees the legacy does not provide."""
+    """Map the legacy 0410 using the accepted operational contract."""
     code = (iso.respcode_39 or "").strip() or "96"
     if iso.mtype != "0410":
         return invalid_reversal_result()
     if code == "00":
         return ReversalResult(
-            status=ReversalStatus.INDETERMINATE,
+            status=ReversalStatus.REVERSED_CONFIRMED,
             response_code=code,
-            user_message="Resultado de reverso indeterminado",
+            user_message="Reverso aceptado",
         )
     return ReversalResult(
         status=ReversalStatus.PROCESSOR_DECLINED,

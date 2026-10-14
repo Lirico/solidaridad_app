@@ -5,21 +5,17 @@
 
 ## Conclusión operativa
 
-El `DE39=00` del `0410` **no confirma** que una venta existente haya sido
-encontrada y neutralizada. El procesador devuelve el mismo código cuando la
-venta original no existe, acepta el mismo reverso más de una vez e incluso
-permite que un `0200` posterior se aplique después de un `0400` anticipado.
+El procesador devuelve `0410/DE39=00` tanto cuando encuentra la venta original
+como cuando no existe. Esto no produce un saldo negativo: el cálculo de consumo
+solo incluye filas `0200`, y reportes y cierre excluyen `0400`.
 
-Por lo tanto, con el contrato actual:
+El contrato operativo acordado establece que:
 
-- ninguna respuesta observada habilita `REVERSED_CONFIRMED`;
-- ninguna respuesta observada habilita `ORIGINAL_NOT_FOUND`;
-- `0410 / DE39=00` debe clasificarse como `INDETERMINATE`;
-- una autorización incierta no puede publicarse como `FAILED` a partir de ese
-  `00`;
-- RA-01/RA-02 pueden modelar y transportar el mensaje, pero la recuperación
-  automática que converge a `FAILED` queda bloqueada hasta contar con una
-  garantía nueva del procesador o una consulta autoritativa independiente.
+- el `0400` solo se genera para un `0200` previamente enviado;
+- `0410/00` se clasifica como `REVERSED_CONFIRMED`;
+- un reverso de una original inexistente es económicamente neutro;
+- una respuesta inválida o un fallo ambiguo de transporte permanece
+  `INDETERMINATE`.
 
 ## Mensaje caracterizado
 
@@ -54,13 +50,13 @@ proceso. Sin embargo, que la búsqueda no encuentre filas no es un error:
 
 ## Matriz reproducida
 
-| Escenario | DE39 | Estado de DB después | Clasificación segura |
+| Escenario | DE39 | Estado de DB después | Clasificación operativa |
 |---|---:|---|---|
-| Venta existente y luego reverso | `00` | 2 filas `0400`: original mutada + registro de reverso | `INDETERMINATE` |
-| Venta inexistente | `00` | 1 fila `0400` sin original | `INDETERMINATE` |
-| Mismo reverso repetido | `00` | pasa de 2 a 3 filas `0400` | `INDETERMINATE` |
-| Reverso antes de registrar la venta | `00` | 1 fila `0400` | `INDETERMINATE` |
-| Venta después del reverso anticipado | `00` | 1 fila `0400` + 1 fila `0200` activa | venta aplicada |
+| Venta existente y luego reverso | `00` | 2 filas `0400`: original mutada + registro de reverso | `REVERSED_CONFIRMED` |
+| Venta inexistente | `00` | 1 fila `0400` sin original, sin impacto en saldo | `REVERSED_CONFIRMED` |
+| Mismo reverso repetido | `00` | pasa de 2 a 3 filas `0400`, sin impacto adicional | `REVERSED_CONFIRMED` |
+| Reverso antes de registrar la venta | `00` | 1 fila `0400` | fuera del flujo admitido |
+| Venta después del reverso anticipado | `00` | 1 fila `0400` + 1 fila `0200` activa | fuera del flujo admitido |
 
 La repetición es idempotente respecto del código HTTP/ISO aparente, pero no en
 persistencia: cada repetición agrega otra fila. Tampoco existe un tombstone que
@@ -71,7 +67,7 @@ impida una venta tardía.
 - `tests/fixtures/legacy_reversal_contract.json` contiene las tramas binarias
   sintéticas y los conteos observados; no contiene datos de producción.
 - `tests/test_legacy_reversal_contract.py` verifica los MTI, bitmaps, códigos y
-  diferencias de estado que hacen que `00` sea ambiguo.
+  la clasificación operativa aceptada.
 - `tests/manual/record_legacy_reversal_contract.py` reproduce los cuatro casos
   contra `authkig` + MySQL locales. Solo limpia los STAN/tickets reservados
   `890001`–`890003` de la tarjeta sintética del seed.
@@ -86,11 +82,8 @@ PYTHONPATH=. uv run python tests/manual/record_legacy_reversal_contract.py
 make check
 ```
 
-## Condición para desbloquear la recuperación
+## Decisión de integración
 
-Antes de mapear un resultado a `REVERSED_CONFIRMED` u `ORIGINAL_NOT_FOUND`, se
-necesita al menos una garantía verificable: códigos distintos según filas
-afectadas, consulta autoritativa del estado original, clave idempotente con
-restricción única o tombstone que neutralice una venta tardía. Cualquiera de
-esas opciones modifica el contrato del procesador y requiere una tarea aparte;
-RA-00 no cambia el C legacy.
+No se modifica el C legacy. El gateway interpreta `0410/00` como reverso
+confirmado y no reintenta internamente. La orquestación superior conserva
+`INDETERMINATE` cuando no obtiene una respuesta ISO válida.

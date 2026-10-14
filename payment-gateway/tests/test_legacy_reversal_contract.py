@@ -37,7 +37,7 @@ def test_recorded_reversal_frames_match_the_legacy_wire_contract() -> None:
         assert response.respcode_39 == capture["response_code"] == "00"
 
 
-def test_response_00_does_not_distinguish_existing_from_missing_original() -> None:
+def test_response_00_is_accepted_for_existing_and_missing_original() -> None:
     captures = _captures()
 
     existing = captures["reversal_existing_sale"]
@@ -46,7 +46,11 @@ def test_response_00_does_not_distinguish_existing_from_missing_original() -> No
     assert existing["response_code"] == missing["response_code"] == "00"
     assert existing["database_rows_after"] == {"0400": 2}
     assert missing["database_rows_after"] == {"0400": 1}
-    assert existing["safe_outcome"] == missing["safe_outcome"] == "INDETERMINATE"
+    assert (
+        existing["safe_outcome"]
+        == missing["safe_outcome"]
+        == "REVERSED_CONFIRMED"
+    )
 
 
 def test_repeated_reversal_is_not_persistence_idempotent() -> None:
@@ -58,7 +62,7 @@ def test_repeated_reversal_is_not_persistence_idempotent() -> None:
     assert first["response_code"] == duplicate["response_code"] == "00"
     assert first["database_rows_after"] == {"0400": 2}
     assert duplicate["database_rows_after"] == {"0400": 3}
-    assert duplicate["safe_outcome"] == "INDETERMINATE"
+    assert duplicate["safe_outcome"] == "REVERSED_CONFIRMED"
 
 
 def test_early_reversal_does_not_neutralize_a_later_sale() -> None:
@@ -67,6 +71,6 @@ def test_early_reversal_does_not_neutralize_a_later_sale() -> None:
     later_sale = captures["sale_after_early_reversal"]
 
     assert reversal["response_code"] == "00"
-    assert reversal["safe_outcome"] == "INDETERMINATE"
+    assert reversal["safe_outcome"] == "OUT_OF_CONTRACT"
     assert later_sale["response_code"] == "00"
     assert later_sale["database_rows_after"] == {"0200": 1, "0400": 1}

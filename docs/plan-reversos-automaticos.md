@@ -1,11 +1,10 @@
 # Plan de reversos automáticos y recuperación durable
 
-> Estado: diseño parcialmente validado. RA-00 confirmó que el `0410 / DE39=00`
-> actual es ambiguo; la publicación automática de `FAILED` queda bloqueada
-> hasta incorporar una garantía adicional del procesador o una consulta
-> autoritativa.
+> Estado: contrato ISO validado. Por decisión de producto, el reverso solo se
+> emite para un `0200` previamente enviado y `0410/DE39=00` confirma que el
+> procesador aceptó la neutralización.
 >
-> Última revisión: 2026-10-12.
+> Última revisión: 2026-10-13.
 
 ## 1. Objetivo
 
@@ -259,7 +258,6 @@ negocio del reverso, por ejemplo:
 
 ```text
 REVERSED_CONFIRMED
-ORIGINAL_NOT_FOUND
 PROCESSOR_DECLINED
 ACTIVE_APPROVAL_CONFIRMED
 ```
@@ -279,7 +277,6 @@ puede pasar a `RETRY`; una ejecución ambigua pasa a revisión manual.
 | `NOT_SENT` | No existe | `FAILED` |
 | `INDETERMINATE` | `READY`, `PROCESSING` o `RETRY` | `PENDING` |
 | `INDETERMINATE` | `COMPLETED` + `REVERSED_CONFIRMED` | `FAILED` |
-| `INDETERMINATE` | `COMPLETED` + `ORIGINAL_NOT_FOUND` confiable | `FAILED` |
 | `INDETERMINATE` | `COMPLETED` + `PROCESSOR_DECLINED` confirmado | `DECLINED` |
 | `INDETERMINATE` | `COMPLETED` + `ACTIVE_APPROVAL_CONFIRMED` | `APPROVED` |
 | `INDETERMINATE` | `MANUAL_REVIEW` | `PENDING` + `UNDER_REVIEW`; alerta operativa, comprobante y nuevas ventas permitidas |
@@ -415,7 +412,10 @@ UNIQUE(transaction_id, reversal_stan)
 ```
 
 El `reversal_stan` se genera una sola vez y se reutiliza en todos los
-reintentos. No se debe crear un reverso nuevo por intento.
+reintentos. No se debe crear un reverso nuevo por intento. Es la identidad
+estable del trabajo de orquestación; en el contrato legacy caracterizado por
+RA-00 no reemplaza al STAN original en DE11, porque hacerlo impediría la
+coincidencia con la venta.
 
 ### 8.1 Reclamo concurrente
 
@@ -604,8 +604,8 @@ La métrica o notificación por sí sola no reemplaza el registro durable.
 La herramienta administrativa debe permitir consultar la evidencia y cerrar
 el caso mediante una acción autenticada y auditada:
 
-- impacto neutralizado o inexistente confirmado → job `COMPLETED`, resultado
-  `REVERSED_CONFIRMED` u `ORIGINAL_NOT_FOUND`, estado público `FAILED`;
+- impacto neutralizado → job `COMPLETED`, resultado `REVERSED_CONFIRMED`,
+  estado público `FAILED`;
 - rechazo original confirmado → job `COMPLETED`, resultado
   `PROCESSOR_DECLINED`, estado público `DECLINED`;
 - venta activa confirmada → job `COMPLETED`, resultado
@@ -698,12 +698,12 @@ La matriz observada es:
 | Reverso duplicado | `00` | Agrega otra fila `0400` |
 | Reverso antes de la venta | `00` | No bloquea el `0200` posterior |
 
-En consecuencia, ninguna respuesta observada habilita
-`REVERSED_CONFIRMED` ni `ORIGINAL_NOT_FOUND`. El gateway debe clasificar el
-`0410 / 00` como `INDETERMINATE`; la API conserva `PENDING` y no puede afirmar
-`FAILED`. Para desbloquear la convergencia automática se requiere una tarea de
-contrato adicional: código diferenciado por filas afectadas, consulta
-autoritativa, idempotencia con clave única o tombstone de reverso.
+La diferencia entre una venta encontrada y una inexistente no tiene efecto
+económico: `calcula_consumo_vivo()` solo computa filas `0200`, y los reportes y
+el cierre excluyen `0400`. El contrato operativo fija además que el reverso se
+genera únicamente para un `0200` previamente enviado. Por eso el gateway
+acepta `0410/00` como `REVERSED_CONFIRMED`; una respuesta inválida o un fallo
+de transporte posterior al envío siguen siendo `INDETERMINATE`.
 
 ## 12. Contratos propuestos
 
@@ -734,16 +734,15 @@ Resultado deseado:
 
 ```text
 REVERSED_CONFIRMED
-ORIGINAL_NOT_FOUND
 DECLINED
 NOT_SENT
 UNKNOWN
 ```
 
-RA-00 comprobó que el procesador no distingue `REVERSED_CONFIRMED` de
-`ORIGINAL_NOT_FOUND`. Hasta resolver el bloqueo de contrato, el único mapeo
-seguro para `0410 / 00` es `UNKNOWN`/`INDETERMINATE`; el gateway no debe
-inventar esa distinción.
+RA-00 comprobó que `0410/00` es la respuesta estable del procesador. El
+gateway la mapea a `REVERSED_CONFIRMED` según el contrato operativo aceptado.
+Solo una respuesta rota o un fallo ambiguo de transporte produce
+`UNKNOWN`/`INDETERMINATE`.
 
 ### 12.2 API pública
 

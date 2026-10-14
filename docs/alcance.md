@@ -161,6 +161,9 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - Registro técnico request/response para soporte, sin PAN/CVV/track completos.
 - Para ventas y consultas, usa el layout histórico del procesador: `DE22=0012`,
   PAN en `DE2` y vencimiento en `DE14`. No recibe ni reenvía Track 2.
+- El reverso técnico `0400` se genera únicamente para un `0200` previamente
+  enviado. `0410/DE39=00` se considera confirmación operativa del reverso; una
+  fila `0400` sin original no afecta saldo, reportes ni cierre.
 
 ### 2.4 Procesador existente (on-premises)
 

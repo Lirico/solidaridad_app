@@ -2,6 +2,7 @@
 
 from domain.authorization import AuthorizationResult, AuthorizationStatus
 from domain.balance import BalanceResult
+from domain.reversal import ReversalResult, ReversalStatus
 from infrastructure.iso.packer import IsoMessage
 
 _APPROVED_CODES = frozenset({"00", "08", "10", "11", "85"})
@@ -67,4 +68,32 @@ def map_balance_response(iso: IsoMessage) -> BalanceResult:
         user_message=message,
         available_balance_minor=available_balance_minor,
         assigned_products=iso.field_63.strip() or None,
+    )
+
+
+def map_reversal_response(iso: IsoMessage) -> ReversalResult:
+    """Map the legacy 0410 using the accepted operational contract."""
+    code = (iso.respcode_39 or "").strip() or "96"
+    if iso.mtype != "0410":
+        return invalid_reversal_result()
+    if code == "00":
+        return ReversalResult(
+            status=ReversalStatus.REVERSED_CONFIRMED,
+            response_code=code,
+            user_message="Reverso aceptado",
+        )
+    return ReversalResult(
+        status=ReversalStatus.PROCESSOR_DECLINED,
+        response_code=code,
+        user_message=_MESSAGES.get(
+            code, iso.field_63.strip() if iso.field_63 else "Reverso rechazado"
+        ),
+    )
+
+
+def invalid_reversal_result() -> ReversalResult:
+    return ReversalResult(
+        status=ReversalStatus.INDETERMINATE,
+        response_code="96",
+        user_message="Respuesta ISO de reverso inválida",
     )

@@ -7,6 +7,7 @@ from domain.authorization import (
     VoidCommand,
 )
 from domain.balance import BalanceCommand, BalanceResult
+from domain.reversal import ReversalResult, ReversalStatus, ReverseCommand
 
 
 class MockIsoProcessor:
@@ -46,6 +47,19 @@ class MockIsoProcessor:
             user_message="Aprobada",
             auth_id="MOCKVD",
             retrieval_reference=command.stan.zfill(12),
+        )
+
+    def reverse(self, command: ReverseCommand) -> ReversalResult:
+        if command.card_number == self.DECLINE_PAN:
+            return ReversalResult(
+                status=ReversalStatus.PROCESSOR_DECLINED,
+                response_code="05",
+                user_message="Denegada",
+            )
+        return ReversalResult(
+            status=ReversalStatus.REVERSED_CONFIRMED,
+            response_code="00",
+            user_message="Reverso aceptado",
         )
 
     def balance(self, command: BalanceCommand) -> BalanceResult:

@@ -5,12 +5,10 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from solidaridad_catalog import Product
 
-from domain.money import MAX_AMOUNT_TEXT
-
 
 class CreateTransactionRequest(BaseModel):
     product: Product
-    amount: str = Field(min_length=1, max_length=len(MAX_AMOUNT_TEXT))
+    amount: str = Field(min_length=1, max_length=32)
     card_number: str = Field(min_length=13, max_length=19)
     # El procesador legacy no recibe ni valida CVV en este flujo. Se conserva
     # temporalmente por compatibilidad con clientes que todavía lo envían.

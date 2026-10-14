@@ -10,9 +10,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from application.payments.ports import (
+    AuthorizationGatewayOutcome,
     AuthorizeRequest,
     AuthorizeResult,
-    GatewayOutcome,
     PaymentGateway,
 )
 from application.payments.response_messages import (
@@ -241,15 +241,15 @@ class CreateTransaction:
         transaction_id: int,
         result: AuthorizeResult,
     ) -> Transaction:
-        if result.outcome == GatewayOutcome.APPROVED:
+        if result.outcome == AuthorizationGatewayOutcome.APPROVED:
             status = TransactionStatus.APPROVED
             authorization_outcome = AuthorizationOutcome.APPROVED
             message = message_for_code(result.response_code, approved=True)
-        elif result.outcome == GatewayOutcome.DECLINED:
+        elif result.outcome == AuthorizationGatewayOutcome.DECLINED:
             status = TransactionStatus.DECLINED
             authorization_outcome = AuthorizationOutcome.DECLINED
             message = message_for_code(result.response_code, approved=False)
-        elif result.outcome == GatewayOutcome.FAILED:
+        elif result.outcome == AuthorizationGatewayOutcome.NOT_SENT:
             status = TransactionStatus.FAILED
             authorization_outcome = AuthorizationOutcome.NOT_SENT
             message = MSG_FAILED

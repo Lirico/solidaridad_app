@@ -7,7 +7,10 @@ from application.payments.create_transaction import (
     CreateTransaction,
     CreateTransactionHttpStatus,
 )
-from application.payments.ports import AuthorizeResult, GatewayOutcome
+from application.payments.ports import (
+    AuthorizationGatewayOutcome,
+    AuthorizeResult,
+)
 from domain.authorization_outcome import AuthorizationOutcome
 from domain.exceptions import (
     IdempotencyConflict,
@@ -78,7 +81,7 @@ def _build(
     final = _tx(status=TransactionStatus.APPROVED)
     transactions.update_result.return_value = final
     gateway.authorize.return_value = gateway_result or AuthorizeResult(
-        outcome=GatewayOutcome.APPROVED,
+        outcome=AuthorizationGatewayOutcome.APPROVED,
         response_code="00",
         auth_id="A1",
         retrieval_reference="R1",
@@ -260,7 +263,9 @@ def test_replay_conflict_on_different_body() -> None:
 
 def test_gateway_timeout_maps_to_unknown() -> None:
     use_case, transactions, _, _ = _build(
-        gateway_result=AuthorizeResult(outcome=GatewayOutcome.UNKNOWN),
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.INDETERMINATE
+        ),
     )
     transactions.update_result.return_value = _tx(status=TransactionStatus.UNKNOWN)
     result = use_case.execute(
@@ -280,7 +285,7 @@ def test_gateway_timeout_maps_to_unknown() -> None:
 
 def test_gateway_connect_failure_maps_to_failed() -> None:
     use_case, transactions, _, _ = _build(
-        gateway_result=AuthorizeResult(outcome=GatewayOutcome.FAILED),
+        gateway_result=AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
     )
     transactions.update_result.return_value = _tx(status=TransactionStatus.FAILED)
     result = use_case.execute(
@@ -300,7 +305,7 @@ def test_gateway_connect_failure_maps_to_failed() -> None:
 def test_gateway_declined() -> None:
     use_case, transactions, _, _ = _build(
         gateway_result=AuthorizeResult(
-            outcome=GatewayOutcome.DECLINED,
+            outcome=AuthorizationGatewayOutcome.DECLINED,
             response_code="51",
         ),
     )
@@ -329,7 +334,10 @@ def test_pending_recovery_data_is_committed_before_gateway_call() -> None:
         assert create_kwargs["card_number"] == "6063007014007403"
         assert create_kwargs["expiration_date"] == "2912"
         assert "cvv" not in create_kwargs
-        return AuthorizeResult(outcome=GatewayOutcome.APPROVED, response_code="00")
+        return AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        )
 
     gateway.authorize.side_effect = authorize_after_commit
     use_case.execute(

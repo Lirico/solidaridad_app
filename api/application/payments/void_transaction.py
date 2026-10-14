@@ -7,10 +7,10 @@ from enum import IntEnum
 from sqlalchemy.orm import Session
 
 from application.payments.ports import (
-    AuthorizeResult,
     GatewayOutcome,
     PaymentGateway,
     VoidRequest,
+    VoidResult,
 )
 from application.payments.response_messages import (
     MSG_VOID_DECLINED,
@@ -155,7 +155,7 @@ class VoidTransaction:
         self,
         transaction_id: int,
         void_idempotency_key: str,
-        result: AuthorizeResult,
+        result: VoidResult,
     ) -> tuple[Transaction, str]:
         if result.outcome == GatewayOutcome.APPROVED:
             status = TransactionStatus.VOIDED

@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
@@ -102,10 +103,18 @@ def _build(
     claimed: ProcessorJob | None = None,
     transaction: Transaction | None = None,
     outcome: ReversalOutcome = ReversalOutcome.REVERSED_CONFIRMED,
-) -> tuple[ReversalJobWorker, MagicMock, MagicMock, MagicMock, MagicMock]:
+) -> tuple[
+    ReversalJobWorker,
+    MagicMock,
+    MagicMock,
+    MagicMock,
+    MagicMock,
+    MagicMock,
+]:
     session = MagicMock()
     transactions = MagicMock()
     jobs = MagicMock()
+    alerts = MagicMock()
     configs = MagicMock()
     gateway = MagicMock()
     jobs.claim_next_due_reverse.return_value = claimed or _job()
@@ -118,17 +127,18 @@ def _build(
         session=session,
         transactions=transactions,
         jobs=jobs,
+        alerts=alerts,
         configs=configs,
         gateway=gateway,
         now=lambda: NOW,
         random_value=lambda: 0.5,
         claim_token_factory=lambda: TOKEN,
     )
-    return worker, session, transactions, jobs, gateway
+    return worker, session, transactions, jobs, alerts, gateway
 
 
 def test_run_once_commits_claim_before_sending_reversal() -> None:
-    worker, session, transactions, jobs, gateway = _build()
+    worker, session, transactions, jobs, _, gateway = _build()
 
     def reverse(request: object) -> ReverseResult:
         assert session.commit.call_count == 1
@@ -170,7 +180,7 @@ def test_run_once_commits_claim_before_sending_reversal() -> None:
 
 
 def test_run_once_retries_only_definitely_unsent_result_with_attempts_left() -> None:
-    worker, session, _, jobs, _ = _build(outcome=ReversalOutcome.NOT_SENT)
+    worker, session, _, jobs, _, _ = _build(outcome=ReversalOutcome.NOT_SENT)
 
     assert worker.run_once() is True
 
@@ -198,7 +208,7 @@ def test_run_once_moves_unrecoverable_outcomes_to_manual_review(
     attempt_count: int,
     error_code: str,
 ) -> None:
-    worker, session, _, jobs, _ = _build(
+    worker, session, _, jobs, _, _ = _build(
         claimed=_job(attempt_count=attempt_count),
         outcome=outcome,
     )
@@ -212,7 +222,7 @@ def test_run_once_moves_unrecoverable_outcomes_to_manual_review(
 
 
 def test_run_once_marks_missing_recovery_data_for_manual_review() -> None:
-    worker, session, _, jobs, gateway = _build(
+    worker, session, _, jobs, _, gateway = _build(
         transaction=_transaction(expiration_date=None)
     )
 
@@ -230,8 +240,31 @@ def test_run_once_marks_missing_recovery_data_for_manual_review() -> None:
     assert session.commit.call_count == 2
 
 
+def test_manual_review_opens_a_sanitized_durable_alert(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    worker, _, _, _, alerts, _ = _build(outcome=ReversalOutcome.INDETERMINATE)
+    alerts.open_for_job.return_value = True
+
+    with caplog.at_level(logging.WARNING):
+        assert worker.run_once() is True
+
+    alerts.open_for_job.assert_called_once_with(
+        processor_job_id=7,
+        cause=ReversalOutcome.INDETERMINATE.value,
+        opened_at=NOW,
+    )
+    record = caplog.records[-1]
+    assert record.event_name == "recovery_alert_opened"
+    assert record.processor_job_id == 7
+    assert record.transaction_id == 11
+    assert record.cause == ReversalOutcome.INDETERMINATE.value
+    assert "4111111111111111" not in record.__dict__.values()
+    assert "2912" not in record.__dict__.values()
+
+
 def test_late_gateway_result_with_an_old_claim_token_changes_nothing() -> None:
-    worker, session, transactions, jobs, _ = _build()
+    worker, session, transactions, jobs, _, _ = _build()
     jobs.finalize_claim.return_value = False
 
     assert worker.run_once() is True
@@ -241,7 +274,7 @@ def test_late_gateway_result_with_an_old_claim_token_changes_nothing() -> None:
 
 
 def test_run_once_returns_false_without_due_work() -> None:
-    worker, session, transactions, jobs, gateway = _build()
+    worker, session, transactions, jobs, _, gateway = _build()
     jobs.claim_next_due_reverse.return_value = None
 
     assert worker.run_once() is False
@@ -258,6 +291,7 @@ def test_worker_requires_a_non_empty_identifier() -> None:
             session=MagicMock(),
             transactions=MagicMock(),
             jobs=MagicMock(),
+            alerts=MagicMock(),
             configs=MagicMock(),
             gateway=MagicMock(),
         )

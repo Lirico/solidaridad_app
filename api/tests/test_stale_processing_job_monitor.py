@@ -33,12 +33,14 @@ def _config() -> PaymentProcessingConfig:
 def test_monitor_moves_a_job_at_the_exact_timeout_boundary() -> None:
     session = MagicMock()
     jobs = MagicMock()
+    alerts = MagicMock()
     configs = MagicMock()
     configs.get_default.return_value = _config()
     jobs.move_next_stale_processing_to_manual_review.return_value = MagicMock()
     monitor = StaleProcessingJobMonitor(
         session=session,
         jobs=jobs,
+        alerts=alerts,
         configs=configs,
         now=lambda: NOW,
     )
@@ -50,17 +52,24 @@ def test_monitor_moves_a_job_at_the_exact_timeout_boundary() -> None:
         reviewed_at=NOW,
     )
     session.commit.assert_called_once()
+    alerts.open_for_job.assert_called_once_with(
+        processor_job_id=jobs.move_next_stale_processing_to_manual_review.return_value.id,
+        cause="PROCESSING_TIMEOUT",
+        opened_at=NOW,
+    )
 
 
 def test_monitor_commits_no_change_when_no_job_is_stale() -> None:
     session = MagicMock()
     jobs = MagicMock()
+    alerts = MagicMock()
     configs = MagicMock()
     configs.get_default.return_value = _config()
     jobs.move_next_stale_processing_to_manual_review.return_value = None
     monitor = StaleProcessingJobMonitor(
         session=session,
         jobs=jobs,
+        alerts=alerts,
         configs=configs,
         now=lambda: NOW,
     )
@@ -68,16 +77,19 @@ def test_monitor_commits_no_change_when_no_job_is_stale() -> None:
     assert monitor.run_once() is False
 
     session.commit.assert_called_once()
+    alerts.open_for_job.assert_not_called()
 
 
 def test_monitor_rolls_back_when_persistence_fails() -> None:
     session = MagicMock()
     jobs = MagicMock()
+    alerts = MagicMock()
     configs = MagicMock()
     configs.get_default.side_effect = RuntimeError("missing configuration")
     monitor = StaleProcessingJobMonitor(
         session=session,
         jobs=jobs,
+        alerts=alerts,
         configs=configs,
         now=lambda: NOW,
     )

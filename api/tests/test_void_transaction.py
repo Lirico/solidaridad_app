@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.payments.ports import AuthorizeResult, GatewayOutcome
+from application.payments.ports import GatewayOutcome, VoidResult
 from application.payments.void_transaction import (
     VoidTransaction,
     VoidTransactionHttpStatus,
@@ -52,7 +52,7 @@ def _tx(**overrides: object) -> Transaction:
 def _build(
     *,
     existing: Transaction | None = None,
-    gateway_result: AuthorizeResult | None = None,
+    gateway_result: VoidResult | None = None,
 ) -> tuple[VoidTransaction, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
@@ -60,7 +60,7 @@ def _build(
     transactions.get_by_transaction_number.return_value = existing or _tx()
     voided = _tx(status=TransactionStatus.VOIDED, user_message="Anulación aprobada")
     transactions.apply_void_result.return_value = voided
-    gateway.void.return_value = gateway_result or AuthorizeResult(
+    gateway.void.return_value = gateway_result or VoidResult(
         outcome=GatewayOutcome.APPROVED,
         response_code="00",
     )
@@ -194,7 +194,7 @@ def test_void_invalid_pan() -> None:
 
 def test_void_declined_keeps_approved() -> None:
     use_case, transactions, _ = _build(
-        gateway_result=AuthorizeResult(
+        gateway_result=VoidResult(
             outcome=GatewayOutcome.DECLINED,
             response_code="76",
         ),
@@ -216,7 +216,7 @@ def test_void_declined_keeps_approved() -> None:
 
 def test_void_unknown_maps_status() -> None:
     use_case, transactions, _ = _build(
-        gateway_result=AuthorizeResult(outcome=GatewayOutcome.UNKNOWN),
+        gateway_result=VoidResult(outcome=GatewayOutcome.UNKNOWN),
     )
     transactions.apply_void_result.return_value = _tx(
         status=TransactionStatus.UNKNOWN,
@@ -234,7 +234,7 @@ def test_void_unknown_maps_status() -> None:
 
 def test_void_failed_keeps_approved() -> None:
     use_case, transactions, _ = _build(
-        gateway_result=AuthorizeResult(outcome=GatewayOutcome.FAILED),
+        gateway_result=VoidResult(outcome=GatewayOutcome.FAILED),
     )
     transactions.apply_void_result.return_value = _tx(void_idempotency_key="void-1")
     result = use_case.execute(

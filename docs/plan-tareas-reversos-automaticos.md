@@ -3,7 +3,7 @@
 > Documento de ejecución basado en
 > [`plan-reversos-automaticos.md`](plan-reversos-automaticos.md).
 >
-> Estado: RA-00 a RA-04 completadas. RA-05 es la siguiente tarea del orden de
+> Estado: RA-00 a RA-05 completadas. RA-06 es la siguiente tarea del orden de
 > integración.
 >
 > Última revisión: 2026-10-13.

@@ -22,6 +22,7 @@ from domain.exceptions import (
 )
 from domain.installation import Installation
 from domain.payment_processing_config import PaymentProcessingConfig
+from domain.processor_job import ProcessorJobState
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -256,6 +257,39 @@ def test_replay_pending_returns_202() -> None:
     transactions.record_idempotent_hit.assert_called_once()
     session = use_case._session
     session.commit.assert_called()
+
+
+def test_pending_replay_uses_the_current_manual_review_projection() -> None:
+    from application.payments.create_transaction import _fingerprint
+    from application.payments.public_transaction_status import PendingReason
+
+    fp = _fingerprint(
+        product=Product.GARRAFA_10,
+        amount_minor=200,
+        card_number="4111111111111111",
+        expiration_date=None,
+    )
+    existing = _tx(status=TransactionStatus.PENDING, request_fingerprint=fp)
+    use_case, _, _, _ = _build(existing=existing)
+    use_case._jobs.get_by_transaction.return_value = MagicMock(
+        state=ProcessorJobState.MANUAL_REVIEW
+    )
+
+    result = use_case.execute(
+        user_id=existing.user_id,
+        installation_id="inst-1",
+        idempotency_key="key-1",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+        cvv="123",
+    )
+
+    assert result.http_status == CreateTransactionHttpStatus.ACCEPTED
+    assert result.public_status is not None
+    assert result.public_status.reason is PendingReason.UNDER_REVIEW
+    assert result.public_status.poll_after_seconds is None
+    assert result.public_status.may_start_new_sale is True
 
 
 def test_replay_approved_returns_201_without_gateway() -> None:

@@ -152,7 +152,7 @@ def get_transaction(
     response_model=PublicTransactionResponse,
     responses={
         status.HTTP_202_ACCEPTED: {
-            "description": "Idempotent replay while still PENDING",
+            "description": "Initial response or idempotent replay while PENDING",
             "model": TransactionResponse,
         },
         status.HTTP_400_BAD_REQUEST: {

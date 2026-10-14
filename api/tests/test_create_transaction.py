@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
+from decimal import Decimal
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -20,6 +21,7 @@ from domain.exceptions import (
     MissingTerminalId,
 )
 from domain.installation import Installation
+from domain.payment_processing_config import PaymentProcessingConfig
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -55,12 +57,18 @@ def _build(
     *,
     existing: Transaction | None = None,
     gateway_result: AuthorizeResult | None = None,
+    gateway_results: list[AuthorizeResult] | None = None,
     installation_code: str | None = "05000001",
+    max_authorization_attempts: int = 1,
+    processing_timeout_seconds: int = 3,
+    monotonic: MagicMock | None = None,
 ) -> tuple[CreateTransaction, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
     installations = MagicMock()
     gateway = MagicMock()
+    configs = MagicMock()
+    sleeper = MagicMock()
 
     transactions.get_by_idempotency.return_value = existing
     installations.get_by_installation_id.return_value = (
@@ -80,11 +88,36 @@ def _build(
     transactions.create_pending.return_value = pending
     final = _tx(status=TransactionStatus.APPROVED)
     transactions.update_result.return_value = final
-    gateway.authorize.return_value = gateway_result or AuthorizeResult(
+    default_result = gateway_result or AuthorizeResult(
         outcome=AuthorizationGatewayOutcome.APPROVED,
         response_code="00",
         auth_id="A1",
         retrieval_reference="R1",
+    )
+    if gateway_results is None:
+        gateway.authorize.return_value = default_result
+    else:
+        gateway.authorize.side_effect = gateway_results
+    transactions.start_authorization_retry.side_effect = iter(
+        range(2, max_authorization_attempts + 1)
+    )
+    now = datetime.now(UTC)
+    configs.get_default.return_value = PaymentProcessingConfig(
+        id=1,
+        config_name="default",
+        max_authorization_attempts=max_authorization_attempts,
+        authorization_initial_delay_ms=100,
+        authorization_max_delay_ms=500,
+        authorization_backoff_multiplier=Decimal("2"),
+        max_reversal_attempts=5,
+        reversal_initial_delay_seconds=5,
+        reversal_max_delay_seconds=300,
+        reversal_backoff_multiplier=Decimal("2"),
+        jitter_percentage=0,
+        processing_timeout_seconds=processing_timeout_seconds,
+        worker_poll_interval_seconds=Decimal("1"),
+        created_at=now,
+        updated_at=now,
     )
 
     use_case = CreateTransaction(
@@ -92,6 +125,10 @@ def _build(
         transactions=transactions,
         installations=installations,
         gateway=gateway,
+        configs=configs,
+        sleep=sleeper,
+        monotonic=monotonic or MagicMock(return_value=0.0),
+        random_value=lambda: 0.5,
     )
     return use_case, transactions, installations, gateway
 
@@ -300,6 +337,148 @@ def test_gateway_connect_failure_maps_to_failed() -> None:
     assert result.transaction.status == TransactionStatus.FAILED
     kwargs = transactions.update_result.call_args.kwargs
     assert kwargs["authorization_outcome"] == AuthorizationOutcome.NOT_SENT
+
+
+def test_maximum_one_makes_no_additional_attempts() -> None:
+    use_case, transactions, _, gateway = _build(
+        gateway_result=AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
+        max_authorization_attempts=1,
+    )
+    transactions.update_result.return_value = _tx(status=TransactionStatus.FAILED)
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    gateway.authorize.assert_called_once()
+    transactions.start_authorization_retry.assert_not_called()
+    use_case._sleep.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "final_result",
+    [
+        AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        ),
+        AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.DECLINED,
+            response_code="51",
+        ),
+    ],
+)
+def test_retries_not_sent_then_stops_on_definitive_result(
+    final_result: AuthorizeResult,
+) -> None:
+    use_case, transactions, _, gateway = _build(
+        gateway_results=[
+            AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
+            final_result,
+        ],
+        max_authorization_attempts=3,
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="stable-key",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    assert gateway.authorize.call_count == 2
+    first_request = gateway.authorize.call_args_list[0].args[0]
+    second_request = gateway.authorize.call_args_list[1].args[0]
+    assert second_request is first_request
+    assert first_request.idempotency_key == "stable-key"
+    assert first_request.stan == second_request.stan
+    assert first_request.ticket_number == second_request.ticket_number
+    use_case._sleep.assert_called_once_with(0.1)
+    assert [
+        call.kwargs["outcome"]
+        for call in transactions.record_authorization_attempt.call_args_list
+    ] == [
+        AuthorizationOutcome.NOT_SENT,
+        AuthorizationOutcome(final_result.outcome.value),
+    ]
+    assert use_case._configs.get_default.call_count == 1
+
+
+def test_indeterminate_stops_without_retry_even_when_attempts_remain() -> None:
+    use_case, transactions, _, gateway = _build(
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.INDETERMINATE
+        ),
+        max_authorization_attempts=3,
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    gateway.authorize.assert_called_once()
+    transactions.start_authorization_retry.assert_not_called()
+    use_case._sleep.assert_not_called()
+
+
+def test_exhausted_not_sent_attempts_publish_failed() -> None:
+    not_sent = AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT)
+    use_case, transactions, _, gateway = _build(
+        gateway_results=[not_sent, not_sent, not_sent],
+        max_authorization_attempts=3,
+    )
+    transactions.update_result.return_value = _tx(status=TransactionStatus.FAILED)
+
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    assert gateway.authorize.call_count == 3
+    assert use_case._sleep.call_args_list == [call(0.1), call(0.2)]
+    assert transactions.start_authorization_retry.call_count == 2
+    assert result.transaction.status == TransactionStatus.FAILED
+    final = transactions.update_result.call_args.kwargs
+    assert final["authorization_outcome"] == AuthorizationOutcome.NOT_SENT
+
+
+def test_sync_budget_prevents_retry_when_delay_does_not_fit() -> None:
+    clock = MagicMock(side_effect=[0.0, 0.95])
+    use_case, transactions, _, gateway = _build(
+        gateway_result=AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
+        max_authorization_attempts=3,
+        processing_timeout_seconds=1,
+        monotonic=clock,
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="k1",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    gateway.authorize.assert_called_once()
+    transactions.start_authorization_retry.assert_not_called()
+    use_case._sleep.assert_not_called()
 
 
 def test_gateway_declined() -> None:

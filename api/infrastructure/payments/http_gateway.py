@@ -47,7 +47,11 @@ class HttpPaymentGateway:
         }
         if request.expiration_date is not None:
             payload["expiration_date"] = request.expiration_date
-        return self._post_authorize("/v1/authorize", payload)
+        return self._post_authorize(
+            "/v1/authorize",
+            payload,
+            idempotency_key=request.idempotency_key,
+        )
 
     def void(self, request: VoidRequest) -> VoidResult:
         payload = {
@@ -120,9 +124,15 @@ class HttpPaymentGateway:
         self,
         path: str,
         payload: dict[str, object],
+        *,
+        idempotency_key: str,
     ) -> AuthorizeResult:
         try:
-            response = self._client.post(path, json=payload)
+            response = self._client.post(
+                path,
+                json=payload,
+                headers={"Idempotency-Key": idempotency_key},
+            )
         except httpx.ConnectError:
             return AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT)
         except (httpx.TimeoutException, httpx.HTTPError):

@@ -22,6 +22,7 @@ def _request() -> AuthorizeRequest:
         terminal_id="05000001",
         stan="000001",
         ticket_number="00000001",
+        idempotency_key="payment-key-1",
         expiration_date="2912",
     )
 
@@ -34,6 +35,7 @@ def _gateway(handler: object) -> HttpPaymentGateway:
 
 def test_authorize_approved() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Idempotency-Key"] == "payment-key-1"
         return httpx.Response(
             200,
             json={

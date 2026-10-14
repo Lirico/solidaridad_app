@@ -22,6 +22,9 @@ from config import Settings, get_settings
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.payment_processing_config_repository import (
+    PaymentProcessingConfigRepository,
+)
 from persistence.repositories.transaction_repository import TransactionRepository
 from persistence.repositories.user_repository import UserRepository
 
@@ -117,6 +120,7 @@ def get_create_transaction(
         transactions=TransactionRepository(db),
         installations=InstallationRepository(db),
         gateway=gateway,
+        configs=PaymentProcessingConfigRepository(db),
     )
 
 

@@ -1,7 +1,10 @@
 """Create and authorize a payment transaction."""
 
 import hashlib
+import random
 import secrets
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
@@ -9,6 +12,7 @@ from enum import IntEnum
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from application.payments.authorization_retry import AuthorizationRetryPolicy
 from application.payments.ports import (
     AuthorizationGatewayOutcome,
     AuthorizeRequest,
@@ -40,6 +44,9 @@ from domain.product import (
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.payment_processing_config_repository import (
+    PaymentProcessingConfigRepository,
+)
 from persistence.repositories.transaction_repository import (
     TransactionRepository,
     ticket_from_transaction_number,
@@ -96,11 +103,19 @@ class CreateTransaction:
         transactions: TransactionRepository,
         installations: InstallationRepository,
         gateway: PaymentGateway,
+        configs: PaymentProcessingConfigRepository,
+        sleep: Callable[[float], None] = time.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
+        random_value: Callable[[], float] = random.random,
     ) -> None:
         self._session = session
         self._transactions = transactions
         self._installations = installations
         self._gateway = gateway
+        self._configs = configs
+        self._sleep = sleep
+        self._monotonic = monotonic
+        self._random_value = random_value
 
     def execute(
         self,
@@ -148,6 +163,11 @@ class CreateTransaction:
         if existing is not None:
             return self._replay(existing, fingerprint, idempotency_key=key)
 
+        policy = AuthorizationRetryPolicy.from_config(
+            self._configs.get_default(),
+            random_value=self._random_value,
+        )
+
         installation = self._installations.get_by_installation_id(installation_id)
         if installation is None:
             raise MissingTerminalId()
@@ -190,16 +210,20 @@ class CreateTransaction:
                 raise
             return self._replay(raced, fingerprint, idempotency_key=key)
 
-        gateway_result = self._gateway.authorize(
-            AuthorizeRequest(
-                product_code=proc_code,
-                amount_minor=money.amount_minor,
-                card_number=pan,
-                terminal_id=terminal_id[:8].ljust(8),
-                stan=stan,
-                ticket_number=processor_ticket,
-                expiration_date=exp,
-            )
+        authorization_request = AuthorizeRequest(
+            product_code=proc_code,
+            amount_minor=money.amount_minor,
+            card_number=pan,
+            terminal_id=terminal_id[:8].ljust(8),
+            stan=stan,
+            ticket_number=processor_ticket,
+            idempotency_key=key,
+            expiration_date=exp,
+        )
+        gateway_result = self._authorize_with_safe_retries(
+            transaction_id=pending.id,
+            request=authorization_request,
+            policy=policy,
         )
         final = self._apply_gateway_result(pending.id, gateway_result)
         self._session.commit()
@@ -207,6 +231,42 @@ class CreateTransaction:
             transaction=final,
             http_status=CreateTransactionHttpStatus.CREATED,
         )
+
+    def _authorize_with_safe_retries(
+        self,
+        *,
+        transaction_id: int,
+        request: AuthorizeRequest,
+        policy: AuthorizationRetryPolicy,
+    ) -> AuthorizeResult:
+        deadline = self._monotonic() + policy.processing_timeout_seconds
+        attempt_number = 1
+
+        while True:
+            result = self._gateway.authorize(request)
+            self._transactions.record_authorization_attempt(
+                transaction_id=transaction_id,
+                attempt_number=attempt_number,
+                outcome=AuthorizationOutcome(result.outcome.value),
+                processor_response_code=result.response_code,
+            )
+            self._session.commit()
+
+            if (
+                result.outcome != AuthorizationGatewayOutcome.NOT_SENT
+                or attempt_number >= policy.max_attempts
+            ):
+                return result
+
+            next_attempt = attempt_number + 1
+            delay = policy.delay_before_attempt(next_attempt)
+            if self._monotonic() + delay > deadline:
+                return result
+            self._sleep(delay)
+            attempt_number = self._transactions.start_authorization_retry(
+                transaction_id=transaction_id
+            )
+            self._session.commit()
 
     def _replay(
         self,

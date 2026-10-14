@@ -3,8 +3,8 @@
 > Documento de ejecución basado en
 > [`plan-reversos-automaticos.md`](plan-reversos-automaticos.md).
 >
-> Estado: RA-00 y RA-01 completadas. RA-02 es la siguiente tarea del camino
-> crítico.
+> Estado: RA-00, RA-01 y RA-02 completadas. RA-03 es la siguiente tarea del
+> orden de integración.
 >
 > Última revisión: 2026-10-13.
 
@@ -218,6 +218,11 @@ el `0400` validado en RA-00 y nunca reutiliza la lógica de anulación `0200`.
 ## RA-02 — Exponer `POST /v1/reverse` en el gateway
 
 **Branch:** `codex/reversal-ra-02-gateway-http`
+
+**Estado:** completada el 2026-10-13. Endpoint stateless en
+`payment-gateway/presentation/controllers/reversal_controller.py`, caso de uso
+en `payment-gateway/application/payments/reverse_payment.py` y cobertura HTTP
+en `payment-gateway/tests/test_reversal_http.py`.
 
 **Objetivo:** ofrecer a la API una primitiva HTTP stateless para un único
 intento de reverso.

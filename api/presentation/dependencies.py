@@ -25,6 +25,7 @@ from persistence.repositories.installation_repository import InstallationReposit
 from persistence.repositories.payment_processing_config_repository import (
     PaymentProcessingConfigRepository,
 )
+from persistence.repositories.processor_job_repository import ProcessorJobRepository
 from persistence.repositories.transaction_repository import TransactionRepository
 from persistence.repositories.user_repository import UserRepository
 
@@ -121,6 +122,7 @@ def get_create_transaction(
         installations=InstallationRepository(db),
         gateway=gateway,
         configs=PaymentProcessingConfigRepository(db),
+        jobs=ProcessorJobRepository(db),
     )
 
 

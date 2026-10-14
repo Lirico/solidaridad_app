@@ -2,11 +2,12 @@
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from domain.authorization_outcome import AuthorizationOutcome
 from domain.batch_close import BatchClose
+from domain.processor_job import ProcessorOperationType
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -15,6 +16,7 @@ from domain.transaction_status_event import (
     TransactionStatusEventType,
 )
 from persistence.models.batch_close import BatchClose as BatchCloseModel
+from persistence.models.processor_job import ProcessorJob as ProcessorJobModel
 from persistence.models.transaction import Transaction as TransactionModel
 from persistence.models.transaction import TransactionNumberCounter
 from persistence.models.transaction_status_event import TransactionStatusEvent
@@ -126,6 +128,17 @@ class TransactionRepository:
             return None
         return _to_domain(row)
 
+    def get_by_id_for_update(self, *, transaction_id: int) -> Transaction:
+        """Lock one transaction before attaching recovery work to it."""
+        row = self._session.scalar(
+            select(TransactionModel)
+            .where(TransactionModel.id == transaction_id)
+            .with_for_update()
+        )
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        return _to_domain(row)
+
     def start_authorization_retry(self, *, transaction_id: int) -> int:
         """Persist the next attempt number before its external effect."""
         row = self._session.get(TransactionModel, transaction_id)
@@ -175,6 +188,39 @@ class TransactionRepository:
         if row is None:
             return None
         return _to_domain(row)
+
+    def list_stale_pending_without_reverse_job(
+        self,
+        *,
+        created_before: datetime,
+    ) -> list[Transaction]:
+        """Lock recoverable pending payments stranded before classification.
+
+        A row is selected only when no reversal job exists.  The row lock makes
+        the subsequent status update and job insert safe against a concurrent
+        request or watchdog instance.
+        """
+        reverse_job_exists = exists(
+            select(ProcessorJobModel.id).where(
+                ProcessorJobModel.transaction_id == TransactionModel.id,
+                ProcessorJobModel.operation_type
+                == ProcessorOperationType.REVERSE.value,
+            )
+        )
+        stmt = (
+            select(TransactionModel)
+            .where(
+                TransactionModel.status == TransactionStatus.PENDING.value,
+                TransactionModel.authorization_outcome
+                == AuthorizationOutcome.PENDING.value,
+                TransactionModel.created_at <= created_before,
+                TransactionModel.stan.is_not(None),
+                TransactionModel.processor_ticket.is_not(None),
+                ~reverse_job_exists,
+            )
+            .with_for_update(skip_locked=True)
+        )
+        return [_to_domain(row) for row in self._session.scalars(stmt).all()]
 
     def next_transaction_number(self, business_date: date) -> str:
         """Atomically allocate OP-YYMMDD-NNNNNNNN for the business date.
@@ -404,11 +450,30 @@ class TransactionRepository:
             actor_type=TransactionStatusActorType.SYSTEM,
             actor_user_id=row.user_id,
             processor_response_code=processor_response_code,
+            authorization_outcome=authorization_outcome,
             user_message=user_message,
             idempotency_key=row.idempotency_key,
         )
         self._session.flush()
         return _to_domain(row)
+
+    def record_reversal_enqueued(self, *, transaction_id: int) -> None:
+        """Audit creation of the durable compensation work item."""
+        row = self._session.get(TransactionModel, transaction_id)
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        self._append_status_event(
+            transaction_id=row.id,
+            from_status=row.status,
+            to_status=row.status,
+            event_type=TransactionStatusEventType.REVERSAL_ENQUEUED,
+            actor_type=TransactionStatusActorType.SYSTEM,
+            actor_user_id=row.user_id,
+            authorization_outcome=AuthorizationOutcome.INDETERMINATE,
+            user_message=row.user_message,
+            idempotency_key=row.idempotency_key,
+        )
+        self._session.flush()
 
     def apply_void_result(
         self,

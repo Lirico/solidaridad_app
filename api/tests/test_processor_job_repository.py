@@ -256,6 +256,23 @@ def test_finalize_claim_requires_the_current_processing_token() -> None:
     assert "processor_jobs.claim_token" in str(statement)
 
 
+def test_late_completion_cannot_overwrite_manual_review() -> None:
+    session = MagicMock()
+    session.execute.return_value.scalar_one_or_none.return_value = None
+
+    finalized = ProcessorJobRepository(session).finalize_claim(
+        job_id=7,
+        claim_token=uuid4(),
+        target=ProcessorJobState.COMPLETED,
+        finalized_at=datetime.now(UTC),
+        result="REVERSED_CONFIRMED",
+    )
+
+    assert finalized is False
+    statement = session.execute.call_args.args[0]
+    assert "processor_jobs.state" in str(statement)
+
+
 def test_invalid_or_incomplete_job_transitions_are_rejected() -> None:
     session = MagicMock()
     row = _row()

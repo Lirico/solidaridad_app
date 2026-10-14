@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from persistence.models.payment_processing_config import PaymentProcessingConfig
 from persistence.models.processor_job import ProcessorJob
+from persistence.models.recovery_alert import RecoveryAlert
 
 
 def _config_values() -> dict[str, object]:
@@ -107,3 +108,26 @@ def test_database_rejects_duplicate_job_identity(duplicate_field: str) -> None:
         connection.execute(insert(ProcessorJob).values(**first))
         with pytest.raises(IntegrityError):
             connection.execute(insert(ProcessorJob).values(**second))
+
+
+def test_database_keeps_one_open_alert_per_job_and_cause() -> None:
+    engine = create_engine("sqlite://")
+    RecoveryAlert.__table__.create(engine)
+    now = datetime.now(UTC)
+    alert = {
+        "id": 1,
+        "processor_job_id": 10,
+        "cause": "PROCESSING_TIMEOUT",
+        "state": "OPEN",
+        "opened_at": now,
+        "created_at": now,
+    }
+
+    with engine.begin() as connection:
+        connection.execute(insert(RecoveryAlert).values(**alert))
+        with pytest.raises(IntegrityError):
+            connection.execute(insert(RecoveryAlert).values(**alert | {"id": 2}))
+        with pytest.raises(IntegrityError):
+            connection.execute(
+                insert(RecoveryAlert).values(**alert | {"id": 3, "state": "CLOSED"})
+            )

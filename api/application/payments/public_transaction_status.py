@@ -42,7 +42,10 @@ def project_public_transaction_status(
     recovery metadata.
     """
     if transaction.status is TransactionStatus.PENDING:
-        if reverse_job is not None and reverse_job.state is ProcessorJobState.MANUAL_REVIEW:
+        if (
+            reverse_job is not None
+            and reverse_job.state is ProcessorJobState.MANUAL_REVIEW
+        ):
             return PublicTransactionStatus(
                 status=TransactionStatus.PENDING.value,
                 reason=PendingReason.UNDER_REVIEW,

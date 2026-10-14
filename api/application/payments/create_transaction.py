@@ -19,6 +19,10 @@ from application.payments.ports import (
     AuthorizeResult,
     PaymentGateway,
 )
+from application.payments.public_transaction_status import (
+    PublicTransactionStatus,
+    project_public_transaction_status,
+)
 from application.payments.response_messages import (
     MSG_FAILED,
     MSG_PENDING,
@@ -64,6 +68,7 @@ class CreateTransactionHttpStatus(IntEnum):
 class CreateTransactionResult:
     transaction: Transaction
     http_status: CreateTransactionHttpStatus
+    public_status: PublicTransactionStatus | None = None
 
 
 def _fingerprint(
@@ -237,14 +242,7 @@ class CreateTransaction:
         except Exception:
             self._session.rollback()
             raise
-        return CreateTransactionResult(
-            transaction=final,
-            http_status=(
-                CreateTransactionHttpStatus.ACCEPTED
-                if final.status == TransactionStatus.PENDING
-                else CreateTransactionHttpStatus.CREATED
-            ),
-        )
+        return self._result(final)
 
     def _authorize_with_safe_retries(
         self,
@@ -301,13 +299,22 @@ class CreateTransaction:
         )
         self._session.commit()
         if existing.status == TransactionStatus.PENDING:
-            return CreateTransactionResult(
-                transaction=existing,
-                http_status=CreateTransactionHttpStatus.ACCEPTED,
-            )
+            return self._result(existing)
+        return self._result(existing)
+
+    def _result(self, transaction: Transaction) -> CreateTransactionResult:
+        reverse_job = self._jobs.get_by_transaction(
+            transaction_id=transaction.id,
+            operation_type=ProcessorOperationType.REVERSE,
+        )
         return CreateTransactionResult(
-            transaction=existing,
-            http_status=CreateTransactionHttpStatus.CREATED,
+            transaction=transaction,
+            http_status=(
+                CreateTransactionHttpStatus.ACCEPTED
+                if transaction.status == TransactionStatus.PENDING
+                else CreateTransactionHttpStatus.CREATED
+            ),
+            public_status=project_public_transaction_status(transaction, reverse_job),
         )
 
     def _apply_gateway_result(

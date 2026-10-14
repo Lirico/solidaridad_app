@@ -27,6 +27,10 @@ MSG_FAILED = "No se pudo procesar el pago. Intente nuevamente."
 MSG_UNKNOWN = (
     "No pudimos confirmar el pago. No vuelva a intentarlo; consulte la operación."
 )
+MSG_UNDER_REVIEW = (
+    "No fue posible confirmar el resultado. Verifique la operación con casa "
+    "central ante un posible cobro duplicado."
+)
 MSG_DECLINED_DEFAULT = "Pago rechazado"
 MSG_VOIDED = "Anulación aprobada"
 MSG_VOID_DECLINED = "Anulación rechazada"

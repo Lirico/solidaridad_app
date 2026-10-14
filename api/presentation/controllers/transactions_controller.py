@@ -12,6 +12,9 @@ from application.payments.create_transaction import (
     CreateTransactionHttpStatus,
 )
 from application.payments.list_transactions import ListTransactions
+from application.payments.public_transaction_status import (
+    project_public_transaction_status,
+)
 from application.payments.void_transaction import VoidTransaction
 from domain.exceptions import (
     BatchCloseHasInFlightTransactions,
@@ -42,6 +45,7 @@ from presentation.schemas.transactions import (
     CreateTransactionRequest,
     TransactionItemResponse,
     TransactionListResponse,
+    PublicTransactionResponse,
     TransactionResponse,
     VoidTransactionRequest,
 )
@@ -87,7 +91,7 @@ def list_transactions(
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    response_model=TransactionResponse,
+    response_model=PublicTransactionResponse,
     responses={
         status.HTTP_202_ACCEPTED: {
             "description": "Idempotent replay while still PENDING",
@@ -122,7 +126,7 @@ def create_transaction(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     use_case: Annotated[CreateTransaction, Depends(get_create_transaction)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> TransactionResponse | JSONResponse:
+) -> PublicTransactionResponse | JSONResponse:
     try:
         result = use_case.execute(
             user_id=current_user.user_id,
@@ -154,10 +158,18 @@ def create_transaction(
             content={"message": str(exc)},
         )
 
-    payload = TransactionResponse(
+    public_status = result.public_status
+    if public_status is None:
+        # Test doubles and callers compiled against the previous application
+        # result keep a safe, additive projection during this migration.
+        public_status = project_public_transaction_status(result.transaction, None)
+    payload = PublicTransactionResponse(
         transaction_number=result.transaction.transaction_number,
-        status=result.transaction.status.value,
-        user_message=result.transaction.user_message or "",
+        status=public_status.status,
+        reason=public_status.reason,
+        user_message=public_status.user_message,
+        poll_after_seconds=public_status.poll_after_seconds,
+        may_start_new_sale=public_status.may_start_new_sale,
         created_at=result.transaction.created_at,
     )
     if result.http_status == CreateTransactionHttpStatus.ACCEPTED:

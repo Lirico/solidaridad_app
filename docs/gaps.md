@@ -4,7 +4,18 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-13
+Última revisión: 2026-10-14
+
+> ✅ **Último cambio (2026-10-14, RA-10):** la API detecta un job
+> `PROCESSING` que alcanza `processing_timeout_seconds` y lo mueve, con
+> `FOR UPDATE SKIP LOCKED`, a `MANUAL_REVIEW` sin reenviarlo al procesador.
+> La migración `20261014_0011` incorpora alertas durables `OPEN`, únicas por
+> job y causa; los timeouts, agotamientos, rechazos permanentes, ambigüedades
+> e inconsistencias que requieren revisión abren el caso y emiten un evento
+> operativo sanitizado. Las pruebas cubren el límite exacto, monitores
+> concurrentes, deduplicación, migración y finalización tardía. Pendiente:
+> calendarización/lifespan del monitor (RA-11) y resolución por casa central
+> (RA-12). Ver G-P1-09.
 
 > ✅ **Último cambio (2026-10-13, RA-04):** la API incorpora la cola durable
 > `processor_jobs` y la política persistida `payment_processing_config`, con

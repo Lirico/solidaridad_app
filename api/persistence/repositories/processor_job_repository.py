@@ -86,6 +86,48 @@ class ProcessorJobRepository:
         self._session.flush()
         return _to_domain(row)
 
+    def claim_next_due_reverse(
+        self,
+        *,
+        worker_id: str,
+        claim_token: UUID,
+        claimed_at: datetime,
+    ) -> ProcessorJob | None:
+        """Claim one due reversal job without competing with other workers.
+
+        The caller owns the surrounding database transaction and must commit it
+        before making the processor request.  PostgreSQL keeps the row lock
+        until that commit, while ``SKIP LOCKED`` lets another worker continue
+        looking for a different ready job instead of waiting.
+        """
+        row = self._session.scalar(
+            select(ProcessorJobModel)
+            .where(
+                ProcessorJobModel.operation_type
+                == ProcessorOperationType.REVERSE.value,
+                ProcessorJobModel.state.in_(
+                    (ProcessorJobState.READY.value, ProcessorJobState.RETRY.value)
+                ),
+                ProcessorJobModel.next_attempt_at <= claimed_at,
+            )
+            .order_by(ProcessorJobModel.next_attempt_at, ProcessorJobModel.id)
+            .with_for_update(skip_locked=True)
+        )
+        if row is None:
+            return None
+
+        validate_processor_job_transition(
+            ProcessorJobState(row.state), ProcessorJobState.PROCESSING
+        )
+        row.state = ProcessorJobState.PROCESSING.value
+        row.worker_id = worker_id
+        row.claim_token = claim_token
+        row.processing_started_at = claimed_at
+        row.attempt_count += 1
+        row.updated_at = claimed_at
+        self._session.flush()
+        return _to_domain(row)
+
     def transition(
         self,
         *,

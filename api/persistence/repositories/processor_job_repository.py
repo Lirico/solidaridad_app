@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from domain.processor_job import (
@@ -128,6 +128,50 @@ class ProcessorJobRepository:
         self._session.flush()
         return _to_domain(row)
 
+    def finalize_claim(
+        self,
+        *,
+        job_id: int,
+        claim_token: UUID,
+        target: ProcessorJobState,
+        finalized_at: datetime,
+        next_attempt_at: datetime | None = None,
+        result: str | None = None,
+        last_error_code: str | None = None,
+        last_error_detail_sanitized: str | None = None,
+    ) -> bool:
+        """Persist one claimed outcome only while its claim is still current."""
+        validate_processor_job_transition(ProcessorJobState.PROCESSING, target)
+        if target is ProcessorJobState.RETRY and next_attempt_at is None:
+            raise ValueError("RETRY requires next_attempt_at")
+        if target is ProcessorJobState.COMPLETED and result is None:
+            raise ValueError("COMPLETED requires result")
+
+        values: dict[str, object] = {
+            "state": target.value,
+            "updated_at": finalized_at,
+            "last_error_code": last_error_code,
+            "last_error_detail_sanitized": last_error_detail_sanitized,
+        }
+        if next_attempt_at is not None:
+            values["next_attempt_at"] = next_attempt_at
+        if result is not None:
+            values["result"] = result
+        if target is ProcessorJobState.COMPLETED:
+            values["completed_at"] = finalized_at
+
+        outcome = self._session.execute(
+            update(ProcessorJobModel)
+            .where(
+                ProcessorJobModel.id == job_id,
+                ProcessorJobModel.state == ProcessorJobState.PROCESSING.value,
+                ProcessorJobModel.claim_token == claim_token,
+            )
+            .values(**values)
+            .returning(ProcessorJobModel.id)
+        )
+        return outcome.scalar_one_or_none() is not None
+
     def transition(
         self,
         *,
@@ -148,9 +192,7 @@ class ProcessorJobRepository:
 
         validate_processor_job_transition(ProcessorJobState(row.state), target)
         if target is ProcessorJobState.PROCESSING and (
-            worker_id is None
-            or claim_token is None
-            or processing_started_at is None
+            worker_id is None or claim_token is None or processing_started_at is None
         ):
             raise ValueError(
                 "PROCESSING requires worker_id, claim_token and start time"

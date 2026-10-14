@@ -128,6 +128,10 @@ class TransactionRepository:
             return None
         return _to_domain(row)
 
+    def get_by_id(self, *, transaction_id: int) -> Transaction | None:
+        row = self._session.get(TransactionModel, transaction_id)
+        return _to_domain(row) if row is not None else None
+
     def get_by_id_for_update(self, *, transaction_id: int) -> Transaction:
         """Lock one transaction before attaching recovery work to it."""
         row = self._session.scalar(

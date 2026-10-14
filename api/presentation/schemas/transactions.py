@@ -32,6 +32,14 @@ class TransactionResponse(BaseModel):
     created_at: datetime
 
 
+class PublicTransactionResponse(TransactionResponse):
+    """Terminal-facing authorization status and next-action instructions."""
+
+    reason: str | None
+    poll_after_seconds: int | None
+    may_start_new_sale: bool
+
+
 class TransactionItemResponse(BaseModel):
     """Single item in a transaction list response."""
 

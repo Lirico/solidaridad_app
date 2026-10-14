@@ -11,7 +11,11 @@ from application.payments.create_transaction import (
     CreateTransaction,
     CreateTransactionHttpStatus,
 )
+from application.payments.get_transaction_status import GetTransactionStatus
 from application.payments.list_transactions import ListTransactions
+from application.payments.public_transaction_status import (
+    project_public_transaction_status,
+)
 from application.payments.void_transaction import VoidTransaction
 from domain.exceptions import (
     BatchCloseHasInFlightTransactions,
@@ -37,9 +41,13 @@ from presentation.dependencies import (
     get_list_transactions,
     get_void_transaction,
 )
+from presentation.dependencies import (
+    get_transaction_status as get_transaction_status_use_case,
+)
 from presentation.schemas.transactions import (
     BatchCloseResponse,
     CreateTransactionRequest,
+    PublicTransactionResponse,
     TransactionItemResponse,
     TransactionListResponse,
     TransactionResponse,
@@ -84,13 +92,67 @@ def list_transactions(
     return TransactionListResponse(items=items, total=result.total)
 
 
+@router.get(
+    "/{transaction_number}",
+    response_model=PublicTransactionResponse,
+    responses={
+        status.HTTP_202_ACCEPTED: {
+            "description": "Authorization recovery is still processing",
+            "model": PublicTransactionResponse,
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing/invalid token",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Transaction not found for the authenticated terminal",
+        },
+    },
+)
+def get_transaction(
+    transaction_number: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[
+        GetTransactionStatus,
+        Depends(get_transaction_status_use_case),
+    ],
+) -> PublicTransactionResponse | JSONResponse:
+    try:
+        result = use_case.execute(
+            terminal_id=current_user.installation_id,
+            transaction_number=transaction_number,
+        )
+    except TransactionNotFound as exc:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": str(exc)},
+        )
+
+    public_status = result.public_status
+    payload = PublicTransactionResponse(
+        transaction_number=result.transaction.transaction_number,
+        status=public_status.status,
+        reason=public_status.reason,
+        user_message=public_status.user_message,
+        poll_after_seconds=public_status.poll_after_seconds,
+        may_start_new_sale=public_status.may_start_new_sale,
+        created_at=result.transaction.created_at,
+    )
+    if public_status.poll_after_seconds is not None:
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=payload.model_dump(mode="json"),
+            headers={"Retry-After": str(public_status.poll_after_seconds)},
+        )
+    return payload
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    response_model=TransactionResponse,
+    response_model=PublicTransactionResponse,
     responses={
         status.HTTP_202_ACCEPTED: {
-            "description": "Idempotent replay while still PENDING",
+            "description": "Initial response or idempotent replay while PENDING",
             "model": TransactionResponse,
         },
         status.HTTP_400_BAD_REQUEST: {
@@ -122,7 +184,7 @@ def create_transaction(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     use_case: Annotated[CreateTransaction, Depends(get_create_transaction)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> TransactionResponse | JSONResponse:
+) -> PublicTransactionResponse | JSONResponse:
     try:
         result = use_case.execute(
             user_id=current_user.user_id,
@@ -154,10 +216,18 @@ def create_transaction(
             content={"message": str(exc)},
         )
 
-    payload = TransactionResponse(
+    public_status = result.public_status
+    if public_status is None:
+        # Test doubles and callers compiled against the previous application
+        # result keep a safe, additive projection during this migration.
+        public_status = project_public_transaction_status(result.transaction, None)
+    payload = PublicTransactionResponse(
         transaction_number=result.transaction.transaction_number,
-        status=result.transaction.status.value,
-        user_message=result.transaction.user_message or "",
+        status=public_status.status,
+        reason=public_status.reason,
+        user_message=public_status.user_message,
+        poll_after_seconds=public_status.poll_after_seconds,
+        may_start_new_sale=public_status.may_start_new_sale,
         created_at=result.transaction.created_at,
     )
     if result.http_status == CreateTransactionHttpStatus.ACCEPTED:

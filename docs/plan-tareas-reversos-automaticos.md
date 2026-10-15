@@ -625,46 +625,42 @@ abandonado converge a `MANUAL_REVIEW`, no a una ejecución duplicada.
 
 ---
 
-## RA-12 — Implementar revisión de casa central
+## RA-12 — Operación temporal de casa central por SQL
 
 **Branch:** `codex/reversal-ra-12-central-review`
 
-**Objetivo:** permitir que un operador autorizado consulte, audite y resuelva
-casos `MANUAL_REVIEW`.
+**Objetivo:** permitir que casa central consulte casos `MANUAL_REVIEW` mediante
+el acceso SQL operativo existente, sin incorporar por ahora una superficie de
+administración en la API.
 
 **Alcance:**
 
-- incorporar rol mínimo `CENTRAL_OPERATOR` separado del usuario terminal;
-- provisionamiento administrativo explícito, sin permitir autorregistro con
-  ese rol;
-- endpoint interno para listar/ver jobs y alertas sin devolver PAN completo;
-- acciones auditadas para resolver como:
-  `REVERSED_CONFIRMED`, `PROCESSOR_DECLINED` o `ACTIVE_APPROVAL_CONFIRMED`;
-- proyección final a `FAILED`, `DECLINED` o `APPROVED` según evidencia;
-- conservar `authorization_outcome = INDETERMINATE` como hecho histórico;
-- guardar operador, timestamp, motivo y referencia externa;
-- acción separada para reintento manual, deshabilitada por defecto y con motivo
-  obligatorio.
+- usar acceso SQL de solo lectura y mínimo privilegio para consultar jobs,
+  alertas y transacciones en `MANUAL_REVIEW`;
+- mantener fuera de las consultas operativas el PAN completo y el vencimiento;
+- no incorporar `CENTRAL_OPERATOR`, provisionamiento administrativo ni
+  endpoints internos en esta etapa;
+- no modificar estados, resultados ni reintentar reversos directamente por
+  SQL: una resolución requiere la futura herramienta auditada;
+- conservar `authorization_outcome = INDETERMINATE` y `MANUAL_REVIEW` hasta
+  que exista una resolución con evidencia trazable.
 
 **Commits sugeridos:**
 
-1. `feat(api): add central operator authorization`
-2. `feat(api): expose manual recovery review endpoints`
-3. `feat(api): audit manual payment resolutions`
-4. `test(api): cover review authorization and resolution transitions`
+1. `docs(recovery): document central SQL review procedure`
+2. `docs(gaps): defer central API and audited resolution`
 
 **Pruebas:**
 
-- usuario terminal recibe `403`;
-- operador central ve datos enmascarados;
-- transición y proyección por cada resultado;
-- doble resolución es idempotente o rechazada con conflicto explícito;
-- reintento manual exige motivo y política de seguridad;
-- auditoría completa sin PAN;
-- `make check` en `api/`.
+- las consultas operativas se ejecutan con un rol de solo lectura;
+- no incluyen PAN completo ni vencimiento;
+- un caso `MANUAL_REVIEW` no puede ser modificado por el procedimiento de
+  consulta;
+- no hay cambio de código de API que requiera `make check`.
 
-**Criterio de aceptación:** casa central puede resolver una operación sin
-editar directamente la base y toda acción queda atribuida y auditada.
+**Criterio de aceptación:** casa central puede identificar e investigar un caso
+en `MANUAL_REVIEW` por SQL sin exponer una API nueva ni modificar datos. La
+resolución auditada queda diferida a una tarea posterior.
 
 ---
 

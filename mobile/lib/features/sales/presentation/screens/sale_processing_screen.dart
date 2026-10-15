@@ -20,6 +20,7 @@ class SaleProcessingScreen extends StatefulWidget {
 
 class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
   SalesCubit? _salesCubit;
+  bool _reviewHandoffStarted = false;
 
   @override
   void didChangeDependencies() {
@@ -31,7 +32,9 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
   void dispose() {
     // La autorización continúa durablemente en la API, pero no dejamos un
     // timer de UI vivo después de abandonar esta pantalla.
-    _salesCubit?.cancelPendingSalePolling();
+    if (!_reviewHandoffStarted) {
+      _salesCubit?.cancelPendingSalePolling();
+    }
     super.dispose();
   }
 
@@ -42,6 +45,27 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
 
   String _formatAmount(double amount) {
     return '\$${amount.toStringAsFixed(2)}';
+  }
+
+  OperationModel _operationFromReview(SalesAwaitingAuthorization state) {
+    final normalizedCard = state.cardNumber.replaceAll(' ', '');
+    final hiddenCard = normalizedCard.length >= 4
+        ? '•••• ${normalizedCard.substring(normalizedCard.length - 4)}'
+        : '•••• ----';
+    return OperationModel(
+      id: state.operationNumber,
+      productCode: state.productCode,
+      productLabel: state.productLabel,
+      amount: state.amount,
+      cardNumber: hiddenCard,
+      result: PaymentResult.underReview,
+      authorizationStatus: SaleAuthorizationStatus.pending,
+      pendingReason: PendingSaleReason.underReview,
+      pollAfterSeconds: null,
+      mayStartNewSale: state.mayStartNewSale,
+      date: DateTime.now(),
+      userMessage: state.message,
+    );
   }
 
   @override
@@ -63,6 +87,21 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
           date: DateTime.now(),
           userMessage: salesState.errorMessage,
         );
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.saleStatus,
+          arguments: operation,
+        );
+      });
+    }
+
+    if (salesState is SalesAwaitingAuthorization &&
+        salesState.pendingReason == PendingSaleReason.underReview &&
+        !_reviewHandoffStarted) {
+      _reviewHandoffStarted = true;
+      final operation = _operationFromReview(salesState);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
         Navigator.pushReplacementNamed(
           context,
           AppRoutes.saleStatus,

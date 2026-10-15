@@ -445,7 +445,9 @@ class SalesCubit extends Cubit<SalesState> {
       case SaleAuthorizationStatus.declined:
         return PaymentResult.declined;
       case SaleAuthorizationStatus.pending:
-        return PaymentResult.pending;
+        return response.pendingReason == PendingSaleReason.underReview
+            ? PaymentResult.underReview
+            : PaymentResult.pending;
       case SaleAuthorizationStatus.failed:
         return PaymentResult.failed;
     }

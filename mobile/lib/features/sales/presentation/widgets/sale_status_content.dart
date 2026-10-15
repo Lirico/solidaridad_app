@@ -216,6 +216,8 @@ class SaleStatusContent extends StatelessWidget {
         return '51 (Fondos insuficientes)';
       case PaymentResult.pending:
         return 'PENDIENTE';
+      case PaymentResult.underReview:
+        return 'VERIFICACIÓN REQUERIDA';
       case PaymentResult.failed:
         return 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:

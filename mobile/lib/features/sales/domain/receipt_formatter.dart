@@ -27,6 +27,8 @@ class ReceiptFormatter {
         return 'RECHAZADA';
       case PaymentResult.pending:
         return 'EN PROCESO';
+      case PaymentResult.underReview:
+        return 'VERIFICACIÓN REQUERIDA';
       case PaymentResult.failed:
         return 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:

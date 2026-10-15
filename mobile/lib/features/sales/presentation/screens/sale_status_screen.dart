@@ -112,6 +112,12 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.hourglass_top;
         statusTitle = 'Transacción en Proceso';
         statusSubtitle = 'La autorización sigue en curso.';
+      case PaymentResult.underReview:
+        statusColor = Colors.orange.shade800;
+        statusIcon = Icons.manage_search;
+        statusTitle = 'Verificación requerida';
+        statusSubtitle =
+            'Verifique la operación con casa central. El cobro podría haberse procesado.';
       case PaymentResult.failed:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;

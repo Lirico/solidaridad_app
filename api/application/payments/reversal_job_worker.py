@@ -13,6 +13,7 @@ from application.payments.ports import (
     ReverseRequest,
 )
 from application.payments.recovery_alert_events import log_recovery_alert_opened
+from application.payments.recovery_job_events import log_recovery_job_transition
 from application.payments.response_messages import MSG_FAILED
 from application.payments.reversal_retry import ReversalRetryPolicy
 from domain.authorization_outcome import AuthorizationOutcome
@@ -72,9 +73,14 @@ class ReversalJobWorker:
         if request is None:
             self._persist_manual_review(
                 claimed,
+                transaction_number=(
+                    transaction.transaction_number if transaction is not None else None
+                ),
                 error_code="RECOVERY_DATA_MISSING",
             )
             return True
+        if transaction is None:
+            raise RuntimeError("recovery transaction missing after validation")
 
         policy = ReversalRetryPolicy.from_config(
             self._configs.get_default(),
@@ -99,6 +105,11 @@ class ReversalJobWorker:
                     processor_response_code=result.response_code,
                 )
                 self._commit_outcome()
+                log_recovery_job_transition(
+                    transaction_number=transaction.transaction_number,
+                    processor_job_id=claimed.id,
+                    state=ProcessorJobState.COMPLETED,
+                )
             else:
                 self._session.rollback()
             return True
@@ -107,11 +118,17 @@ class ReversalJobWorker:
             result.outcome is ReversalOutcome.NOT_SENT
             and claimed.attempt_count < policy.max_attempts
         ):
-            self._persist_retry(claimed, policy, finalized_at)
+            self._persist_retry(
+                claimed,
+                transaction.transaction_number,
+                policy,
+                finalized_at,
+            )
             return True
 
         self._persist_manual_review(
             claimed,
+            transaction_number=transaction.transaction_number,
             error_code=result.outcome.value,
             error_detail=result.response_code,
             finalized_at=finalized_at,
@@ -167,6 +184,7 @@ class ReversalJobWorker:
     def _persist_retry(
         self,
         claimed: ProcessorJob,
+        transaction_number: str,
         policy: ReversalRetryPolicy,
         finalized_at: datetime,
     ) -> None:
@@ -182,6 +200,12 @@ class ReversalJobWorker:
             last_error_code=ReversalOutcome.NOT_SENT.value,
         ):
             self._commit_outcome()
+            log_recovery_job_transition(
+                transaction_number=transaction_number,
+                processor_job_id=claimed.id,
+                state=ProcessorJobState.RETRY,
+                error_code=ReversalOutcome.NOT_SENT.value,
+            )
         else:
             self._session.rollback()
 
@@ -189,6 +213,7 @@ class ReversalJobWorker:
         self,
         claimed: ProcessorJob,
         *,
+        transaction_number: str | None,
         error_code: str,
         error_detail: str | None = None,
         finalized_at: datetime | None = None,
@@ -207,10 +232,17 @@ class ReversalJobWorker:
                 opened_at=finalized_at or self._now(),
             )
             self._commit_outcome()
+            resolved_transaction_number = transaction_number or "unknown"
+            log_recovery_job_transition(
+                transaction_number=resolved_transaction_number,
+                processor_job_id=claimed.id,
+                state=ProcessorJobState.MANUAL_REVIEW,
+                error_code=error_code,
+            )
             if alert_opened:
                 log_recovery_alert_opened(
                     processor_job_id=claimed.id,
-                    transaction_id=claimed.transaction_id,
+                    transaction_number=resolved_transaction_number,
                     cause=error_code,
                 )
         else:

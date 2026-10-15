@@ -63,6 +63,7 @@ def test_readiness_is_degraded_after_a_fatal_worker_error() -> None:
             "started_at": "2026-10-14T12:00:00+00:00",
             "last_iteration_at": None,
             "last_error": "RuntimeError",
+            "stale": False,
         },
     }
 
@@ -90,3 +91,27 @@ def test_disabled_worker_is_ready_before_operational_activation() -> None:
     assert response.json()["recovery_worker"]["enabled"] is False
     worker.start.assert_not_called()
     worker.stop.assert_not_called()
+
+
+def test_readiness_is_degraded_when_a_worker_is_stale() -> None:
+    worker = MagicMock()
+    worker.health.return_value = RecoveryWorkerHealth(
+        enabled=True,
+        alive=True,
+        stopping=False,
+        started_at=NOW,
+        last_iteration_at=NOW,
+        last_error=None,
+        stale=True,
+    )
+    app = create_app(
+        create_router(),
+        settings=Settings(embedded_recovery_worker_enabled=True),
+        recovery_worker=worker,
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["recovery_worker"]["stale"] is True

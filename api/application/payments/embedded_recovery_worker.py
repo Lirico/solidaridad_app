@@ -19,10 +19,11 @@ class RecoveryWorkerHealth:
     started_at: datetime | None
     last_iteration_at: datetime | None
     last_error: str | None
+    stale: bool = False
 
     @property
     def ready(self) -> bool:
-        return not self.enabled or (self.alive and not self.stopping)
+        return not self.enabled or (self.alive and not self.stopping and not self.stale)
 
 
 class EmbeddedRecoveryWorker:
@@ -39,10 +40,14 @@ class EmbeddedRecoveryWorker:
         run_iteration: Callable[[Callable[[], bool]], float],
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
         enabled: bool = True,
+        max_iteration_age_seconds: float = 30.0,
     ) -> None:
         self._run_iteration = run_iteration
         self._now = now
         self._enabled = enabled
+        if max_iteration_age_seconds <= 0:
+            raise ValueError("max_iteration_age_seconds must be positive")
+        self._max_iteration_age_seconds = max_iteration_age_seconds
         self._stop_requested = Event()
         self._lock = Lock()
         self._thread: Thread | None = None
@@ -89,6 +94,14 @@ class EmbeddedRecoveryWorker:
 
     def health(self) -> RecoveryWorkerHealth:
         with self._lock:
+            latest_activity = self._last_iteration_at or self._started_at
+            stale = (
+                self._enabled
+                and self._alive
+                and latest_activity is not None
+                and (self._now() - latest_activity).total_seconds()
+                > self._max_iteration_age_seconds
+            )
             return RecoveryWorkerHealth(
                 enabled=self._enabled,
                 alive=self._alive,
@@ -96,6 +109,7 @@ class EmbeddedRecoveryWorker:
                 started_at=self._started_at,
                 last_iteration_at=self._last_iteration_at,
                 last_error=self._last_error,
+                stale=stale,
             )
 
     def stop_requested(self) -> bool:

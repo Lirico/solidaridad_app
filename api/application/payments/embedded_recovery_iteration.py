@@ -61,6 +61,7 @@ def create_embedded_recovery_iteration(
                     session=session,
                     jobs=ProcessorJobRepository(session),
                     alerts=RecoveryAlertRepository(session),
+                    transactions=TransactionRepository(session),
                     configs=configs,
                 ).run_once()
             poll_interval = configs.get_default().worker_poll_interval_seconds

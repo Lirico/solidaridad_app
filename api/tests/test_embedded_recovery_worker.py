@@ -88,3 +88,11 @@ def test_shutdown_grace_must_not_be_negative() -> None:
 
     with pytest.raises(ValueError, match="grace_seconds"):
         worker.stop(grace_seconds=-1)
+
+
+def test_worker_requires_a_positive_iteration_age_threshold() -> None:
+    with pytest.raises(ValueError, match="max_iteration_age_seconds"):
+        EmbeddedRecoveryWorker(
+            run_iteration=lambda _should_stop: 60,
+            max_iteration_age_seconds=0,
+        )

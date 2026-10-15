@@ -1,12 +1,12 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Protocol
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from application.payments.embedded_recovery_iteration import (
     create_embedded_recovery_iteration,
@@ -16,6 +16,7 @@ from application.payments.embedded_recovery_worker import (
     RecoveryWorkerHealth,
 )
 from config import Settings, get_settings
+from infrastructure.payments.recovery_metrics import RecoveryMetricsExporter
 from presentation import create_router
 
 logger = logging.getLogger(__name__)
@@ -59,12 +60,17 @@ def create_app(
     *,
     settings: Settings | None = None,
     recovery_worker: ManagedRecoveryWorker | None = None,
+    recovery_metrics: Callable[[], str] | None = None,
 ) -> FastAPI:
     runtime_settings = settings or get_settings()
     worker = recovery_worker or EmbeddedRecoveryWorker(
         run_iteration=create_embedded_recovery_iteration(settings=runtime_settings),
         enabled=runtime_settings.embedded_recovery_worker_enabled,
+        max_iteration_age_seconds=(
+            runtime_settings.recovery_worker_max_iteration_age_seconds
+        ),
     )
+    metrics = recovery_metrics or RecoveryMetricsExporter().render
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -110,6 +116,7 @@ def create_app(
                 "started_at": _timestamp(health.started_at),
                 "last_iteration_at": _timestamp(health.last_iteration_at),
                 "last_error": health.last_error,
+                "stale": health.stale,
             },
         }
         return JSONResponse(
@@ -120,6 +127,10 @@ def create_app(
             ),
             content=body,
         )
+
+    @app.get("/metrics", include_in_schema=False)
+    def recovery_metrics_endpoint() -> PlainTextResponse:
+        return PlainTextResponse(metrics(), media_type="text/plain; version=0.0.4")
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(

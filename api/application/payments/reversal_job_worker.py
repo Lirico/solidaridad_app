@@ -43,6 +43,7 @@ class ReversalJobWorker:
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
         random_value: Callable[[], float] = random.random,
         claim_token_factory: Callable[[], UUID] = uuid4,
+        should_stop: Callable[[], bool] = lambda: False,
     ) -> None:
         if not worker_id.strip():
             raise ValueError("worker_id must not be empty")
@@ -56,6 +57,7 @@ class ReversalJobWorker:
         self._now = now
         self._random_value = random_value
         self._claim_token_factory = claim_token_factory
+        self._should_stop = should_stop
 
     def run_once(self) -> bool:
         """Process one job, returning whether this worker claimed any work."""
@@ -117,6 +119,8 @@ class ReversalJobWorker:
         return True
 
     def _claim(self) -> ProcessorJob | None:
+        if self._should_stop():
+            return None
         try:
             claimed = self._jobs.claim_next_due_reverse(
                 worker_id=self._worker_id,

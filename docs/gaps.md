@@ -6,15 +6,15 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-15
 
-> ✅ **Último cambio (2026-10-15, RA-16):** Readiness se degrada si el worker
-> muere, se está apagando o no completa una iteración dentro del umbral. Los
-> eventos estructurados contienen `transaction_number`, job, estado y código
-> sanitizado; las pruebas escanean logs, persistencia operacional y respuestas
-> con un PAN sintético completo. El runbook define la alerta durable, revisión
-> manual, cierre de lote bloqueado y mínimos de acceso/backup/dump. Las métricas
-> de recuperación y sus alertas automáticas se difieren. Evidencia:
-> `api/tests/test_sensitive_data_leakage.py`,
-> `docs/runbook-recuperacion-pagos.md` y `make -C api check`.
+> ✅ **Último cambio (2026-10-15, RA-17):** la matriz determinista completa
+> prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
+> timeout y reclamo concurrente entre workers. El rollout por canary, rollback
+> sin borrar jobs y conciliación posterior quedaron documentados; el worker
+> conserva desactivación segura por defecto y puede iniciarse explícitamente en
+> una única instancia controlada. La activación real sigue requiriendo la
+> aprobación y ejecución de Operaciones/Riesgo en cada ambiente. Evidencia:
+> `api/tests/test_recovery_end_to_end.py`,
+> `docs/rollout-recuperacion-reversos.md` y `make -C api check`.
 
 > ✅ **Último cambio (2026-10-14, RA-15):** cuando la API proyecta
 > `PENDING / UNDER_REVIEW`, mobile detiene el polling, muestra un handoff de
@@ -609,6 +609,16 @@ respuestas. El procedimiento de alerta durable, revisión manual y lote
 bloqueado está en `docs/runbook-recuperacion-pagos.md`. Pendiente: métricas y
 alertas automáticas de recuperación, más resolución administrativa auditada por
 casa central.
+
+**RA-17 (2026-10-15):** la matriz integral determinista cubre aprobación,
+rechazo, agotamiento `NOT_SENT`, autorización ambigua, reverso confirmado,
+reintento de reverso, respuesta ambigua, crash/timeout con alerta y dos workers
+compitiendo por el mismo job. El procedimiento de
+`docs/rollout-recuperacion-reversos.md` fija los valores iniciales, la
+activación canary, el rollback que sólo detiene nuevos claims y la conciliación
+sin PAN. El gap sigue `partial`: falta ejecutar la activación controlada en los
+ambientes reales y una resolución administrativa autenticada/auditada para
+`MANUAL_REVIEW`.
 
 ### Actualización G-P1-15 — 2026-10-14
 

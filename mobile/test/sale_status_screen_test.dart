@@ -70,7 +70,7 @@ Future<void> _openStatus(WidgetTester tester, {Object? arguments}) async {
                     settings: RouteSettings(arguments: arguments),
                     transitionDuration: Duration.zero,
                     reverseTransitionDuration: Duration.zero,
-                    pageBuilder: (_, __, ___) => const SaleStatusScreen(),
+                    pageBuilder: (_, _, _) => const SaleStatusScreen(),
                   ),
                 );
               },

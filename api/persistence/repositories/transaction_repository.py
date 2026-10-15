@@ -479,59 +479,6 @@ class TransactionRepository:
         )
         self._session.flush()
 
-    def apply_manual_recovery_resolution(
-        self,
-        *,
-        transaction_id: int,
-        status: TransactionStatus,
-        operator_user_id: int,
-        user_message: str,
-    ) -> Transaction:
-        """Project verified evidence without rewriting the original outcome."""
-        row = self._session.get(TransactionModel, transaction_id)
-        if row is None:
-            raise LookupError(f"transaction {transaction_id} not found")
-        if row.authorization_outcome != AuthorizationOutcome.INDETERMINATE.value:
-            raise ValueError("manual recovery requires an indeterminate authorization")
-
-        from_status = row.status
-        row.status = status.value
-        row.user_message = user_message
-        row.updated_at = datetime.now(UTC)
-        self._append_status_event(
-            transaction_id=row.id,
-            from_status=from_status,
-            to_status=status.value,
-            event_type=TransactionStatusEventType.MANUAL_RECOVERY_RESOLUTION,
-            actor_type=TransactionStatusActorType.CENTRAL_OPERATOR,
-            actor_user_id=operator_user_id,
-            authorization_outcome=AuthorizationOutcome.INDETERMINATE,
-            user_message=user_message,
-        )
-        self._session.flush()
-        return _to_domain(row)
-
-    def record_manual_recovery_retry(
-        self,
-        *,
-        transaction_id: int,
-        operator_user_id: int,
-    ) -> None:
-        row = self._session.get(TransactionModel, transaction_id)
-        if row is None:
-            raise LookupError(f"transaction {transaction_id} not found")
-        self._append_status_event(
-            transaction_id=row.id,
-            from_status=row.status,
-            to_status=row.status,
-            event_type=TransactionStatusEventType.MANUAL_RECOVERY_RETRY,
-            actor_type=TransactionStatusActorType.CENTRAL_OPERATOR,
-            actor_user_id=operator_user_id,
-            authorization_outcome=AuthorizationOutcome.INDETERMINATE,
-            user_message=row.user_message,
-        )
-        self._session.flush()
-
     def apply_void_result(
         self,
         *,

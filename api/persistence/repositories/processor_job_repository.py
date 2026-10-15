@@ -46,60 +46,6 @@ class ProcessorJobRepository:
         row = self._session.get(ProcessorJobModel, job_id)
         return _to_domain(row) if row is not None else None
 
-    def get_by_id_for_update(self, job_id: int) -> ProcessorJob | None:
-        row = self._session.scalar(
-            select(ProcessorJobModel)
-            .where(ProcessorJobModel.id == job_id)
-            .with_for_update()
-        )
-        return _to_domain(row) if row is not None else None
-
-    def list_manual_review(self) -> list[ProcessorJob]:
-        rows = self._session.scalars(
-            select(ProcessorJobModel)
-            .where(ProcessorJobModel.state == ProcessorJobState.MANUAL_REVIEW.value)
-            .order_by(ProcessorJobModel.updated_at.asc(), ProcessorJobModel.id.asc())
-        ).all()
-        return [_to_domain(row) for row in rows]
-
-    def complete_manual_review(
-        self,
-        *,
-        job_id: int,
-        result: str,
-        completed_at: datetime,
-    ) -> ProcessorJob:
-        row = self._session.get(ProcessorJobModel, job_id)
-        if row is None:
-            raise LookupError(f"processor job {job_id} not found")
-        validate_processor_job_transition(
-            ProcessorJobState(row.state), ProcessorJobState.COMPLETED
-        )
-        row.state = ProcessorJobState.COMPLETED.value
-        row.result = result
-        row.completed_at = completed_at
-        row.updated_at = completed_at
-        self._session.flush()
-        return _to_domain(row)
-
-    def retry_manual_review(
-        self,
-        *,
-        job_id: int,
-        next_attempt_at: datetime,
-    ) -> ProcessorJob:
-        row = self._session.get(ProcessorJobModel, job_id)
-        if row is None:
-            raise LookupError(f"processor job {job_id} not found")
-        validate_processor_job_transition(
-            ProcessorJobState(row.state), ProcessorJobState.RETRY
-        )
-        row.state = ProcessorJobState.RETRY.value
-        row.next_attempt_at = next_attempt_at
-        row.updated_at = next_attempt_at
-        self._session.flush()
-        return _to_domain(row)
-
     def get_by_transaction(
         self,
         *,

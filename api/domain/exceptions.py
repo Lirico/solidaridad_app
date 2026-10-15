@@ -53,21 +53,6 @@ class CentralOperatorProvisioningForbidden(DomainError):
         super().__init__(message)
 
 
-class ManualRecoveryCaseNotFound(DomainError):
-    def __init__(self, message: str = "Caso de recuperación no encontrado") -> None:
-        super().__init__(message)
-
-
-class ManualRecoveryConflict(DomainError):
-    def __init__(self, message: str = "El caso ya no está en revisión manual") -> None:
-        super().__init__(message)
-
-
-class ManualReversalRetryDisabled(DomainError):
-    def __init__(self, message: str = "El reintento manual está deshabilitado") -> None:
-        super().__init__(message)
-
-
 class UnsupportedProduct(DomainError):
     """Raised when the product code is not in the supported catalog."""
 

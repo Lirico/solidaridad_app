@@ -6,7 +6,6 @@ from presentation.controllers import (
     central_operators_router,
     ping_router,
     products_router,
-    recovery_review_router,
     transactions_router,
 )
 
@@ -20,11 +19,6 @@ def create_router() -> APIRouter:
     v1.include_router(
         central_operators_router,
         prefix="/internal",
-        tags=["internal"],
-    )
-    v1.include_router(
-        recovery_review_router,
-        prefix="/internal/recovery",
         tags=["internal"],
     )
     v1.include_router(products_router, prefix="/products", tags=["products"])

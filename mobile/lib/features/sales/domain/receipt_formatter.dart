@@ -10,6 +10,10 @@ class ReceiptFormatter {
   ReceiptFormatter._();
 
   static const String merchantName = 'GAS Terminal — Solidaridad';
+  static const String terminalId = String.fromEnvironment(
+    'INSTALLATION_ID',
+    defaultValue: '05000001',
+  );
 
   static String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -28,7 +32,7 @@ class ReceiptFormatter {
       case PaymentResult.pending:
         return 'EN PROCESO';
       case PaymentResult.underReview:
-        return 'VERIFICACIÓN REQUERIDA';
+        return 'COMPROBANTE DE VERIFICACIÓN';
       case PaymentResult.failed:
         return 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:
@@ -41,7 +45,8 @@ class ReceiptFormatter {
   /// Texto plano para previsualización / log.
   static String toPlainText(OperationModel op) {
     final buf = StringBuffer()
-      ..writeln(merchantName)
+      ..writeln('Comercio: $merchantName')
+      ..writeln('Terminal: $terminalId')
       ..writeln('--------------------------------')
       ..writeln(_statusLabel(op.result))
       ..writeln('--------------------------------')
@@ -50,9 +55,13 @@ class ReceiptFormatter {
       ..writeln('Hora:   ${_formatTime(op.date)}')
       ..writeln('Prod:   ${op.productLabel}')
       ..writeln('Monto:  ${formatAmount(op.amount)}')
-      ..writeln('Tarjeta:${op.cardNumber}');
+      ..writeln('Tarjeta:${_maskedPan(op.cardNumber)}');
     if (op.userMessage != null && op.userMessage!.trim().isNotEmpty) {
       buf.writeln('Mensaje:${op.userMessage}');
+    }
+    if (op.result == PaymentResult.underReview) {
+      buf.writeln('No cobre nuevamente: podría producirse un cobro duplicado.');
+      buf.writeln('Verifique esta referencia con casa central.');
     }
     buf
       ..writeln('--------------------------------')
@@ -65,6 +74,9 @@ class ReceiptFormatter {
     final message =
         (op.userMessage != null && op.userMessage!.trim().isNotEmpty)
         ? '<div class="c">${_esc(op.userMessage!)}</div>'
+        : '';
+    final verificationWarning = op.result == PaymentResult.underReview
+        ? '<div class="warning">No cobre nuevamente: podría producirse un cobro duplicado.<br/>Verifique esta referencia con casa central.</div>'
         : '';
 
     return '''
@@ -86,7 +98,8 @@ class ReceiptFormatter {
 </style>
 </head>
 <body>
-  <div class="c b">${_esc(merchantName)}</div>
+  <div class="c b">Comercio: ${_esc(merchantName)}</div>
+  <div class="c">Terminal: ${_esc(terminalId)}</div>
   <hr/>
   <div class="c big">${_esc(_statusLabel(op.result))}</div>
   $message
@@ -97,8 +110,9 @@ class ReceiptFormatter {
     <tr><td class="l">Hora</td><td class="r">${_esc(_formatTime(op.date))}</td></tr>
     <tr><td class="l">Producto</td><td class="r">${_esc(op.productLabel)}</td></tr>
     <tr><td class="l">Monto</td><td class="r b">${_esc(formatAmount(op.amount))}</td></tr>
-    <tr><td class="l">Tarjeta</td><td class="r">${_esc(op.cardNumber)}</td></tr>
+    <tr><td class="l">Tarjeta</td><td class="r">${_esc(_maskedPan(op.cardNumber))}</td></tr>
   </table>
+  $verificationWarning
   <hr/>
   <div class="c">Gracias</div>
   <br/><br/>
@@ -128,5 +142,15 @@ class ReceiptFormatter {
       }
     }
     return buf.toString();
+  }
+
+  /// The receipt layer is a final guard: it never prints a full PAN even if a
+  /// caller accidentally constructs an [OperationModel] with one.
+  static String _maskedPan(String value) {
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length >= 4) {
+      return '•••• ${digits.substring(digits.length - 4)}';
+    }
+    return '•••• ----';
   }
 }

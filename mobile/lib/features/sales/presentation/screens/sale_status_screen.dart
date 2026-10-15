@@ -40,8 +40,10 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is OperationModel) {
       _operation = args;
-      // Impresión automática al aprobar la venta.
-      if (args.result == PaymentResult.approved) {
+      // El comercio recibe un comprobante tanto de una aprobación como de una
+      // verificación manual; el segundo nunca afirma un resultado financiero.
+      if (args.result == PaymentResult.approved ||
+          args.result == PaymentResult.underReview) {
         _printTicket();
       }
     }
@@ -156,7 +158,9 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             operation: operation,
             printStatus: _printStatus,
             printMessage: _printMessage,
-            onRetryPrint: result == PaymentResult.approved
+            onRetryPrint:
+                result == PaymentResult.approved ||
+                    result == PaymentResult.underReview
                 ? _printTicket
                 : null,
             onRetry: result == PaymentResult.connectionError

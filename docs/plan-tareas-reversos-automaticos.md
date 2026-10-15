@@ -113,8 +113,8 @@ En `api/` y `payment-gateway/` la cobertura total debe permanecer en al menos
 | RA-09 | Reclamo y ejecución de jobs | RA-04, RA-05, RA-07 | RA-08 |
 | RA-10 | Timeouts, `MANUAL_REVIEW` y alertas durables | RA-09 | — |
 | RA-11 | Worker embebido en FastAPI | RA-10 | RA-12, RA-13 |
-| RA-12 | Operación de casa central y resolución manual | RA-08, RA-10 | RA-11, RA-13 |
-| RA-13 | Protección del cierre de lote | RA-07, RA-10 | RA-11, RA-12 |
+| RA-12 | Consulta temporal de casa central por SQL; API diferida | RA-08, RA-10 | RA-11, RA-13 |
+| RA-13 | Protección del cierre de lote | RA-07, RA-10 | RA-11 |
 | RA-14 | Polling mobile de operaciones en proceso | RA-08 | RA-09 a RA-13 |
 | RA-15 | `UNDER_REVIEW`, comprobante y nueva venta | RA-08, RA-10, RA-14 | RA-12 |
 | RA-16 | Observabilidad y controles de datos sensibles | RA-11, RA-12 | RA-15 |

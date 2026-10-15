@@ -6,6 +6,20 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-14
 
+> ✅ **Último cambio (2026-10-14, RA-14):** mobile modela por separado los
+> estados de autorización `PENDING`, `APPROVED`, `DECLINED` y `FAILED`, más
+> `reason`, `poll_after_seconds` y `may_start_new_sale`. Un `202 PENDING /
+> PROCESSING` conserva el `transaction_number` y la misma
+> `Idempotency-Key`, consulta `GET /v1/transactions/{transaction_number}` con
+> el intervalo que entrega la API y nunca lo presenta como rechazo. Los fallos
+> transitorios no generan un segundo `POST`; el polling termina al llegar a un
+> estado final, `UNDER_REVIEW`, timeout de UI o salida de la pantalla. Una
+> pendiente del historial se retoma por `GET`, sin PAN/CVV ni un nuevo `0200`.
+> Durante `PROCESSING` la navegación para otra venta queda inhabilitada. La
+> interfaz y comprobante específico para `UNDER_REVIEW` sigue en RA-15.
+> Evidencia: `mobile/test/sales_polling_test.dart`, `flutter analyze` (3
+> informes preexistentes) y `flutter test` (102 pruebas).
+
 > ✅ **Decisión (2026-10-14, RA-12):** casa central consultará por ahora los
 > casos de recuperación mediante SQL operativo de solo lectura; no se incorpora
 > rol, provisionamiento ni endpoint administrativo en la API. Las consultas de
@@ -537,7 +551,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. El endpoint `POST /v1/auth/register` se mantiene para que la empresa pueda registrar usuarios vía Postman. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. **Pendiente:** manejar HTTP 202 (ACCEPTED). Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-10-14 (RA-14):** `202 PENDING` queda en curso y se consulta por número de operación; los intervalos vienen de la API, los fallos transitorios no reenvían el `POST` y una venta pendiente del historial se retoma solo con `GET`. **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. La presentación y comprobante de `UNDER_REVIEW` pertenece a RA-15. Ver TC-069 en `docs/test_cases_index.md`. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |
@@ -568,6 +582,13 @@ lock y consulta, los cuatro estados de job bloqueantes, `PENDING` e
 `INDETERMINATE`, y que una operación confirmada sin job abierto puede cerrar.
 La nota anterior que marcaba RA-13 como pendiente queda reemplazada por esta
 actualización. Pendiente: operación/resolución auditada por casa central.
+
+**RA-14:** la terminal consulta la proyección pública aislada por terminal de
+una autorización `PENDING` por su `transaction_number`. Conserva esa referencia
+y su idempotencia inicial, respeta `poll_after_seconds`, no envía un nuevo
+`0200` durante polling ni ante fallos transitorios, y puede reanudar desde el
+historial tras reinicio. `UNDER_REVIEW` detiene la consulta automática; su
+handoff visible y la liberación para una nueva venta se completan en RA-15.
 
 ---
 

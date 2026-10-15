@@ -217,6 +217,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ),
                 isThreeLine: true,
                 onTap: () {
+                  if (operation.isPending) {
+                    final authState = context.read<AuthCubit>().state;
+                    if (authState is AuthSuccess && authState.user != null) {
+                      context.read<SalesCubit>().resumePendingSale(
+                        token: authState.user!.token,
+                        operation: operation,
+                      );
+                      Navigator.pushNamed(context, AppRoutes.saleProcessing);
+                    }
+                    return;
+                  }
                   Navigator.pushNamed(
                     context,
                     AppRoutes.saleDetail,

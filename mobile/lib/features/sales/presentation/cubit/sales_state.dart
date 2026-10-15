@@ -90,6 +90,34 @@ class SalesProcessing extends SalesState {
   });
 }
 
+/// Una autorización ya fue aceptada por la API, pero aún no tiene un resultado
+/// final. Mientras este estado esté activo no se puede enviar otro `0200`.
+class SalesAwaitingAuthorization extends SalesState {
+  final String operationNumber;
+  final PendingSaleReason? pendingReason;
+  final int? pollAfterSeconds;
+  final bool mayStartNewSale;
+  final String message;
+  final bool pollingStopped;
+
+  const SalesAwaitingAuthorization({
+    required super.productCode,
+    required super.productLabel,
+    required super.amount,
+    required super.cardNumber,
+    required super.cvv,
+    required super.expirationDate,
+    required super.history,
+    required super.idempotencyKey,
+    required this.operationNumber,
+    required this.pendingReason,
+    required this.pollAfterSeconds,
+    required this.mayStartNewSale,
+    required this.message,
+    this.pollingStopped = false,
+  });
+}
+
 class SalesCompleted extends SalesState {
   final PaymentResult result;
   final String? operationNumber;

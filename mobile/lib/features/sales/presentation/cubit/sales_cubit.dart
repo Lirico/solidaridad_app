@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/sale_model.dart';
 import '../../../../psdk/msr_card_data.dart';
@@ -7,8 +6,20 @@ import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
   final SalesRepository salesRepository;
+  final Future<void> Function(Duration) _wait;
+  final DateTime Function() _now;
+  final Duration pollingTimeout;
+  bool _polling = false;
+  bool _pollingCancelled = false;
 
-  SalesCubit({required this.salesRepository}) : super(const SalesLoading());
+  SalesCubit({
+    required this.salesRepository,
+    Future<void> Function(Duration)? wait,
+    DateTime Function()? now,
+    this.pollingTimeout = const Duration(minutes: 2),
+  }) : _wait = wait ?? Future<void>.delayed,
+       _now = now ?? DateTime.now,
+       super(const SalesLoading());
 
   Future<void> loadHistory({
     required String token,
@@ -97,7 +108,9 @@ class SalesCubit extends Cubit<SalesState> {
   }
 
   Future<void> sendIsoMessage({required String token}) async {
-    if (state is SalesProcessing) return;
+    if (state is SalesProcessing || state is SalesAwaitingAuthorization) {
+      return;
+    }
 
     final currentProductCode = state.productCode;
     final currentProductLabel = state.productLabel;
@@ -137,32 +150,9 @@ class SalesCubit extends Cubit<SalesState> {
       return;
     }
 
-    final String hiddenCard = currentCardNumber.replaceAll(' ', '').length >= 4
-        ? '•••• ${currentCardNumber.replaceAll(' ', '').substring(currentCardNumber.replaceAll(' ', '').length - 4)}'
-        : '•••• 4321';
-
-    final PaymentResult paymentResult = response.connectionError
-        ? PaymentResult.connectionError
-        : response.isApproved
-        ? PaymentResult.approved
-        : PaymentResult.declined;
-
-    final newOperation = OperationModel(
-      id: response.operationNumber.isNotEmpty
-          ? response.operationNumber
-          : 'OP-ERR',
-      productCode: currentProductCode,
-      productLabel: currentProductLabel,
-      amount: currentAmount,
-      cardNumber: hiddenCard,
-      result: paymentResult,
-      date: DateTime.now(),
-    );
-
-    currentHistory.insert(0, newOperation);
-
-    emit(
-      SalesCompleted(
+    if (response.isPending) {
+      _emitPendingResponse(
+        response: response,
         productCode: currentProductCode,
         productLabel: currentProductLabel,
         amount: currentAmount,
@@ -171,8 +161,241 @@ class SalesCubit extends Cubit<SalesState> {
         expirationDate: currentExpirationDate,
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
+      );
+      await pollPendingSale(token: token);
+      return;
+    }
+
+    _emitCompletedResponse(
+      response: response,
+      productCode: currentProductCode,
+      productLabel: currentProductLabel,
+      amount: currentAmount,
+      cardNumber: currentCardNumber,
+      cvv: currentCvv,
+      expirationDate: currentExpirationDate,
+      history: currentHistory,
+      idempotencyKey: currentIdempotencyKey,
+    );
+  }
+
+  /// Reanuda una venta observada como pendiente en el historial. Solo consulta
+  /// su número de operación: no conserva ni vuelve a transmitir PAN, CVV o la
+  /// clave de idempotencia original.
+  Future<void> resumePendingSale({
+    required String token,
+    required OperationModel operation,
+  }) async {
+    if (!operation.isPending ||
+        _polling ||
+        state is SalesAwaitingAuthorization) {
+      return;
+    }
+    _emitPendingResponse(
+      response: SaleResponse(
+        isApproved: false,
+        operationNumber: operation.id,
+        message: operation.userMessage ?? 'Operación en curso.',
+        errorCode: 'PENDING',
+        authorizationStatus: SaleAuthorizationStatus.pending,
+        pendingReason: operation.pendingReason,
+        pollAfterSeconds: operation.pollAfterSeconds ?? 2,
+        mayStartNewSale: operation.mayStartNewSale,
+      ),
+      productCode: operation.productCode,
+      productLabel: operation.productLabel,
+      amount: operation.amount,
+      cardNumber: operation.cardNumber,
+      cvv: '',
+      expirationDate: '',
+      history: state.history,
+      idempotencyKey: '',
+    );
+    await pollPendingSale(token: token);
+  }
+
+  /// Polls exactly at the interval supplied by the API. Transient failures do
+  /// not change a pending authorization into a decline and never trigger POST.
+  Future<void> pollPendingSale({required String token}) async {
+    if (_polling || state is! SalesAwaitingAuthorization) return;
+    _polling = true;
+    _pollingCancelled = false;
+    final startedAt = _now();
+
+    try {
+      while (!_pollingCancelled && !isClosed) {
+        final current = state;
+        if (current is! SalesAwaitingAuthorization) return;
+        if (current.pendingReason == PendingSaleReason.underReview ||
+            current.pollAfterSeconds == null) {
+          return;
+        }
+        if (_now().difference(startedAt) >= pollingTimeout) {
+          emit(
+            _stoppedPolling(
+              current,
+              'La operación sigue en curso. Consulte el historial para continuar.',
+            ),
+          );
+          return;
+        }
+
+        await _wait(Duration(seconds: current.pollAfterSeconds!));
+        if (_pollingCancelled || isClosed) return;
+
+        SaleResponse response;
+        try {
+          response = await salesRepository.getSaleStatus(
+            token: token,
+            transactionNumber: current.operationNumber,
+          );
+        } on SessionExpiredException {
+          emit(const SalesSessionExpired());
+          return;
+        } on DataLoadException {
+          // Conservamos la operación pendiente y volvemos a consultar en el
+          // próximo intervalo indicado por la API.
+          continue;
+        }
+
+        if (response.isPending) {
+          _emitPendingResponse(
+            response: response,
+            productCode: current.productCode,
+            productLabel: current.productLabel,
+            amount: current.amount,
+            cardNumber: current.cardNumber,
+            cvv: current.cvv,
+            expirationDate: current.expirationDate,
+            history: current.history,
+            idempotencyKey: current.idempotencyKey,
+          );
+          continue;
+        }
+
+        _emitCompletedResponse(
+          response: response,
+          productCode: current.productCode,
+          productLabel: current.productLabel,
+          amount: current.amount,
+          cardNumber: current.cardNumber,
+          cvv: current.cvv,
+          expirationDate: current.expirationDate,
+          history: current.history,
+          idempotencyKey: current.idempotencyKey,
+        );
+        return;
+      }
+    } finally {
+      _polling = false;
+    }
+  }
+
+  void cancelPendingSalePolling() {
+    _pollingCancelled = true;
+    final current = state;
+    if (current is SalesAwaitingAuthorization && !current.pollingStopped) {
+      emit(
+        _stoppedPolling(
+          current,
+          'Consulta pausada. Puede retomarla desde el historial.',
+        ),
+      );
+    }
+  }
+
+  SalesAwaitingAuthorization _stoppedPolling(
+    SalesAwaitingAuthorization current,
+    String message,
+  ) {
+    return SalesAwaitingAuthorization(
+      productCode: current.productCode,
+      productLabel: current.productLabel,
+      amount: current.amount,
+      cardNumber: current.cardNumber,
+      cvv: current.cvv,
+      expirationDate: current.expirationDate,
+      history: current.history,
+      idempotencyKey: current.idempotencyKey,
+      operationNumber: current.operationNumber,
+      pendingReason: current.pendingReason,
+      pollAfterSeconds: current.pollAfterSeconds,
+      mayStartNewSale: current.mayStartNewSale,
+      message: message,
+      pollingStopped: true,
+    );
+  }
+
+  void _emitPendingResponse({
+    required SaleResponse response,
+    required String productCode,
+    required String productLabel,
+    required double amount,
+    required String cardNumber,
+    required String cvv,
+    required String expirationDate,
+    required List<OperationModel> history,
+    required String idempotencyKey,
+  }) {
+    emit(
+      SalesAwaitingAuthorization(
+        productCode: productCode,
+        productLabel: productLabel,
+        amount: amount,
+        cardNumber: cardNumber,
+        cvv: cvv,
+        expirationDate: expirationDate,
+        history: _upsertOperation(
+          history,
+          _operationFromResponse(
+            response: response,
+            productCode: productCode,
+            productLabel: productLabel,
+            amount: amount,
+            cardNumber: cardNumber,
+          ),
+        ),
+        idempotencyKey: idempotencyKey,
+        operationNumber: response.operationNumber,
+        pendingReason: response.pendingReason,
+        pollAfterSeconds: response.pollAfterSeconds,
+        mayStartNewSale: response.mayStartNewSale,
+        message: response.message,
+      ),
+    );
+  }
+
+  void _emitCompletedResponse({
+    required SaleResponse response,
+    required String productCode,
+    required String productLabel,
+    required double amount,
+    required String cardNumber,
+    required String cvv,
+    required String expirationDate,
+    required List<OperationModel> history,
+    required String idempotencyKey,
+  }) {
+    final paymentResult = _paymentResultFromResponse(response);
+    final operation = _operationFromResponse(
+      response: response,
+      productCode: productCode,
+      productLabel: productLabel,
+      amount: amount,
+      cardNumber: cardNumber,
+    );
+    emit(
+      SalesCompleted(
+        productCode: productCode,
+        productLabel: productLabel,
+        amount: amount,
+        cardNumber: cardNumber,
+        cvv: cvv,
+        expirationDate: expirationDate,
+        history: _upsertOperation(history, operation),
+        idempotencyKey: idempotencyKey,
         result: paymentResult,
-        operationNumber: paymentResult == PaymentResult.approved
+        operationNumber: response.operationNumber.isNotEmpty
             ? response.operationNumber
             : null,
         errorMessage: paymentResult != PaymentResult.approved
@@ -183,6 +406,63 @@ class SalesCubit extends Cubit<SalesState> {
             : null,
       ),
     );
+  }
+
+  OperationModel _operationFromResponse({
+    required SaleResponse response,
+    required String productCode,
+    required String productLabel,
+    required double amount,
+    required String cardNumber,
+  }) {
+    final normalizedCard = cardNumber.replaceAll(' ', '');
+    final hiddenCard = normalizedCard.length >= 4
+        ? '•••• ${normalizedCard.substring(normalizedCard.length - 4)}'
+        : '•••• 4321';
+    return OperationModel(
+      id: response.operationNumber.isNotEmpty
+          ? response.operationNumber
+          : 'OP-ERR',
+      productCode: productCode,
+      productLabel: productLabel,
+      amount: amount,
+      cardNumber: hiddenCard,
+      result: _paymentResultFromResponse(response),
+      authorizationStatus: response.authorizationStatus,
+      pendingReason: response.pendingReason,
+      pollAfterSeconds: response.pollAfterSeconds,
+      mayStartNewSale: response.mayStartNewSale,
+      date: _now(),
+      userMessage: response.message,
+    );
+  }
+
+  PaymentResult _paymentResultFromResponse(SaleResponse response) {
+    if (response.connectionError) return PaymentResult.connectionError;
+    switch (response.authorizationStatus) {
+      case SaleAuthorizationStatus.approved:
+        return PaymentResult.approved;
+      case SaleAuthorizationStatus.declined:
+        return PaymentResult.declined;
+      case SaleAuthorizationStatus.pending:
+        return PaymentResult.pending;
+      case SaleAuthorizationStatus.failed:
+        return PaymentResult.failed;
+    }
+  }
+
+  List<OperationModel> _upsertOperation(
+    List<OperationModel> history,
+    OperationModel operation,
+  ) {
+    final updated = List<OperationModel>.from(history);
+    final index = updated.indexWhere((item) => item.id == operation.id);
+    if (index >= 0) {
+      updated[index] = operation;
+    } else {
+      updated.insert(0, operation);
+    }
+    return updated;
   }
 
   void resetSale() {
@@ -249,5 +529,11 @@ class SalesCubit extends Cubit<SalesState> {
   /// Appends more history items (used for pagination / load-more).
   void appendHistory(List<OperationModel> items) {
     emit(SalesInitialWithHistory(history: [...state.history, ...items]));
+  }
+
+  @override
+  Future<void> close() {
+    _pollingCancelled = true;
+    return super.close();
   }
 }

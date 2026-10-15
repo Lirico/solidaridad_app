@@ -1,4 +1,19 @@
-enum PaymentResult { approved, declined, connectionError, voided }
+/// Estados terminales y en curso publicados por la API de autorizaciones.
+///
+/// `failed` reúne los resultados técnicos finales (`FAILED`, `NOT_SENT` e
+/// `INDETERMINATE`); no debe confundirse con una autorización rechazada.
+enum SaleAuthorizationStatus { pending, approved, declined, failed }
+
+enum PendingSaleReason { processing, underReview }
+
+enum PaymentResult {
+  approved,
+  declined,
+  pending,
+  failed,
+  connectionError,
+  voided,
+}
 
 /// Estado de la impresión del ticket en la pantalla de resultado.
 enum PrintStatus { idle, printing, printed, error }
@@ -10,6 +25,10 @@ class OperationModel {
   final double amount;
   final String cardNumber;
   final PaymentResult result;
+  final SaleAuthorizationStatus authorizationStatus;
+  final PendingSaleReason? pendingReason;
+  final int? pollAfterSeconds;
+  final bool mayStartNewSale;
   final DateTime date;
   final String? userMessage;
 
@@ -22,7 +41,21 @@ class OperationModel {
     required this.result,
     required this.date,
     this.userMessage,
-  });
+    SaleAuthorizationStatus? authorizationStatus,
+    this.pendingReason,
+    this.pollAfterSeconds,
+    this.mayStartNewSale = true,
+  }) : authorizationStatus =
+           authorizationStatus ??
+           (result == PaymentResult.approved
+               ? SaleAuthorizationStatus.approved
+               : result == PaymentResult.declined
+               ? SaleAuthorizationStatus.declined
+               : result == PaymentResult.pending
+               ? SaleAuthorizationStatus.pending
+               : SaleAuthorizationStatus.failed);
+
+  bool get isPending => authorizationStatus == SaleAuthorizationStatus.pending;
 
   factory OperationModel.fromJson(Map<String, dynamic> json) {
     final code = json['product'] as String? ?? '';
@@ -32,12 +65,18 @@ class OperationModel {
       productLabel: _labelForProductCode(code),
       amount: double.tryParse(json['amount'] as String? ?? '0') ?? 0.0,
       cardNumber: '•••• ${json['card_last4'] as String? ?? '0000'}',
-      result: _parseStatus(json['status'] as String? ?? ''),
+      result: _resultForStatus(json['status'] as String? ?? ''),
+      authorizationStatus: _parseAuthorizationStatus(
+        json['status'] as String? ?? '',
+      ),
       date:
           DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal() ??
           DateTime.now(),
 
       userMessage: json['user_message'] as String?,
+      pendingReason: _parsePendingReason(json['reason'] as String?),
+      pollAfterSeconds: json['poll_after_seconds'] as int?,
+      mayStartNewSale: json['may_start_new_sale'] as bool? ?? true,
     );
   }
 
@@ -58,7 +97,23 @@ class OperationModel {
     }
   }
 
-  static PaymentResult _parseStatus(String status) {
+  static SaleAuthorizationStatus _parseAuthorizationStatus(String status) {
+    switch (status.toUpperCase()) {
+      case 'APPROVED':
+        return SaleAuthorizationStatus.approved;
+      case 'DECLINED':
+        return SaleAuthorizationStatus.declined;
+      case 'PENDING':
+        return SaleAuthorizationStatus.pending;
+      case 'FAILED':
+      case 'NOT_SENT':
+      case 'UNKNOWN':
+      default:
+        return SaleAuthorizationStatus.failed;
+    }
+  }
+
+  static PaymentResult _resultForStatus(String status) {
     switch (status.toUpperCase()) {
       case 'APPROVED':
         return PaymentResult.approved;
@@ -66,11 +121,25 @@ class OperationModel {
         return PaymentResult.declined;
       case 'VOIDED':
         return PaymentResult.voided;
-      case 'FAILED':
-      case 'UNKNOWN':
       case 'PENDING':
+        return PaymentResult.pending;
+      case 'FAILED':
+      case 'NOT_SENT':
+      case 'INDETERMINATE':
+      case 'UNKNOWN':
       default:
-        return PaymentResult.connectionError;
+        return PaymentResult.failed;
+    }
+  }
+
+  static PendingSaleReason? _parsePendingReason(String? reason) {
+    switch (reason?.toUpperCase()) {
+      case 'PROCESSING':
+        return PendingSaleReason.processing;
+      case 'UNDER_REVIEW':
+        return PendingSaleReason.underReview;
+      default:
+        return null;
     }
   }
 }
@@ -139,6 +208,10 @@ class SaleResponse {
   final String errorCode;
   final bool connectionError;
   final bool sessionExpired;
+  final SaleAuthorizationStatus authorizationStatus;
+  final PendingSaleReason? pendingReason;
+  final int? pollAfterSeconds;
+  final bool mayStartNewSale;
 
   const SaleResponse({
     required this.isApproved,
@@ -147,7 +220,19 @@ class SaleResponse {
     required this.errorCode,
     this.connectionError = false,
     this.sessionExpired = false,
-  });
+    SaleAuthorizationStatus? authorizationStatus,
+    this.pendingReason,
+    this.pollAfterSeconds,
+    this.mayStartNewSale = true,
+  }) : authorizationStatus =
+           authorizationStatus ??
+           (isApproved
+               ? SaleAuthorizationStatus.approved
+               : connectionError
+               ? SaleAuthorizationStatus.failed
+               : SaleAuthorizationStatus.declined);
+
+  bool get isPending => authorizationStatus == SaleAuthorizationStatus.pending;
 }
 
 class ProductUnit {
@@ -189,11 +274,7 @@ class ProductInfo {
     } else {
       unit = ProductUnit.forProductCode(code);
     }
-    return ProductInfo(
-      code: code,
-      label: json['label'] as String,
-      unit: unit,
-    );
+    return ProductInfo(code: code, label: json['label'] as String, unit: unit);
   }
 }
 

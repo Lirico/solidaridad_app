@@ -11,8 +11,29 @@ import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 import '../cubit/sales_state.dart';
 
-class SaleProcessingScreen extends StatelessWidget {
+class SaleProcessingScreen extends StatefulWidget {
   const SaleProcessingScreen({super.key});
+
+  @override
+  State<SaleProcessingScreen> createState() => _SaleProcessingScreenState();
+}
+
+class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
+  SalesCubit? _salesCubit;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _salesCubit ??= context.read<SalesCubit>();
+  }
+
+  @override
+  void dispose() {
+    // La autorización continúa durablemente en la API, pero no dejamos un
+    // timer de UI vivo después de abandonar esta pantalla.
+    _salesCubit?.cancelPendingSalePolling();
+    super.dispose();
+  }
 
   String _maskCardNumber(String cardNumber) {
     if (cardNumber.length < 4) return cardNumber;
@@ -148,8 +169,11 @@ class SaleProcessingScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // Mensaje de advertencia
-              const Text(
-                'Procesando Transacción...',
+              Text(
+                salesState is SalesAwaitingAuthorization &&
+                        salesState.pollingStopped
+                    ? 'Consulta pausada'
+                    : 'Procesando Transacción...',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -157,9 +181,11 @@ class SaleProcessingScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Estamos autorizando el pago.\n'
-                'Por favor, no cierre la aplicación.',
+              Text(
+                salesState is SalesAwaitingAuthorization
+                    ? salesState.message
+                    : 'Estamos autorizando el pago.\n'
+                          'Por favor, no cierre la aplicación.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.5),
               ),

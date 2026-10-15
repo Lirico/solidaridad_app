@@ -617,8 +617,15 @@ la envía al canal operativo configurado. La alerta debe contener
 de intentos y código de error sanitizado; nunca PAN completo ni vencimiento.
 La métrica o notificación por sí sola no reemplaza el registro durable.
 
-La herramienta administrativa debe permitir consultar la evidencia y cerrar
-el caso mediante una acción autenticada y auditada:
+Por el momento, casa central consulta la evidencia mediante acceso SQL
+operativo de solo lectura; no se expone una herramienta administrativa ni
+roles de API. Ese acceso debe aplicar mínimo privilegio y las consultas de
+operación no deben seleccionar PAN completo ni vencimiento. Una futura
+herramienta autenticada deberá reemplazar este procedimiento antes de habilitar
+resoluciones o reintentos desde la aplicación.
+
+Cuando se implemente esa herramienta futura, deberá permitir cerrar el caso
+mediante una acción autenticada y auditada:
 
 - impacto neutralizado → job `COMPLETED`, resultado `REVERSED_CONFIRMED`,
   estado público `FAILED`;
@@ -629,9 +636,9 @@ el caso mediante una acción autenticada y auditada:
 - evidencia insuficiente → conservar `MANUAL_REVIEW` y
   `PENDING / UNDER_REVIEW`.
 
-La resolución registra operador, fecha, evidencia/referencia externa y motivo.
-Reintentar manualmente el reverso es una acción separada y solo se habilita si
-el operador documenta por qué es seguro hacerlo.
+La futura resolución registrará operador, fecha, evidencia/referencia externa
+y motivo. El reintento manual seguirá siendo una acción separada y solo se
+habilitará si el operador documenta por qué es seguro hacerlo.
 
 ## 9. Recuperación ante caídas
 

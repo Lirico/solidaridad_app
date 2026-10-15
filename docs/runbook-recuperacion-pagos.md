@@ -11,31 +11,21 @@ lectura y escala la decisión a Finanzas/Riesgo.
 comprueba además el worker: responde `503` cuando está detenido, apagándose,
 falló o quedó `stale`. El balanceador debe usar únicamente `ready`.
 
-El scrape de `/metrics` debe quedar restringido a la red de observabilidad;
-no se publica a terminales ni a Internet. No lleva etiquetas de tarjeta,
-terminal, comercio ni número de operación.
+La exposición de métricas y alertas automáticas se difiere. La señal durable
+actual para operación es `recovery_alerts`, complementada por los eventos
+estructurados y el endpoint de readiness.
 
 | Señal | Acción inicial |
 | --- | --- |
-| `solidaridad_recovery_worker_ready == 0` durante 2 min | P1: retirar la réplica del tráfico y reiniciarla; conservar los jobs para que otra réplica los reclame. |
-| `solidaridad_recovery_jobs{state="MANUAL_REVIEW"} > 0` | P1 operativo: abrir la cola de casos y avisar a casa central. La alerta durable ya evita duplicados por job y causa. |
-| Edad de un job `READY`, `PROCESSING` o `RETRY` mayor que `solidaridad_recovery_open_job_alert_age_threshold_seconds` durante 2 min | P1 operativo: diagnosticar gateway/DB/worker y seguir el caso por `transaction_number`. |
-| `solidaridad_recovery_max_attempts` llega al máximo de reversos configurado | P1 operativo: preparar revisión manual; no forzar otro `0400`. |
-
-Las métricas de jobs son `solidaridad_recovery_jobs`,
-`solidaridad_recovery_oldest_job_age_seconds` y
-`solidaridad_recovery_max_attempts`, todas segmentadas solo por `state`. La
-resolución se observa con `solidaridad_recovery_resolution_seconds_total` y
-`solidaridad_recovery_resolutions_total`. Las métricas del hilo son
-`solidaridad_recovery_worker_{ready,alive,stale}`, su edad de última vuelta y
-el umbral publicado.
+| `GET /health/ready` responde `503` durante 2 min | P1: retirar la réplica del tráfico y reiniciarla; conservar los jobs para que otra réplica los reclame. |
+| Nueva fila `recovery_alerts` en estado `OPEN` | P1 operativo: abrir la cola de casos y avisar a casa central. La alerta durable evita duplicados por job y causa. |
+| Job `READY`, `PROCESSING` o `RETRY` que excede el SLA operativo | P1 operativo: diagnosticar gateway/DB/worker y seguir el caso por `transaction_number`; no forzar otro `0400`. |
 
 Los valores iniciales se cambian por entorno y requieren redeploy:
 
 | Variable | Valor inicial | Propósito |
 | --- | ---: | --- |
 | `RECOVERY_WORKER_MAX_ITERATION_AGE_SECONDS` | 30 s | Degrada readiness si el loop no completa una vuelta. Debe superar el intervalo de polling más la variación normal. |
-| `RECOVERY_OPEN_JOB_ALERT_AGE_SECONDS` | 300 s | Umbral exportado para alertar por antigüedad de job abierto. Debe ser mayor que el timeout normal de gateway y el backoff esperado. |
 
 `payment_processing_config` conserva los valores de política de la cola,
 incluidos `worker_poll_interval_seconds`, `processing_timeout_seconds` y el

@@ -55,7 +55,7 @@ def test_recovery_events_and_persistence_never_emit_a_synthetic_pan(
     )
 
 
-def test_operational_responses_and_metrics_do_not_echo_a_synthetic_pan() -> None:
+def test_operational_responses_do_not_echo_a_synthetic_pan() -> None:
     worker = MagicMock()
     worker.health.return_value = RecoveryWorkerHealth(
         enabled=False,
@@ -69,13 +69,11 @@ def test_operational_responses_and_metrics_do_not_echo_a_synthetic_pan() -> None
         create_router(),
         settings=Settings(),
         recovery_worker=worker,
-        recovery_metrics=lambda: "solidaridad_recovery_jobs 0\n",
     )
 
     with TestClient(app) as client:
         responses = (
             client.get("/health/ready"),
-            client.get("/metrics"),
             client.post("/v1/transactions", json={"card_number": SYNTHETIC_PAN}),
         )
 

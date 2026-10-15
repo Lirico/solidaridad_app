@@ -4,17 +4,16 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-14
+Última revisión: 2026-10-15
 
-> ✅ **Último cambio (2026-10-14, RA-16):** la API expone métricas Prometheus
-> de recuperación por estado, antigüedad, intentos y tiempo de resolución, más
-> salud del worker y umbrales configurables. Readiness se degrada si el worker
+> ✅ **Último cambio (2026-10-15, RA-16):** Readiness se degrada si el worker
 > muere, se está apagando o no completa una iteración dentro del umbral. Los
 > eventos estructurados contienen `transaction_number`, job, estado y código
 > sanitizado; las pruebas escanean logs, persistencia operacional y respuestas
-> con un PAN sintético completo. El runbook define alertas, revisión manual,
-> cierre de lote bloqueado y mínimos de acceso/backup/dump. Evidencia:
-> `api/tests/{test_recovery_metrics,test_sensitive_data_leakage}.py`,
+> con un PAN sintético completo. El runbook define la alerta durable, revisión
+> manual, cierre de lote bloqueado y mínimos de acceso/backup/dump. Las métricas
+> de recuperación y sus alertas automáticas se difieren. Evidencia:
+> `api/tests/test_sensitive_data_leakage.py`,
 > `docs/runbook-recuperacion-pagos.md` y `make -C api check`.
 
 > ✅ **Último cambio (2026-10-14, RA-14):** mobile modela por separado los
@@ -574,6 +573,7 @@ Verifone (banda + térmica).
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias y ejecución contra `authkig` + MySQL locales. **Decisión 2026-10-13:** el `0400` solo se genera para un `0200` previamente enviado y `0410/00` se acepta como confirmación; un `0400` sin original no interviene en el cálculo de saldo, reportes ni cierre. **RA-01:** se agregaron `ReverseCommand`, `ReversalResult`, `IsoProcessor.reverse`, mock, transporte TCP de un solo intento y `build_reversal_request` separado de la anulación. **RA-02:** `POST /v1/reverse` ejecuta un intento y distingue `NOT_SENT` de `INDETERMINATE`. **RA-03 (2026-10-13):** `transactions` persiste datos y outcome de recuperación antes del efecto externo; filas históricas quedan fuera de recuperación automática. **RA-04 (2026-10-13):** migración `20261013_0009`, modelos y repositorios agregan `processor_jobs` y `payment_processing_config`, fila `default`, constraints y validación de transiciones, sin ejecutar aún un worker. **RA-05 (2026-10-13):** la API tipa autorización como `APPROVED`/`DECLINED`/`NOT_SENT`/`INDETERMINATE`, incorpora el puerto y cliente HTTP de `/v1/reverse`, clasifica fallos de transporte/HTTP y conserva contratos separados para balance y anulación. **RA-06 (2026-10-14):** la API toma un snapshot de política, reintenta el mismo `0200` solo tras `NOT_SENT`, conserva STAN, ticket e `Idempotency-Key`, aplica backoff/jitter dentro del presupuesto síncrono y publica `FAILED` únicamente al agotar resultados no enviados. Cada intento queda registrado sin PAN, vencimiento ni clave de idempotencia. **RA-07 (2026-10-14):** un resultado `INDETERMINATE` mantiene la venta en `PENDING` y, antes de responder `202`, persiste atómicamente el resultado, un único job `REVERSE/READY` con STAN de reverso y evento de auditoría. No se llama a `reverse()` durante el request. Un watchdog explícito bloquea pendientes envejecidas sin job y las encola conservadoramente. **RA-08 (2026-10-14):** `GET /v1/transactions/{transaction_number}` queda aislado a la terminal autenticada y proyecta `READY`/`PROCESSING`/`RETRY` como `PENDING / PROCESSING` (polling de 2 s, sin nueva venta) y `MANUAL_REVIEW` como `PENDING / UNDER_REVIEW` (sin polling, nueva venta permitida), sin exponer detalles del job. El `POST` y su replay devuelven la misma proyección; `VOIDED` conserva su contrato de anulación independiente. Evidencia: pruebas de contratos públicos, aislamiento y OpenAPI. **RA-09 (2026-10-14):** `ReversalJobWorker.run_once()` reclama a lo sumo un `REVERSE` vencido con `FOR UPDATE SKIP LOCKED`, confirma el claim antes de red y lo protege con `claim_token`; reconstruye el `0400` desde Postgres, reintenta solo `NOT_SENT` con backoff, confirma `FAILED` tras `REVERSED_CONFIRMED` y pasa rechazo, agotamiento, ambigüedad o datos faltantes a `MANUAL_REVIEW`. **RA-10 (2026-10-14):** el monitor mueve un `PROCESSING` vencido a `MANUAL_REVIEW` y abre una alerta durable única. **RA-11 (2026-10-14):** cada proceso FastAPI puede activar un thread de recuperación con sesión y cliente por vuelta; lifecycle, shutdown con gracia, monitoreo de jobs abandonados y readiness observable quedan cubiertos. La activación queda explícitamente deshabilitada por defecto. **RA-12 (2026-10-14):** casa central consulta temporalmente por SQL de solo lectura, sin rol ni endpoints de API; la resolución auditada y el reintento manual quedan diferidos. **Pendiente:** guardia de cierre (RA-13) y herramienta administrativa de resolución. Última revisión: 2026-10-14. |
 | G-P1-15 | PAN de recuperación persistido en texto plano amplía deuda PCI | open | **RA-03 (2026-10-13):** aceptación de riesgo ya definida en `plan-reversos-automaticos.md`. El PAN y vencimiento se guardan para recuperación durable, pero se excluyen de respuestas, eventos, errores y `repr`; CVV nunca se persiste. Pendiente: cifrado/tokenización a nivel aplicación, política de retención/borrado, controles y auditoría de acceso a DB/backups. |
+| G-P1-16 | Métricas y alertas automáticas de recuperación | open | **RA-16 (2026-10-15):** se difiere la exposición de métricas por estado, antigüedad, intentos y tiempo de resolución. Mientras tanto, operación usa `GET /health/ready`, alertas durables `recovery_alerts` y eventos estructurados sin datos sensibles; ver `docs/runbook-recuperacion-pagos.md`. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `AUTHORIZATION_ATTEMPT`, `GATEWAY_RESULT`, `REVERSAL_ENQUEUED`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migraciones `20260807_0006` y `20261014_0010`; esta última agrega número y outcome de cada intento de autorización sin PAN, vencimiento ni `Idempotency-Key`. **RA-07 (2026-10-14):** el resultado ambiguo y el enqueue del job de reverso quedan auditados antes de responder. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). Última revisión: 2026-10-14. |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
 | G-P1-14 | Consulta de saldo parcial presentada como completa | done | **2026-10-06:** antes la API llamaba los cinco productos en serie y devolvía `APPROVED` con las filas que alcanzaban a responder. Ahora las despacha concurrentemente, espera los resultados terminales del gateway/cliente ISO y devuelve `FAILED` sin saldos si cualquiera tuvo un fallo técnico terminal (`FAILED`, `UNKNOWN` o excepción). El código `06` no es fallo técnico: conserva la fila en `0.00`. Tests en `api/tests/test_check_balance.py`. |
@@ -601,15 +601,13 @@ y su idempotencia inicial, respeta `poll_after_seconds`, no envía un nuevo
 historial tras reinicio. `UNDER_REVIEW` detiene la consulta automática; su
 handoff visible y la liberación para una nueva venta se completan en RA-15.
 
-**RA-16:** la API publica métricas agregadas de jobs por estado, antigüedad,
-intentos y tiempo de resolución, y métricas/readiness del worker. Readiness se
-degrada si el loop queda stale; los umbrales iniciales de loop y edad de job se
-configuran por entorno y se exponen para alertas. Los eventos incluyen
+**RA-16 (actualizado 2026-10-15):** Readiness se degrada si el loop queda stale; los eventos incluyen
 `transaction_number`, job, estado y código sanitizado. Las pruebas impiden que
 un PAN sintético completo alcance logs, eventos, persistencia operacional o
-respuestas. El procedimiento de alerta, revisión manual y lote bloqueado está
-en `docs/runbook-recuperacion-pagos.md`. Pendiente: resolución administrativa
-auditada por casa central.
+respuestas. El procedimiento de alerta durable, revisión manual y lote
+bloqueado está en `docs/runbook-recuperacion-pagos.md`. Pendiente: métricas y
+alertas automáticas de recuperación, más resolución administrativa auditada por
+casa central.
 
 ### Actualización G-P1-15 — 2026-10-14
 

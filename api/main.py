@@ -1,13 +1,12 @@
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from typing import Protocol
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse
 
 from application.payments.embedded_recovery_iteration import (
     create_embedded_recovery_iteration,
@@ -17,7 +16,6 @@ from application.payments.embedded_recovery_worker import (
     RecoveryWorkerHealth,
 )
 from config import Settings, get_settings
-from infrastructure.payments.recovery_metrics import RecoveryMetricsExporter
 from presentation import create_router
 
 logger = logging.getLogger(__name__)
@@ -61,7 +59,6 @@ def create_app(
     *,
     settings: Settings | None = None,
     recovery_worker: ManagedRecoveryWorker | None = None,
-    recovery_metrics: Callable[[], str] | None = None,
 ) -> FastAPI:
     runtime_settings = settings or get_settings()
     worker = recovery_worker or EmbeddedRecoveryWorker(
@@ -71,16 +68,6 @@ def create_app(
             runtime_settings.recovery_worker_max_iteration_age_seconds
         ),
     )
-    metrics = recovery_metrics or _recovery_metrics_renderer(
-        worker=worker,
-        open_job_alert_age_seconds=(
-            runtime_settings.recovery_open_job_alert_age_seconds
-        ),
-        worker_max_iteration_age_seconds=(
-            runtime_settings.recovery_worker_max_iteration_age_seconds
-        ),
-    )
-
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if runtime_settings.embedded_recovery_worker_enabled:
@@ -137,10 +124,6 @@ def create_app(
             content=body,
         )
 
-    @app.get("/metrics", include_in_schema=False)
-    def recovery_metrics_endpoint() -> PlainTextResponse:
-        return PlainTextResponse(metrics(), media_type="text/plain; version=0.0.4")
-
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         _request: Request,
@@ -167,66 +150,6 @@ def create_app(
 
 def _timestamp(value: object) -> str | None:
     return value.isoformat() if hasattr(value, "isoformat") else None
-
-
-def _recovery_metrics_renderer(
-    *,
-    worker: ManagedRecoveryWorker,
-    open_job_alert_age_seconds: float,
-    worker_max_iteration_age_seconds: float,
-) -> Callable[[], str]:
-    exporter = RecoveryMetricsExporter(
-        open_job_alert_age_seconds=open_job_alert_age_seconds
-    )
-
-    def render() -> str:
-        return exporter.render() + _render_recovery_worker_metrics(
-            worker.health(),
-            max_iteration_age_seconds=worker_max_iteration_age_seconds,
-        )
-
-    return render
-
-
-def _render_recovery_worker_metrics(
-    health: RecoveryWorkerHealth,
-    *,
-    max_iteration_age_seconds: float,
-    now: datetime | None = None,
-) -> str:
-    observed_at = now or datetime.now(UTC)
-    last_iteration_age = (
-        max(0.0, (observed_at - health.last_iteration_at).total_seconds())
-        if health.last_iteration_at is not None
-        else 0.0
-    )
-    return "\n".join(
-        [
-            "# HELP solidaridad_recovery_worker_ready "
-            "Whether the recovery worker is ready.",
-            "# TYPE solidaridad_recovery_worker_ready gauge",
-            f"solidaridad_recovery_worker_ready {int(health.ready)}",
-            "# HELP solidaridad_recovery_worker_alive "
-            "Whether the recovery worker thread is alive.",
-            "# TYPE solidaridad_recovery_worker_alive gauge",
-            f"solidaridad_recovery_worker_alive {int(health.alive)}",
-            "# HELP solidaridad_recovery_worker_stale "
-            "Whether the recovery worker is stale.",
-            "# TYPE solidaridad_recovery_worker_stale gauge",
-            f"solidaridad_recovery_worker_stale {int(health.stale)}",
-            "# HELP solidaridad_recovery_worker_last_iteration_age_seconds "
-            "Age of the last completed worker iteration.",
-            "# TYPE solidaridad_recovery_worker_last_iteration_age_seconds gauge",
-            "solidaridad_recovery_worker_last_iteration_age_seconds "
-            f"{last_iteration_age}",
-            "# HELP solidaridad_recovery_worker_max_iteration_age_seconds "
-            "Configured readiness threshold.",
-            "# TYPE solidaridad_recovery_worker_max_iteration_age_seconds gauge",
-            "solidaridad_recovery_worker_max_iteration_age_seconds "
-            f"{max_iteration_age_seconds}",
-            "",
-        ]
-    )
 
 
 router = create_router()

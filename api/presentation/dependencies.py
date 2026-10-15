@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
-from application.auth.provision_central_operator import ProvisionCentralOperator
 from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
@@ -21,7 +20,6 @@ from application.payments.get_transaction_status import GetTransactionStatus
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
 from config import Settings, get_settings
-from domain.user import UserRole
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
 from persistence.repositories.installation_repository import InstallationRepository
@@ -40,7 +38,6 @@ class CurrentUser:
     user_id: int
     email: str
     installation_id: str
-    role: UserRole = UserRole.TERMINAL
 
 
 def get_settings_dep() -> Settings:
@@ -78,17 +75,6 @@ def get_login_user(
         users=UserRepository(db),
         installations=InstallationRepository(db),
         tokens=tokens,
-    )
-
-
-def get_provision_central_operator(
-    db: Annotated[Session, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
-) -> ProvisionCentralOperator:
-    return ProvisionCentralOperator(
-        session=db,
-        users=UserRepository(db),
-        settings=settings,
     )
 
 
@@ -238,17 +224,4 @@ def get_current_user(
         user_id=user.id,
         email=email,
         installation_id=installation_id.strip(),
-        role=user.role,
     )
-
-
-def get_current_central_operator(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-) -> CurrentUser:
-    """Require the operator role for internal recovery operations."""
-    if current_user.role is not UserRole.CENTRAL_OPERATOR:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operador central requerido",
-        )
-    return current_user

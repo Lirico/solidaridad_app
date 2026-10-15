@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-local-dev-only-use-a-long-random-string"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440
-    central_operator_provisioning_token: str | None = None
     postgres_user: str = "solidaridad"
     postgres_password: str = "solidaridad"
     postgres_db: str = "solidaridad"

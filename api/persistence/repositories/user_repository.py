@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from domain.user import User, UserRole
+from domain.user import User
 from persistence.models.user import User as UserModel
 
 
@@ -16,7 +16,6 @@ def _to_domain(row: UserModel) -> User:
         must_change_password=row.must_change_password,
         created_at=row.created_at,
         updated_at=row.updated_at,
-        role=UserRole(row.role),
     )
 
 
@@ -43,14 +42,12 @@ class UserRepository:
         email: str,
         password_hash: str,
         must_change_password: bool = False,
-        role: UserRole = UserRole.TERMINAL,
     ) -> User:
         row = UserModel(
             name=name,
             email=email,
             password_hash=password_hash,
             must_change_password=must_change_password,
-            role=role.value,
         )
         self._session.add(row)
         self._session.flush()

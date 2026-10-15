@@ -6,6 +6,17 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-14
 
+> ✅ **Último cambio (2026-10-14, RA-16):** la API expone métricas Prometheus
+> de recuperación por estado, antigüedad, intentos y tiempo de resolución, más
+> salud del worker y umbrales configurables. Readiness se degrada si el worker
+> muere, se está apagando o no completa una iteración dentro del umbral. Los
+> eventos estructurados contienen `transaction_number`, job, estado y código
+> sanitizado; las pruebas escanean logs, persistencia operacional y respuestas
+> con un PAN sintético completo. El runbook define alertas, revisión manual,
+> cierre de lote bloqueado y mínimos de acceso/backup/dump. Evidencia:
+> `api/tests/{test_recovery_metrics,test_sensitive_data_leakage}.py`,
+> `docs/runbook-recuperacion-pagos.md` y `make -C api check`.
+
 > ✅ **Último cambio (2026-10-14, RA-14):** mobile modela por separado los
 > estados de autorización `PENDING`, `APPROVED`, `DECLINED` y `FAILED`, más
 > `reason`, `poll_after_seconds` y `may_start_new_sale`. Un `202 PENDING /
@@ -589,6 +600,26 @@ y su idempotencia inicial, respeta `poll_after_seconds`, no envía un nuevo
 `0200` durante polling ni ante fallos transitorios, y puede reanudar desde el
 historial tras reinicio. `UNDER_REVIEW` detiene la consulta automática; su
 handoff visible y la liberación para una nueva venta se completan en RA-15.
+
+**RA-16:** la API publica métricas agregadas de jobs por estado, antigüedad,
+intentos y tiempo de resolución, y métricas/readiness del worker. Readiness se
+degrada si el loop queda stale; los umbrales iniciales de loop y edad de job se
+configuran por entorno y se exponen para alertas. Los eventos incluyen
+`transaction_number`, job, estado y código sanitizado. Las pruebas impiden que
+un PAN sintético completo alcance logs, eventos, persistencia operacional o
+respuestas. El procedimiento de alerta, revisión manual y lote bloqueado está
+en `docs/runbook-recuperacion-pagos.md`. Pendiente: resolución administrativa
+auditada por casa central.
+
+### Actualización G-P1-15 — 2026-10-14
+
+**RA-16:** continúa abierta la deuda PCI por PAN y vencimiento en texto plano,
+pero ahora existen un detector de fugas con PAN sintético y un procedimiento
+para que operación consulte sólo campos no sensibles. El runbook exige mínimo
+privilegio, revisión de grants, cifrado/custodia de backups, prohibición de
+dumps no autorizados y datos sintéticos fuera de producción. Pendiente aplicar
+los controles en infraestructura, tokenizar/cifrar a nivel aplicación,
+retención/borrado y auditoría efectiva de accesos.
 
 ---
 

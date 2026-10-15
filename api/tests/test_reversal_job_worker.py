@@ -260,7 +260,7 @@ def test_manual_review_opens_a_sanitized_durable_alert(
     record = caplog.records[-1]
     assert record.event_name == "recovery_alert_opened"
     assert record.processor_job_id == 7
-    assert record.transaction_id == 11
+    assert record.transaction_number == "OP-261014-00000011"
     assert record.cause == ReversalOutcome.INDETERMINATE.value
     assert "4111111111111111" not in record.__dict__.values()
     assert "2912" not in record.__dict__.values()

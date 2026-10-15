@@ -64,8 +64,10 @@ def create_app(
     worker = recovery_worker or EmbeddedRecoveryWorker(
         run_iteration=create_embedded_recovery_iteration(settings=runtime_settings),
         enabled=runtime_settings.embedded_recovery_worker_enabled,
+        max_iteration_age_seconds=(
+            runtime_settings.recovery_worker_max_iteration_age_seconds
+        ),
     )
-
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if runtime_settings.embedded_recovery_worker_enabled:
@@ -110,6 +112,7 @@ def create_app(
                 "started_at": _timestamp(health.started_at),
                 "last_iteration_at": _timestamp(health.last_iteration_at),
                 "last_error": health.last_error,
+                "stale": health.stale,
             },
         }
         return JSONResponse(

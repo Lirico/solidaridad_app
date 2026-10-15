@@ -36,6 +36,9 @@ autorizado y se auditan. No reactivan automáticamente un job
 3. Verificar que el gateway apunta al transporte correspondiente al ambiente:
    `ISO_TRANSPORT=mock` únicamente para pruebas controladas; nunca asumir el
    mock en producción.
+   Para una prueba local controlada, `make -C api run-recovery-worker` inicia
+   una sola instancia sin `--reload` y sobrescribe la bandera solo para ese
+   proceso.
 4. Verificar que el mobile desplegado entiende `202 PENDING / PROCESSING` y
    `202 PENDING / UNDER_REVIEW` antes de habilitar el worker.
 5. Revisar que no hay alertas `OPEN` sin dueño ni un cierre de lote en curso.

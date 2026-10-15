@@ -1,4 +1,4 @@
-.PHONY: install run db-up db-down db-logs db-reset migrate migrate-new db-seed \
+.PHONY: install run run-recovery-worker db-up db-down db-logs db-reset migrate migrate-new db-seed \
 	dev lint lint-fix typecheck test test-cov check
 
 HOST ?= 0.0.0.0
@@ -30,6 +30,10 @@ db-seed:
 
 run:
 	uv run uvicorn main:app --host $(HOST) --port 8000 --reload
+
+# Controlled rollout only: one process, without reload spawning another worker.
+run-recovery-worker:
+	EMBEDDED_RECOVERY_WORKER_ENABLED=true uv run uvicorn main:app --host $(HOST) --port 8000
 
 dev: db-up migrate run
 

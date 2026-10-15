@@ -296,7 +296,8 @@ def test_close_batch_rejects_in_flight_operations() -> None:
 
     assert response.status_code == 409
     assert response.json()["message"] == (
-        "Hay transacciones en curso o sin resultado definitivo"
+        "No se puede cerrar el lote: hay recuperaciones pendientes. "
+        "Espere a que finalicen o solicite una resolución administrativa"
     )
 
 

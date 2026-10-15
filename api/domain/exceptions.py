@@ -141,7 +141,10 @@ class BatchCloseHasInFlightTransactions(DomainError):
 
     def __init__(
         self,
-        message: str = "Hay transacciones en curso o sin resultado definitivo",
+        message: str = (
+            "No se puede cerrar el lote: hay recuperaciones pendientes. "
+            "Espere a que finalicen o solicite una resolución administrativa"
+        ),
     ) -> None:
         super().__init__(message)
 

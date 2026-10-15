@@ -8,7 +8,7 @@ without a networked processor while keeping every failure mode repeatable.
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from threading import Lock
+from threading import Barrier, Lock, Thread
 from uuid import UUID, uuid4
 
 from application.payments.create_transaction import CreateTransaction
@@ -540,7 +540,7 @@ def test_end_to_end_worker_crash_quarantines_job_and_prevents_a_second_send() ->
     assert harness.gateway.reverse_requests == []
 
 
-def test_end_to_end_two_workers_claim_one_job_and_review_allows_new_sale() -> None:
+def test_concurrent_workers_claim_once_and_review_allows_new_sale() -> None:
     harness = _Harness(
         authorizations=[
             AuthorizeResult(AuthorizationGatewayOutcome.INDETERMINATE),
@@ -550,8 +550,20 @@ def test_end_to_end_two_workers_claim_one_job_and_review_allows_new_sale() -> No
     )
     first = harness.create("first-sale")
 
-    assert harness.worker("worker-a").run_once() is True
-    assert harness.worker("worker-b").run_once() is False
+    barrier = Barrier(2)
+    outcomes: list[bool] = []
+
+    def run(worker_id: str) -> None:
+        barrier.wait()
+        outcomes.append(harness.worker(worker_id).run_once())
+
+    workers = [Thread(target=run, args=(worker_id,)) for worker_id in ("a", "b")]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
+    assert sorted(outcomes) == [False, True]
     assert len(harness.gateway.reverse_requests) == 1
 
     second = harness.create("second-sale")

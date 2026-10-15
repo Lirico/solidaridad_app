@@ -11,7 +11,7 @@ from infrastructure.payments.recovery_metrics import (
     RecoveryMetricsExporter,
     RecoveryResolutionMetric,
 )
-from main import create_app
+from main import _render_recovery_worker_metrics, create_app
 from presentation import create_router
 
 NOW = datetime(2026, 10, 14, 12, tzinfo=UTC)
@@ -37,6 +37,7 @@ def test_metrics_render_job_state_age_attempts_and_resolution_time() -> None:
     assert 'solidaridad_recovery_max_attempts{state="RETRY"} 3' in metrics
     assert "solidaridad_recovery_resolution_seconds_total 120.5" in metrics
     assert "solidaridad_recovery_resolutions_total 4" in metrics
+    assert "solidaridad_recovery_open_job_alert_age_threshold_seconds 300.0" in metrics
     assert 'solidaridad_recovery_jobs{state="MANUAL_REVIEW"} 0' in metrics
 
 
@@ -63,3 +64,25 @@ def test_metrics_endpoint_exposes_only_the_metrics_snapshot() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain; version=0.0.4")
     assert response.text == 'solidaridad_recovery_jobs{state="READY"} 1\n'
+
+
+def test_worker_metrics_expose_readiness_and_configured_threshold() -> None:
+    metrics = _render_recovery_worker_metrics(
+        RecoveryWorkerHealth(
+            enabled=True,
+            alive=True,
+            stopping=False,
+            started_at=NOW,
+            last_iteration_at=NOW - timedelta(seconds=4),
+            last_error=None,
+            stale=False,
+        ),
+        max_iteration_age_seconds=30,
+        now=NOW,
+    )
+
+    assert "solidaridad_recovery_worker_ready 1" in metrics
+    assert "solidaridad_recovery_worker_alive 1" in metrics
+    assert "solidaridad_recovery_worker_stale 0" in metrics
+    assert "solidaridad_recovery_worker_last_iteration_age_seconds 4.0" in metrics
+    assert "solidaridad_recovery_worker_max_iteration_age_seconds 30" in metrics

@@ -34,9 +34,13 @@ class RecoveryMetricsExporter:
         *,
         session_factory: Callable[[], Session] = SessionLocal,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        open_job_alert_age_seconds: float = 300.0,
     ) -> None:
+        if open_job_alert_age_seconds <= 0:
+            raise ValueError("open_job_alert_age_seconds must be positive")
         self._session_factory = session_factory
         self._now = now
+        self._open_job_alert_age_seconds = open_job_alert_age_seconds
 
     def render(self) -> str:
         session = self._session_factory()
@@ -108,6 +112,12 @@ class RecoveryMetricsExporter:
                 "# HELP solidaridad_recovery_max_attempts "
                 "Highest attempt count by state.",
                 "# TYPE solidaridad_recovery_max_attempts gauge",
+                "# HELP solidaridad_recovery_open_job_alert_age_threshold_seconds "
+                "Configured alert threshold for an open recovery job.",
+                "# TYPE solidaridad_recovery_open_job_alert_age_threshold_seconds "
+                "gauge",
+                "solidaridad_recovery_open_job_alert_age_threshold_seconds "
+                f"{self._open_job_alert_age_seconds}",
             ]
         )
         for state in ProcessorJobState:

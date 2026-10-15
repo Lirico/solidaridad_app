@@ -16,6 +16,7 @@ from application.payments.recovery_alert_events import log_recovery_alert_opened
 from application.payments.recovery_job_events import log_recovery_job_transition
 from application.payments.response_messages import MSG_FAILED
 from application.payments.reversal_retry import ReversalRetryPolicy
+from application.payments.sanitize import sanitize_processor_code
 from domain.authorization_outcome import AuthorizationOutcome
 from domain.processor_job import ProcessorJob, ProcessorJobState
 from domain.transaction import Transaction
@@ -130,7 +131,7 @@ class ReversalJobWorker:
             claimed,
             transaction_number=transaction.transaction_number,
             error_code=result.outcome.value,
-            error_detail=result.response_code,
+            error_detail=sanitize_processor_code(result.response_code),
             finalized_at=finalized_at,
         )
         return True

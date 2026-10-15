@@ -4,14 +4,17 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
     Identity,
+    Index,
     Integer,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +28,22 @@ class Transaction(Base):
             "user_id",
             "idempotency_key",
             name="uq_transactions_user_idempotency",
+        ),
+        Index(
+            "ix_transactions_terminal_current",
+            "terminal_id",
+            "created_at",
+            "id",
+            postgresql_where=text("batch_close_id IS NULL"),
+        ),
+        CheckConstraint(
+            "authorization_outcome IS NULL OR authorization_outcome IN "
+            "('PENDING', 'APPROVED', 'DECLINED', 'NOT_SENT', 'INDETERMINATE')",
+            name="ck_transactions_authorization_outcome",
+        ),
+        CheckConstraint(
+            "authorization_attempt_count >= 0",
+            name="ck_transactions_authorization_attempt_count",
         ),
     )
 
@@ -50,6 +69,18 @@ class Transaction(Base):
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     card_last4: Mapped[str] = mapped_column(String(4), nullable=False)
+    card_number: Mapped[str | None] = mapped_column(String(19), nullable=True)
+    expiration_date: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    authorization_outcome: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+    authorization_attempt_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
     stan: Mapped[str | None] = mapped_column(String(6), nullable=True)
     processor_ticket: Mapped[str | None] = mapped_column(String(24), nullable=True)
     auth_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -67,6 +98,11 @@ class Transaction(Base):
         String(128),
         nullable=True,
     )
+    batch_close_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("batch_closes.id"),
+        nullable=True,
+    )
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -79,6 +115,13 @@ class Transaction(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"Transaction(id={self.id!r}, "
+            f"transaction_number={self.transaction_number!r}, "
+            f"status={self.status!r}, card_last4={self.card_last4!r})"
+        )
 
 
 class TransactionNumberCounter(Base):

@@ -22,6 +22,18 @@ class SaleDetailTicket extends StatelessWidget {
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
         statusTitle = 'VENTA RECHAZADA';
+      case PaymentResult.pending:
+        statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_top;
+        statusTitle = 'VENTA EN PROCESO';
+      case PaymentResult.underReview:
+        statusColor = Colors.orange.shade800;
+        statusIcon = Icons.manage_search;
+        statusTitle = 'VENTA EN VERIFICACIÓN';
+      case PaymentResult.failed:
+        statusColor = Colors.red;
+        statusIcon = Icons.error_outline;
+        statusTitle = 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:
         statusColor = Colors.orange;
         statusIcon = Icons.wifi_off;
@@ -30,10 +42,6 @@ class SaleDetailTicket extends StatelessWidget {
         statusColor = Colors.grey;
         statusIcon = Icons.undo;
         statusTitle = 'VENTA ANULADA';
-      case PaymentResult.unknown:
-        statusColor = const Color(0xFFB9770E);
-        statusIcon = Icons.help_outline;
-        statusTitle = 'COBRO SIN CONFIRMAR';
     }
 
     return Column(

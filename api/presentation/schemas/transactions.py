@@ -32,6 +32,14 @@ class TransactionResponse(BaseModel):
     created_at: datetime
 
 
+class PublicTransactionResponse(TransactionResponse):
+    """Terminal-facing authorization status and next-action instructions."""
+
+    reason: str | None
+    poll_after_seconds: int | None
+    may_start_new_sale: bool
+
+
 class TransactionItemResponse(BaseModel):
     """Single item in a transaction list response."""
 
@@ -47,5 +55,14 @@ class TransactionItemResponse(BaseModel):
 class TransactionListResponse(BaseModel):
     """Paginated list of transactions."""
 
+    items: list[TransactionItemResponse]
+    total: int
+
+
+class BatchCloseResponse(BaseModel):
+    """Immutable receipt data for an administrative terminal cut."""
+
+    batch_close_id: int
+    closed_at: datetime
     items: list[TransactionItemResponse]
     total: int

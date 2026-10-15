@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
+import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 
 import 'helpers/mock_http_client.dart';
 
@@ -175,6 +176,41 @@ void main() {
 
       expect(
         () => repository.fetchHistory(token: 'token'),
+        throwsA(isA<SessionExpiredException>()),
+      );
+    });
+  });
+
+  group('getSaleStatus', () {
+    test('interpreta 202 PENDING como una autorización en curso', () async {
+      stubGet(
+        () async => jsonMapResponse({
+          'transaction_number': 'OP-1',
+          'status': 'PENDING',
+          'reason': 'PROCESSING',
+          'user_message': 'Operación en curso',
+          'poll_after_seconds': 2,
+          'may_start_new_sale': false,
+        }, statusCode: 202),
+      );
+
+      final sale = await repository.getSaleStatus(
+        token: 'token',
+        transactionNumber: 'OP-1',
+      );
+
+      expect(sale.authorizationStatus, SaleAuthorizationStatus.pending);
+      expect(sale.pendingReason, PendingSaleReason.processing);
+      expect(sale.pollAfterSeconds, 2);
+      expect(sale.mayStartNewSale, isFalse);
+    });
+
+    test('lanza sesión expirada al consultar una venta', () {
+      stubGet(() async => http.Response('{}', 401));
+
+      expect(
+        () =>
+            repository.getSaleStatus(token: 'token', transactionNumber: 'OP-1'),
         throwsA(isA<SessionExpiredException>()),
       );
     });

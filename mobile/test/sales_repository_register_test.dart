@@ -44,20 +44,22 @@ void main() {
     );
   }
 
-  test('un 202 PENDING queda sin confirmar y no como rechazo', () async {
+  test('un 202 PENDING queda en curso y no como rechazo', () async {
     stubPost(
       jsonMapResponse({
         'status': 'PENDING',
+        'reason': 'PROCESSING',
         'transaction_number': 'OP-9',
-        'user_message': 'Operación en curso, reintente en unos segundos',
+        'user_message': 'Operación en curso',
       }, statusCode: 202),
     );
 
     final result = await register();
 
-    expect(result.isUnknown, isTrue);
+    expect(result.isPending, isTrue);
     expect(result.isApproved, isFalse);
     expect(result.connectionError, isFalse);
+    expect(result.authorizationStatus, SaleAuthorizationStatus.pending);
     expect(result.operationNumber, 'OP-9');
   });
 
@@ -72,7 +74,7 @@ void main() {
 
     final approved = await register();
     expect(approved.isApproved, isTrue);
-    expect(approved.isUnknown, isFalse);
+    expect(approved.isPending, isFalse);
 
     stubPost(
       jsonMapResponse({
@@ -84,19 +86,22 @@ void main() {
 
     final declined = await register();
     expect(declined.isApproved, isFalse);
-    expect(declined.isUnknown, isFalse);
+    expect(declined.isPending, isFalse);
+    expect(declined.authorizationStatus, SaleAuthorizationStatus.declined);
   });
 
-  test('el historial lee PENDING como cobro sin confirmar', () {
+  test('el historial lee PENDING como cobro en curso', () {
     final operation = OperationModel.fromJson({
       'transaction_number': 'OP-9',
       'product': 'GARRAFA_10',
       'amount': '4.00',
       'card_last4': '7403',
       'status': 'PENDING',
+      'reason': 'PROCESSING',
       'created_at': '2026-10-06T12:00:00Z',
     });
 
-    expect(operation.result, PaymentResult.unknown);
+    expect(operation.result, PaymentResult.pending);
+    expect(operation.isPending, isTrue);
   });
 }

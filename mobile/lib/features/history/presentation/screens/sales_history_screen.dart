@@ -189,8 +189,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ? Icons.check_circle
                       : operation.result == PaymentResult.voided
                       ? Icons.undo
-                      : operation.result == PaymentResult.unknown
-                      ? Icons.help_outline
+                      : operation.result == PaymentResult.pending ||
+                            operation.result == PaymentResult.underReview
+                      ? Icons.hourglass_top
                       : operation.result == PaymentResult.connectionError
                       ? Icons.wifi_off
                       : Icons.error,
@@ -198,8 +199,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ? Colors.green
                       : operation.result == PaymentResult.voided
                       ? Colors.grey
-                      : operation.result == PaymentResult.unknown
-                      ? const Color(0xFFB9770E)
+                      : operation.result == PaymentResult.pending ||
+                            operation.result == PaymentResult.underReview
+                      ? Colors.orange
                       : operation.result == PaymentResult.connectionError
                       ? Colors.orange
                       : Colors.red,
@@ -217,6 +219,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ),
                 isThreeLine: true,
                 onTap: () {
+                  if (operation.isPending) {
+                    final authState = context.read<AuthCubit>().state;
+                    if (authState is AuthSuccess && authState.user != null) {
+                      context.read<SalesCubit>().resumePendingSale(
+                        token: authState.user!.token,
+                        operation: operation,
+                      );
+                      Navigator.pushNamed(context, AppRoutes.saleProcessing);
+                    }
+                    return;
+                  }
                   Navigator.pushNamed(
                     context,
                     AppRoutes.saleDetail,

@@ -40,8 +40,10 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is OperationModel) {
       _operation = args;
-      // Impresión automática al aprobar la venta.
-      if (args.result == PaymentResult.approved) {
+      // El comercio recibe un comprobante tanto de una aprobación como de una
+      // verificación manual; el segundo nunca afirma un resultado financiero.
+      if (args.result == PaymentResult.approved ||
+          args.result == PaymentResult.underReview) {
         _printTicket();
       }
     }
@@ -107,6 +109,22 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.error_outline;
         statusTitle = 'Transacción Rechazada';
         statusSubtitle = 'La terminal reportó un error en la autorización.';
+      case PaymentResult.pending:
+        statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_top;
+        statusTitle = 'Transacción en Proceso';
+        statusSubtitle = 'La autorización sigue en curso.';
+      case PaymentResult.underReview:
+        statusColor = Colors.orange.shade800;
+        statusIcon = Icons.manage_search;
+        statusTitle = 'Verificación requerida';
+        statusSubtitle =
+            'Verifique la operación con casa central. El cobro podría haberse procesado.';
+      case PaymentResult.failed:
+        statusColor = const Color(0xFFE74C3C);
+        statusIcon = Icons.error_outline;
+        statusTitle = 'Error de Autorización';
+        statusSubtitle = 'No fue posible completar la autorización.';
       case PaymentResult.connectionError:
         statusColor = const Color(0xFFFF8C00);
         statusIcon = Icons.wifi_off_outlined;
@@ -118,11 +136,6 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.undo;
         statusTitle = 'Transacción Anulada';
         statusSubtitle = 'La venta fue anulada correctamente.';
-      case PaymentResult.unknown:
-        statusColor = const Color(0xFFB9770E);
-        statusIcon = Icons.help_outline;
-        statusTitle = 'No pudimos confirmar el cobro';
-        statusSubtitle = 'Consulte la operación antes de volver a cobrar.';
     }
 
     return Scaffold(
@@ -145,16 +158,21 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             operation: operation,
             printStatus: _printStatus,
             printMessage: _printMessage,
-            onRetryPrint: result == PaymentResult.approved
+            onRetryPrint:
+                result == PaymentResult.approved ||
+                    result == PaymentResult.underReview
                 ? _printTicket
-                : null,
-            onViewOperation: result == PaymentResult.unknown
-                ? () => Navigator.pushNamed(context, AppRoutes.salesHistory)
                 : null,
             onRetry: result == PaymentResult.connectionError
                 ? () => _retrySale(context)
                 : null,
+            finalizeLabel: result == PaymentResult.underReview
+                ? 'NUEVA VENTA'
+                : 'FINALIZAR',
             onFinalize: () {
+              if (result == PaymentResult.underReview) {
+                context.read<SalesCubit>().startNewSaleAfterReview();
+              }
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.saleForm,

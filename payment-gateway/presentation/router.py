@@ -4,6 +4,7 @@ from presentation.controllers import (
     authorize_router,
     balance_router,
     ping_router,
+    reversal_router,
     void_router,
 )
 
@@ -16,5 +17,6 @@ def create_router() -> APIRouter:
     v1.include_router(authorize_router, prefix="/authorize", tags=["authorize"])
     v1.include_router(void_router, prefix="/void", tags=["void"])
     v1.include_router(balance_router, prefix="/balance", tags=["balance"])
+    v1.include_router(reversal_router, prefix="/reverse", tags=["reverse"])
     router.include_router(v1)
     return router

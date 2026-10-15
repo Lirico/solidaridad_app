@@ -1,4 +1,4 @@
-"""Build purchase / void (0200) ISO messages from authorize commands."""
+"""Build payment ISO messages from domain commands."""
 
 from datetime import datetime
 
@@ -6,6 +6,7 @@ from config.settings import Settings
 from domain.authorization import AuthorizeCommand, VoidCommand
 from domain.balance import BalanceCommand
 from domain.product import product_code_de49
+from domain.reversal import ReverseCommand
 from infrastructure.iso.packer import IsoMessage, set_present
 
 _VOID_PROCESSING_CODE = "020000"
@@ -119,6 +120,42 @@ def build_void_request(
         iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
         bits.append(14)
     set_present(iso, *bits)
+    return iso
+
+
+def build_reversal_request(
+    command: ReverseCommand,
+    settings: Settings,
+    *,
+    now: datetime | None = None,
+) -> IsoMessage:
+    """Build the legacy technical reversal (0400), distinct from a void.
+
+    The legacy processor matches DE11 and DE62 against the original sale, so
+    those fields must carry the original identifiers. ``reversal_stan`` stays
+    on the command as the stable orchestration identifier; the characterized
+    wire contract has no separate data element where it can be sent safely.
+    """
+    moment = now or datetime.now()
+
+    iso = IsoMessage(
+        tpdu=settings.iso_tpdu,
+        mtype="0400",
+        pan_2=command.card_number,
+        procode_3=_pad_digits(settings.iso_processing_code, 6),
+        amount_4=f"{command.amount_minor:012d}",
+        systracenum_11=_pad_digits(command.original_stan, 6),
+        timetrx_12=moment.strftime("%H%M%S"),
+        datetrx_13=moment.strftime("%m%d"),
+        dateexpire_14=_pad_digits(command.expiration_date, 4),
+        posentrymode_22=_pad_digits(settings.iso_pos_entry_mode, 4),
+        nii_24=_pad_digits(settings.iso_nii, 4),
+        poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
+        termid_41=command.terminal_id[:8].ljust(8),
+        currcode_49=product_code_de49(command.product_code),
+        field_62=_numeric_ticket(command.original_ticket),
+    )
+    set_present(iso, 2, 3, 4, 11, 12, 13, 14, 22, 24, 25, 41, 49, 62)
     return iso
 
 

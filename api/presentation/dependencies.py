@@ -14,13 +14,19 @@ from application.auth.login_user import LoginUser
 from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
+from application.payments.close_batch import CloseBatch
 from application.payments.create_transaction import CreateTransaction
+from application.payments.get_transaction_status import GetTransactionStatus
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
 from config import Settings, get_settings
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.payment_processing_config_repository import (
+    PaymentProcessingConfigRepository,
+)
+from persistence.repositories.processor_job_repository import ProcessorJobRepository
 from persistence.repositories.transaction_repository import TransactionRepository
 from persistence.repositories.user_repository import UserRepository
 
@@ -98,6 +104,24 @@ def get_list_transactions(
     )
 
 
+def get_transaction_status(
+    db: Annotated[Session, Depends(get_db)],
+) -> GetTransactionStatus:
+    return GetTransactionStatus(
+        transactions=TransactionRepository(db),
+        jobs=ProcessorJobRepository(db),
+    )
+
+
+def get_close_batch(
+    db: Annotated[Session, Depends(get_db)],
+) -> CloseBatch:
+    return CloseBatch(
+        session=db,
+        transactions=TransactionRepository(db),
+    )
+
+
 def get_create_transaction(
     db: Annotated[Session, Depends(get_db)],
     gateway: Annotated[HttpPaymentGateway, Depends(get_payment_gateway)],
@@ -107,6 +131,8 @@ def get_create_transaction(
         transactions=TransactionRepository(db),
         installations=InstallationRepository(db),
         gateway=gateway,
+        configs=PaymentProcessingConfigRepository(db),
+        jobs=ProcessorJobRepository(db),
     )
 
 

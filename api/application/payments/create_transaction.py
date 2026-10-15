@@ -1,7 +1,10 @@
 """Create and authorize a payment transaction."""
 
 import hashlib
+import random
 import secrets
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
@@ -9,11 +12,16 @@ from enum import IntEnum
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from application.payments.authorization_retry import AuthorizationRetryPolicy
 from application.payments.ports import (
+    AuthorizationGatewayOutcome,
     AuthorizeRequest,
     AuthorizeResult,
-    GatewayOutcome,
     PaymentGateway,
+)
+from application.payments.public_transaction_status import (
+    PublicTransactionStatus,
+    project_public_transaction_status,
 )
 from application.payments.response_messages import (
     MSG_FAILED,
@@ -21,6 +29,7 @@ from application.payments.response_messages import (
     MSG_UNKNOWN,
     message_for_code,
 )
+from domain.authorization_outcome import AuthorizationOutcome
 from domain.exceptions import (
     IdempotencyConflict,
     InvalidAmount,
@@ -30,6 +39,7 @@ from domain.exceptions import (
     MissingTerminalId,
 )
 from domain.money import Money, parse_amount
+from domain.processor_job import ProcessorOperationType
 from domain.product import (
     Product,
     parse_product,
@@ -39,6 +49,10 @@ from domain.product import (
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.payment_processing_config_repository import (
+    PaymentProcessingConfigRepository,
+)
+from persistence.repositories.processor_job_repository import ProcessorJobRepository
 from persistence.repositories.transaction_repository import (
     TransactionRepository,
     ticket_from_transaction_number,
@@ -54,20 +68,21 @@ class CreateTransactionHttpStatus(IntEnum):
 class CreateTransactionResult:
     transaction: Transaction
     http_status: CreateTransactionHttpStatus
+    public_status: PublicTransactionStatus | None = None
 
 
 def _fingerprint(
     *,
     product: Product,
     amount_minor: int,
-    card_last4: str,
+    card_number: str,
     expiration_date: str | None,
 ) -> str:
     raw = "|".join(
         [
             product.value,
             str(amount_minor),
-            card_last4,
+            card_number,
             expiration_date or "",
         ]
     )
@@ -95,11 +110,21 @@ class CreateTransaction:
         transactions: TransactionRepository,
         installations: InstallationRepository,
         gateway: PaymentGateway,
+        configs: PaymentProcessingConfigRepository,
+        jobs: ProcessorJobRepository,
+        sleep: Callable[[float], None] = time.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
+        random_value: Callable[[], float] = random.random,
     ) -> None:
         self._session = session
         self._transactions = transactions
         self._installations = installations
         self._gateway = gateway
+        self._configs = configs
+        self._jobs = jobs
+        self._sleep = sleep
+        self._monotonic = monotonic
+        self._random_value = random_value
 
     def execute(
         self,
@@ -133,12 +158,10 @@ class CreateTransaction:
         # lo manda, solo se valida su formato y nunca se persiste ni reenvía.
         if cvv and cvv.strip():
             _validate_cvv(cvv)
-        card_last4 = pan[-4:]
-
         fingerprint = _fingerprint(
             product=parsed_product,
             amount_minor=money.amount_minor,
-            card_last4=card_last4,
+            card_number=pan,
             expiration_date=exp,
         )
 
@@ -148,6 +171,11 @@ class CreateTransaction:
         )
         if existing is not None:
             return self._replay(existing, fingerprint, idempotency_key=key)
+
+        policy = AuthorizationRetryPolicy.from_config(
+            self._configs.get_default(),
+            random_value=self._random_value,
+        )
 
         installation = self._installations.get_by_installation_id(installation_id)
         if installation is None:
@@ -171,7 +199,9 @@ class CreateTransaction:
                 product=parsed_product,
                 processor_product_code=proc_code,
                 amount_minor=money.amount_minor,
-                card_last4=card_last4,
+                card_last4=pan[-4:],
+                card_number=pan,
+                expiration_date=exp,
                 stan=stan,
                 processor_ticket=processor_ticket,
                 idempotency_key=key,
@@ -189,23 +219,66 @@ class CreateTransaction:
                 raise
             return self._replay(raced, fingerprint, idempotency_key=key)
 
-        gateway_result = self._gateway.authorize(
-            AuthorizeRequest(
-                product_code=proc_code,
-                amount_minor=money.amount_minor,
-                card_number=pan,
-                terminal_id=terminal_id[:8].ljust(8),
-                stan=stan,
-                ticket_number=processor_ticket,
-                expiration_date=exp,
+        authorization_request = AuthorizeRequest(
+            product_code=proc_code,
+            amount_minor=money.amount_minor,
+            card_number=pan,
+            terminal_id=terminal_id[:8].ljust(8),
+            stan=stan,
+            ticket_number=processor_ticket,
+            idempotency_key=key,
+            expiration_date=exp,
+        )
+        gateway_result = self._authorize_with_safe_retries(
+            transaction_id=pending.id,
+            request=authorization_request,
+            policy=policy,
+        )
+        try:
+            final = self._apply_gateway_result(pending, gateway_result)
+            # For an ambiguous authorization this is one database transaction:
+            # the public PENDING state, the recovery job and both audit events.
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+            raise
+        return self._result(final)
+
+    def _authorize_with_safe_retries(
+        self,
+        *,
+        transaction_id: int,
+        request: AuthorizeRequest,
+        policy: AuthorizationRetryPolicy,
+    ) -> AuthorizeResult:
+        deadline = self._monotonic() + policy.processing_timeout_seconds
+        attempt_number = 1
+
+        while True:
+            result = self._gateway.authorize(request)
+            self._transactions.record_authorization_attempt(
+                transaction_id=transaction_id,
+                attempt_number=attempt_number,
+                outcome=AuthorizationOutcome(result.outcome.value),
+                processor_response_code=result.response_code,
             )
-        )
-        final = self._apply_gateway_result(pending.id, gateway_result)
-        self._session.commit()
-        return CreateTransactionResult(
-            transaction=final,
-            http_status=CreateTransactionHttpStatus.CREATED,
-        )
+            self._session.commit()
+
+            if (
+                result.outcome != AuthorizationGatewayOutcome.NOT_SENT
+                or attempt_number >= policy.max_attempts
+            ):
+                return result
+
+            next_attempt = attempt_number + 1
+            delay = policy.delay_before_attempt(next_attempt)
+            if self._monotonic() + delay > deadline:
+                return result
+            self._sleep(delay)
+            attempt_number = self._transactions.start_authorization_retry(
+                transaction_id=transaction_id
+            )
+            self._session.commit()
 
     def _replay(
         self,
@@ -226,38 +299,81 @@ class CreateTransaction:
         )
         self._session.commit()
         if existing.status == TransactionStatus.PENDING:
-            return CreateTransactionResult(
-                transaction=existing,
-                http_status=CreateTransactionHttpStatus.ACCEPTED,
-            )
+            return self._result(existing)
+        return self._result(existing)
+
+    def _result(self, transaction: Transaction) -> CreateTransactionResult:
+        reverse_job = self._jobs.get_by_transaction(
+            transaction_id=transaction.id,
+            operation_type=ProcessorOperationType.REVERSE,
+        )
         return CreateTransactionResult(
-            transaction=existing,
-            http_status=CreateTransactionHttpStatus.CREATED,
+            transaction=transaction,
+            http_status=(
+                CreateTransactionHttpStatus.ACCEPTED
+                if transaction.status == TransactionStatus.PENDING
+                else CreateTransactionHttpStatus.CREATED
+            ),
+            public_status=project_public_transaction_status(transaction, reverse_job),
         )
 
     def _apply_gateway_result(
         self,
-        transaction_id: int,
+        transaction: Transaction,
         result: AuthorizeResult,
     ) -> Transaction:
-        if result.outcome == GatewayOutcome.APPROVED:
+        if result.outcome == AuthorizationGatewayOutcome.APPROVED:
             status = TransactionStatus.APPROVED
+            authorization_outcome = AuthorizationOutcome.APPROVED
             message = message_for_code(result.response_code, approved=True)
-        elif result.outcome == GatewayOutcome.DECLINED:
+        elif result.outcome == AuthorizationGatewayOutcome.DECLINED:
             status = TransactionStatus.DECLINED
+            authorization_outcome = AuthorizationOutcome.DECLINED
             message = message_for_code(result.response_code, approved=False)
-        elif result.outcome == GatewayOutcome.FAILED:
+        elif result.outcome == AuthorizationGatewayOutcome.NOT_SENT:
             status = TransactionStatus.FAILED
+            authorization_outcome = AuthorizationOutcome.NOT_SENT
             message = MSG_FAILED
         else:
-            status = TransactionStatus.UNKNOWN
+            status = TransactionStatus.PENDING
+            authorization_outcome = AuthorizationOutcome.INDETERMINATE
             message = MSG_UNKNOWN
 
-        return self._transactions.update_result(
-            transaction_id=transaction_id,
+        if result.outcome == AuthorizationGatewayOutcome.INDETERMINATE:
+            # Serializes this path with the stale-PENDING watchdog.  Once the
+            # lock is held, a replay/recovery race can observe an existing job
+            # instead of creating a second one.
+            transaction = self._transactions.get_by_id_for_update(
+                transaction_id=transaction.id
+            )
+
+        updated = self._transactions.update_result(
+            transaction_id=transaction.id,
             status=status,
+            authorization_outcome=authorization_outcome,
             user_message=message,
             processor_response_code=result.response_code,
             auth_id=result.auth_id,
             retrieval_reference=result.retrieval_reference,
         )
+        if result.outcome != AuthorizationGatewayOutcome.INDETERMINATE:
+            return updated
+
+        existing_job = self._jobs.get_by_transaction(
+            transaction_id=transaction.id,
+            operation_type=ProcessorOperationType.REVERSE,
+        )
+        if existing_job is None:
+            if transaction.stan is None or transaction.processor_ticket is None:
+                raise ValueError(
+                    "ambiguous authorization is missing recovery identifiers"
+                )
+            self._jobs.create_reverse(
+                transaction_id=transaction.id,
+                original_stan=transaction.stan,
+                original_ticket=transaction.processor_ticket,
+                reversal_stan=f"{secrets.randbelow(1_000_000):06d}",
+                next_attempt_at=datetime.now(UTC),
+            )
+            self._transactions.record_reversal_enqueued(transaction_id=transaction.id)
+        return updated

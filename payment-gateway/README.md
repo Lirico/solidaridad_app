@@ -39,6 +39,8 @@ ISO_PORT=4452
 
 - `GET /ping` → `{"status": "ok"}`
 - `POST /v1/authorize` → autorización compra (ver [docs/gateway-plan.md](docs/gateway-plan.md))
+- `POST /v1/reverse` → intento único de reverso técnico `0400`; distingue
+  `NOT_SENT` (`503`) de `INDETERMINATE` (`502`)
 
 ### Useful Make targets
 

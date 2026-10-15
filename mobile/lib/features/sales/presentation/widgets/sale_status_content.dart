@@ -13,9 +13,9 @@ class SaleStatusContent extends StatelessWidget {
   final PrintStatus printStatus;
   final String printMessage;
   final VoidCallback? onRetryPrint;
-  final VoidCallback? onViewOperation;
   final VoidCallback? onRetry;
   final VoidCallback onFinalize;
+  final String finalizeLabel;
 
   const SaleStatusContent({
     super.key,
@@ -28,9 +28,9 @@ class SaleStatusContent extends StatelessWidget {
     this.printStatus = PrintStatus.idle,
     this.printMessage = '',
     this.onRetryPrint,
-    this.onViewOperation,
     this.onRetry,
     required this.onFinalize,
+    this.finalizeLabel = 'FINALIZAR',
   });
 
   @override
@@ -52,7 +52,7 @@ class SaleStatusContent extends StatelessWidget {
             fontWeight: FontWeight.bold,
             color: statusColor,
           ),
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 6),
@@ -61,7 +61,7 @@ class SaleStatusContent extends StatelessWidget {
           statusSubtitle,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Colors.grey),
-          maxLines: 3,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 16),
@@ -95,31 +95,6 @@ class SaleStatusContent extends StatelessWidget {
         _buildPrintStatus(context),
 
         const Spacer(),
-
-        if (onViewOperation != null) ...[
-          ElevatedButton(
-            onPressed: onViewOperation,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.primaryOrange,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: AppColors.primaryOrange),
-              ),
-              elevation: 0,
-            ),
-            child: const Text(
-              'VER OPERACIÓN',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.1,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
 
         if (onRetry != null) ...[
           ElevatedButton(
@@ -157,8 +132,8 @@ class SaleStatusContent extends StatelessWidget {
             ),
             elevation: 2,
           ),
-          child: const Text(
-            'FINALIZAR',
+          child: Text(
+            finalizeLabel,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
@@ -241,12 +216,16 @@ class SaleStatusContent extends StatelessWidget {
         return '00 (Aprobado)';
       case PaymentResult.declined:
         return '51 (Fondos insuficientes)';
+      case PaymentResult.pending:
+        return 'PENDIENTE';
+      case PaymentResult.underReview:
+        return 'VERIFICACIÓN REQUERIDA';
+      case PaymentResult.failed:
+        return 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:
         return '99 (Tiempo agotado)';
       case PaymentResult.voided:
         return '00 (ANULADA)';
-      case PaymentResult.unknown:
-        return 'Sin confirmar';
     }
   }
 

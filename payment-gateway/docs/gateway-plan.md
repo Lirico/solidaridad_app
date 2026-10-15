@@ -84,5 +84,6 @@ El mensaje 0200 incluye **DE41** (terminal); el procesador resuelve comercio des
 ## Fuera de alcance (por ahora)
 
 - Persistencia / idempotencia (vive en la API)
-- Refund / settlement / reverso MTI `0400`
+- Refund / settlement. El reverso MTI `0400` ya existe como primitiva ISO
+  interna; su endpoint HTTP y la orquestación automática siguen pendientes.
 - Tokenización PCI

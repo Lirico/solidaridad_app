@@ -7,10 +7,10 @@ from enum import IntEnum
 from sqlalchemy.orm import Session
 
 from application.payments.ports import (
-    AuthorizeResult,
     GatewayOutcome,
     PaymentGateway,
     VoidRequest,
+    VoidResult,
 )
 from application.payments.response_messages import (
     MSG_VOID_DECLINED,
@@ -23,6 +23,7 @@ from domain.exceptions import (
     CardMismatch,
     InvalidCardNumber,
     MissingIdempotencyKey,
+    TransactionBatchClosed,
     TransactionNotFound,
     TransactionNotVoidable,
 )
@@ -89,6 +90,9 @@ class VoidTransaction:
         if tx is None:
             raise TransactionNotFound()
 
+        if tx.batch_close_id is not None:
+            raise TransactionBatchClosed()
+
         if tx.status == TransactionStatus.VOIDED:
             self._record_idempotent_hit(tx, key)
             return VoidTransactionResult(
@@ -151,7 +155,7 @@ class VoidTransaction:
         self,
         transaction_id: int,
         void_idempotency_key: str,
-        result: AuthorizeResult,
+        result: VoidResult,
     ) -> tuple[Transaction, str]:
         if result.outcome == GatewayOutcome.APPROVED:
             status = TransactionStatus.VOIDED

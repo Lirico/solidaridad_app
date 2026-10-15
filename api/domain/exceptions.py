@@ -43,6 +43,16 @@ class InvalidCurrentPassword(DomainError):
         super().__init__(message)
 
 
+class CentralOperatorProvisioningForbidden(DomainError):
+    """Raised when the dedicated operator provisioning credential is absent."""
+
+    def __init__(
+        self,
+        message: str = "Provisionamiento administrativo no autorizado",
+    ) -> None:
+        super().__init__(message)
+
+
 class UnsupportedProduct(DomainError):
     """Raised when the product code is not in the supported catalog."""
 

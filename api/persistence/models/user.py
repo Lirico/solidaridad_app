@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Identity, String, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Identity,
+    String,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from persistence.models.base import Base
@@ -8,6 +16,12 @@ from persistence.models.base import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('TERMINAL', 'CENTRAL_OPERATOR')",
+            name="ck_users_role",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -18,6 +32,12 @@ class User(Base):
         nullable=False,
         default=False,
         server_default="false",
+    )
+    role: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="TERMINAL",
+        server_default="TERMINAL",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

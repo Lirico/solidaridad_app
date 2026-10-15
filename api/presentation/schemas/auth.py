@@ -29,6 +29,18 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class CentralOperatorProvisionRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class CentralOperatorProvisionResponse(BaseModel):
+    name: str
+    email: str
+    role: str
+
+
 class AuthTokenResponse(BaseModel):
     name: str
     email: str

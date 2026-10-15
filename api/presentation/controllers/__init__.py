@@ -7,6 +7,9 @@ from presentation.controllers.central_operators_controller import (
 )
 from presentation.controllers.ping_controller import router as ping_router
 from presentation.controllers.products_controller import router as products_router
+from presentation.controllers.recovery_review_controller import (
+    router as recovery_review_router,
+)
 from presentation.controllers.transactions_controller import (
     router as transactions_router,
 )
@@ -17,5 +20,6 @@ __all__ = [
     "central_operators_router",
     "ping_router",
     "products_router",
+    "recovery_review_router",
     "transactions_router",
 ]

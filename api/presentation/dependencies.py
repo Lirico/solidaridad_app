@@ -19,6 +19,7 @@ from application.payments.close_batch import CloseBatch
 from application.payments.create_transaction import CreateTransaction
 from application.payments.get_transaction_status import GetTransactionStatus
 from application.payments.list_transactions import ListTransactions
+from application.payments.review_manual_recovery import ReviewManualRecovery
 from application.payments.void_transaction import VoidTransaction
 from config import Settings, get_settings
 from domain.user import UserRole
@@ -29,6 +30,10 @@ from persistence.repositories.payment_processing_config_repository import (
     PaymentProcessingConfigRepository,
 )
 from persistence.repositories.processor_job_repository import ProcessorJobRepository
+from persistence.repositories.recovery_alert_repository import RecoveryAlertRepository
+from persistence.repositories.recovery_review_action_repository import (
+    RecoveryReviewActionRepository,
+)
 from persistence.repositories.transaction_repository import TransactionRepository
 from persistence.repositories.user_repository import UserRepository
 
@@ -124,6 +129,20 @@ def get_transaction_status(
     return GetTransactionStatus(
         transactions=TransactionRepository(db),
         jobs=ProcessorJobRepository(db),
+    )
+
+
+def get_review_manual_recovery(
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> ReviewManualRecovery:
+    return ReviewManualRecovery(
+        session=db,
+        transactions=TransactionRepository(db),
+        jobs=ProcessorJobRepository(db),
+        alerts=RecoveryAlertRepository(db),
+        actions=RecoveryReviewActionRepository(db),
+        settings=settings,
     )
 
 

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440
     central_operator_provisioning_token: str | None = None
+    manual_reversal_retry_enabled: bool = False
     postgres_user: str = "solidaridad"
     postgres_password: str = "solidaridad"
     postgres_db: str = "solidaridad"

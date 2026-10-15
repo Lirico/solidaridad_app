@@ -471,6 +471,22 @@ class SalesCubit extends Cubit<SalesState> {
     emit(SalesInitial());
   }
 
+  /// Cierra el handoff visible de una operación bajo revisión sin descartarla.
+  /// La operación se conserva para una consulta manual posterior y la próxima
+  /// venta vuelve a generar su propia clave en [showReview].
+  bool startNewSaleAfterReview() {
+    final current = state;
+    if (current is! SalesAwaitingAuthorization ||
+        current.pendingReason != PendingSaleReason.underReview ||
+        !current.mayStartNewSale) {
+      return false;
+    }
+
+    _pollingCancelled = true;
+    emit(SalesInitialWithHistory(history: current.history));
+    return true;
+  }
+
   /// Anula una venta aprobada llamando a la API y actualiza la operación
   /// en el historial en memoria con el resultado.
   Future<VoidResult> voidSale({

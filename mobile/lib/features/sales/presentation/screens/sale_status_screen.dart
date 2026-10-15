@@ -166,7 +166,13 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             onRetry: result == PaymentResult.connectionError
                 ? () => _retrySale(context)
                 : null,
+            finalizeLabel: result == PaymentResult.underReview
+                ? 'NUEVA VENTA'
+                : 'FINALIZAR',
             onFinalize: () {
+              if (result == PaymentResult.underReview) {
+                context.read<SalesCubit>().startNewSaleAfterReview();
+              }
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.saleForm,

@@ -15,6 +15,7 @@ class SaleStatusContent extends StatelessWidget {
   final VoidCallback? onRetryPrint;
   final VoidCallback? onRetry;
   final VoidCallback onFinalize;
+  final String finalizeLabel;
 
   const SaleStatusContent({
     super.key,
@@ -29,6 +30,7 @@ class SaleStatusContent extends StatelessWidget {
     this.onRetryPrint,
     this.onRetry,
     required this.onFinalize,
+    this.finalizeLabel = 'FINALIZAR',
   });
 
   @override
@@ -130,8 +132,8 @@ class SaleStatusContent extends StatelessWidget {
             ),
             elevation: 2,
           ),
-          child: const Text(
-            'FINALIZAR',
+          child: Text(
+            finalizeLabel,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,

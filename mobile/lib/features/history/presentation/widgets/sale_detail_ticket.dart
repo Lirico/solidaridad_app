@@ -26,6 +26,10 @@ class SaleDetailTicket extends StatelessWidget {
         statusColor = Colors.orange;
         statusIcon = Icons.hourglass_top;
         statusTitle = 'VENTA EN PROCESO';
+      case PaymentResult.underReview:
+        statusColor = Colors.orange.shade800;
+        statusIcon = Icons.manage_search;
+        statusTitle = 'VENTA EN VERIFICACIÓN';
       case PaymentResult.failed:
         statusColor = Colors.red;
         statusIcon = Icons.error_outline;

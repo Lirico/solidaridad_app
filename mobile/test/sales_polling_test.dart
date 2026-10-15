@@ -169,6 +169,39 @@ void main() {
     },
   );
 
+  test(
+    'una nueva venta tras revisión conserva el historial y usa otra clave',
+    () async {
+      final cubit = makeCubit(wait: (_) async {});
+      addTearDown(cubit.close);
+      openReview(cubit);
+      final originalKey = cubit.state.idempotencyKey;
+      stubRegister(_underReview);
+
+      await cubit.sendIsoMessage(token: 'token');
+
+      expect(cubit.startNewSaleAfterReview(), isTrue);
+      expect(cubit.state, isA<SalesInitialWithHistory>());
+      expect(cubit.state.history.single.result, PaymentResult.underReview);
+
+      cubit.setProductAndAmount(
+        productCode: 'GARRAFA_10',
+        productLabel: 'Garrafa 10 kg',
+        amount: 4,
+      );
+      cubit.showReview(
+        productCode: 'GARRAFA_10',
+        productLabel: 'Garrafa 10 kg',
+        amount: 4,
+        cardNumber: '6063007014007403',
+        cvv: '878',
+        expirationDate: '1228',
+      );
+
+      expect(cubit.state.idempotencyKey, isNot(originalKey));
+    },
+  );
+
   test('reanuda una pendiente del historial sin un segundo POST', () async {
     final cubit = makeCubit(wait: (_) async {});
     addTearDown(cubit.close);

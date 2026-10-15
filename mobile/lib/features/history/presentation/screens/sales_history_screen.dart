@@ -189,7 +189,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ? Icons.check_circle
                       : operation.result == PaymentResult.voided
                       ? Icons.undo
-                      : operation.result == PaymentResult.pending
+                      : operation.result == PaymentResult.pending ||
+                            operation.result == PaymentResult.underReview
                       ? Icons.hourglass_top
                       : operation.result == PaymentResult.connectionError
                       ? Icons.wifi_off
@@ -198,7 +199,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ? Colors.green
                       : operation.result == PaymentResult.voided
                       ? Colors.grey
-                      : operation.result == PaymentResult.pending
+                      : operation.result == PaymentResult.pending ||
+                            operation.result == PaymentResult.underReview
                       ? Colors.orange
                       : operation.result == PaymentResult.connectionError
                       ? Colors.orange

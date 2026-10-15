@@ -10,6 +10,7 @@ enum PaymentResult {
   approved,
   declined,
   pending,
+  underReview,
   failed,
   connectionError,
   voided,
@@ -53,6 +54,8 @@ class OperationModel {
                ? SaleAuthorizationStatus.declined
                : result == PaymentResult.pending
                ? SaleAuthorizationStatus.pending
+               : result == PaymentResult.underReview
+               ? SaleAuthorizationStatus.pending
                : SaleAuthorizationStatus.failed);
 
   bool get isPending => authorizationStatus == SaleAuthorizationStatus.pending;
@@ -65,7 +68,10 @@ class OperationModel {
       productLabel: _labelForProductCode(code),
       amount: double.tryParse(json['amount'] as String? ?? '0') ?? 0.0,
       cardNumber: '•••• ${json['card_last4'] as String? ?? '0000'}',
-      result: _resultForStatus(json['status'] as String? ?? ''),
+      result: _resultForStatus(
+        json['status'] as String? ?? '',
+        json['reason'] as String?,
+      ),
       authorizationStatus: _parseAuthorizationStatus(
         json['status'] as String? ?? '',
       ),
@@ -113,7 +119,7 @@ class OperationModel {
     }
   }
 
-  static PaymentResult _resultForStatus(String status) {
+  static PaymentResult _resultForStatus(String status, String? reason) {
     switch (status.toUpperCase()) {
       case 'APPROVED':
         return PaymentResult.approved;
@@ -122,7 +128,9 @@ class OperationModel {
       case 'VOIDED':
         return PaymentResult.voided;
       case 'PENDING':
-        return PaymentResult.pending;
+        return _parsePendingReason(reason) == PendingSaleReason.underReview
+            ? PaymentResult.underReview
+            : PaymentResult.pending;
       case 'FAILED':
       case 'NOT_SENT':
       case 'INDETERMINATE':

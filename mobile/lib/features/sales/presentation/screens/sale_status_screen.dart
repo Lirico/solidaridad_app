@@ -40,8 +40,10 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is OperationModel) {
       _operation = args;
-      // Impresión automática al aprobar la venta.
-      if (args.result == PaymentResult.approved) {
+      // El comercio recibe un comprobante tanto de una aprobación como de una
+      // verificación manual; el segundo nunca afirma un resultado financiero.
+      if (args.result == PaymentResult.approved ||
+          args.result == PaymentResult.underReview) {
         _printTicket();
       }
     }
@@ -112,6 +114,12 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.hourglass_top;
         statusTitle = 'Transacción en Proceso';
         statusSubtitle = 'La autorización sigue en curso.';
+      case PaymentResult.underReview:
+        statusColor = Colors.orange.shade800;
+        statusIcon = Icons.manage_search;
+        statusTitle = 'Verificación requerida';
+        statusSubtitle =
+            'Verifique la operación con casa central. El cobro podría haberse procesado.';
       case PaymentResult.failed:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
@@ -150,13 +158,21 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             operation: operation,
             printStatus: _printStatus,
             printMessage: _printMessage,
-            onRetryPrint: result == PaymentResult.approved
+            onRetryPrint:
+                result == PaymentResult.approved ||
+                    result == PaymentResult.underReview
                 ? _printTicket
                 : null,
             onRetry: result == PaymentResult.connectionError
                 ? () => _retrySale(context)
                 : null,
+            finalizeLabel: result == PaymentResult.underReview
+                ? 'NUEVA VENTA'
+                : 'FINALIZAR',
             onFinalize: () {
+              if (result == PaymentResult.underReview) {
+                context.read<SalesCubit>().startNewSaleAfterReview();
+              }
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.saleForm,

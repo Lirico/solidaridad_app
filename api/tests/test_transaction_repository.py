@@ -2,8 +2,10 @@ from datetime import UTC, date, datetime
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from domain.authorization_outcome import AuthorizationOutcome
+from domain.processor_job import ProcessorJobState
 from domain.product import Product
 from domain.transaction_status import TransactionStatus
 from domain.transaction_status_event import (
@@ -121,6 +123,153 @@ def test_orm_repr_never_contains_recovery_card_data() -> None:
     assert "4111111111111111" not in rendered
     assert "3012" not in rendered
     assert "1111" in rendered
+
+
+def _current_batch_row(
+    *,
+    status: TransactionStatus,
+    authorization_outcome: AuthorizationOutcome,
+) -> MagicMock:
+    row = MagicMock(spec=TransactionModel)
+    row.id = 17
+    row.installation_id = 2
+    row.status = status.value
+    row.authorization_outcome = authorization_outcome.value
+    return row
+
+
+def _batch_close_session(
+    row: MagicMock,
+    *,
+    open_recovery_job: int | None,
+) -> MagicMock:
+    session = MagicMock()
+    session.scalars.return_value.all.return_value = [row]
+    session.scalar.side_effect = [None, open_recovery_job, None]
+    return session
+
+
+def test_close_batch_locks_current_transactions_before_recovery_check() -> None:
+    row = _current_batch_row(
+        status=TransactionStatus.APPROVED,
+        authorization_outcome=AuthorizationOutcome.APPROVED,
+    )
+    session = _batch_close_session(row, open_recovery_job=9)
+
+    result = TransactionRepository(session).close_current_batch(
+        terminal_id="05000001",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+    )
+
+    assert result == "in_flight"
+    current_query = session.scalars.call_args.args[0]
+    current_sql = str(
+        current_query.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "FOR UPDATE" in current_sql
+    assert session.scalar.call_count == 2
+    assert session.add.call_count == 0
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        ProcessorJobState.READY,
+        ProcessorJobState.PROCESSING,
+        ProcessorJobState.RETRY,
+        ProcessorJobState.MANUAL_REVIEW,
+    ],
+)
+def test_close_batch_blocks_each_open_recovery_job_state(
+    state: ProcessorJobState,
+) -> None:
+    row = _current_batch_row(
+        status=TransactionStatus.APPROVED,
+        authorization_outcome=AuthorizationOutcome.APPROVED,
+    )
+    session = _batch_close_session(row, open_recovery_job=9)
+
+    result = TransactionRepository(session).close_current_batch(
+        terminal_id="05000001",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+    )
+
+    assert result == "in_flight"
+    recovery_query = session.scalar.call_args_list[1].args[0]
+    recovery_sql = str(
+        recovery_query.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert f"'{state.value}'" in recovery_sql
+    assert session.add.call_count == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "outcome"),
+    [
+        (TransactionStatus.PENDING, AuthorizationOutcome.PENDING),
+        (TransactionStatus.APPROVED, AuthorizationOutcome.INDETERMINATE),
+    ],
+)
+def test_close_batch_blocks_pending_or_indeterminate_transactions(
+    status: TransactionStatus,
+    outcome: AuthorizationOutcome,
+) -> None:
+    row = _current_batch_row(status=status, authorization_outcome=outcome)
+    session = _batch_close_session(row, open_recovery_job=None)
+
+    result = TransactionRepository(session).close_current_batch(
+        terminal_id="05000001",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+    )
+
+    assert result == "in_flight"
+    assert session.scalar.call_count == 1
+    assert session.add.call_count == 0
+
+
+def test_close_batch_allows_confirmed_transaction_without_open_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = _current_batch_row(
+        status=TransactionStatus.APPROVED,
+        authorization_outcome=AuthorizationOutcome.APPROVED,
+    )
+    session = _batch_close_session(row, open_recovery_job=None)
+
+    def assign_close_id() -> None:
+        if session.add.called:
+            session.add.call_args.args[0].id = 23
+
+    session.flush.side_effect = assign_close_id
+    expected_close = MagicMock()
+    expected_transaction = MagicMock()
+    monkeypatch.setattr(
+        "persistence.repositories.transaction_repository._to_batch_close",
+        lambda _: expected_close,
+    )
+    monkeypatch.setattr(
+        "persistence.repositories.transaction_repository._to_domain",
+        lambda _: expected_transaction,
+    )
+
+    result = TransactionRepository(session).close_current_batch(
+        terminal_id="05000001",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+    )
+
+    assert result == (expected_close, [expected_transaction])
+    assert row.batch_close_id is not None
+    session.add.assert_called_once()
 
 
 def test_get_by_idempotency_none() -> None:

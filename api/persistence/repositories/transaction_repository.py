@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from domain.authorization_outcome import AuthorizationOutcome
 from domain.batch_close import BatchClose
-from domain.processor_job import ProcessorOperationType
+from domain.processor_job import ProcessorJobState, ProcessorOperationType
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -386,8 +386,35 @@ class TransactionRepository:
         if any(
             row.status
             in {TransactionStatus.PENDING.value, TransactionStatus.UNKNOWN.value}
+            or row.authorization_outcome == AuthorizationOutcome.INDETERMINATE.value
             for row in current
         ):
+            return "in_flight"
+
+        # The transaction-row locks above serialize this check with recovery-job
+        # creation: an insert referencing a current transaction needs a
+        # conflicting key-share lock.  Do not lock jobs here, because a worker
+        # finalizes a job before updating its transaction and that lock order
+        # would permit a deadlock.  Seeing a job complete after this query only
+        # rejects this close conservatively; it never closes an open recovery.
+        open_recovery_job = self._session.scalar(
+            select(ProcessorJobModel.id)
+            .where(
+                ProcessorJobModel.transaction_id.in_([row.id for row in current]),
+                ProcessorJobModel.operation_type
+                == ProcessorOperationType.REVERSE.value,
+                ProcessorJobModel.state.in_(
+                    (
+                        ProcessorJobState.READY.value,
+                        ProcessorJobState.PROCESSING.value,
+                        ProcessorJobState.RETRY.value,
+                        ProcessorJobState.MANUAL_REVIEW.value,
+                    )
+                ),
+            )
+            .limit(1)
+        )
+        if open_recovery_job is not None:
             return "in_flight"
 
         installation_id = current[0].installation_id

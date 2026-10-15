@@ -546,6 +546,22 @@ Verifone (banda + térmica).
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
 | G-P1-14 | Consulta de saldo parcial presentada como completa | done | **2026-10-06:** antes la API llamaba los cinco productos en serie y devolvía `APPROVED` con las filas que alcanzaban a responder. Ahora las despacha concurrentemente, espera los resultados terminales del gateway/cliente ISO y devuelve `FAILED` sin saldos si cualquiera tuvo un fallo técnico terminal (`FAILED`, `UNKNOWN` o excepción). El código `06` no es fallo técnico: conserva la fila en `0.00`. Tests en `api/tests/test_check_balance.py`. |
 
+### Actualización G-P1-09 — 2026-10-14
+
+**RA-13:** el cierre normal bloquea, en la misma transacción y con las
+transacciones actuales bloqueadas, cualquier lote con una transacción `PENDING`,
+outcome `INDETERMINATE` o job de reverso `READY`, `PROCESSING`, `RETRY` o
+`MANUAL_REVIEW`. El conflicto no expone datos sensibles e indica esperar la
+finalización o solicitar la futura resolución administrativa. La inserción del
+job queda serializada por el lock de la transacción; las ventas creadas después
+del snapshot no son parte del cierre y permanecen en el lote siguiente.
+
+**Evidencia:** `api/tests/test_transaction_repository.py` verifica el orden de
+lock y consulta, los cuatro estados de job bloqueantes, `PENDING` e
+`INDETERMINATE`, y que una operación confirmada sin job abierto puede cerrar.
+La nota anterior que marcaba RA-13 como pendiente queda reemplazada por esta
+actualización. Pendiente: operación/resolución auditada por casa central.
+
 ---
 
 ## P2 — Post-MVP / mejoras

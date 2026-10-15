@@ -204,6 +204,30 @@ class SalesRepository {
     }
   }
 
+  /// Consulta una autorización ya creada. Nunca envía otro `POST /transactions`,
+  /// por lo que es segura para continuar una venta tras perder la respuesta
+  /// inicial o reiniciar la aplicación.
+  Future<SaleResponse> getSaleStatus({
+    required String token,
+    required String transactionNumber,
+  }) async {
+    final url = Uri.parse('$_baseUrl/transactions/$transactionNumber');
+    try {
+      final response = await _authorizedGet(url, token);
+      if (response.statusCode != 200 && response.statusCode != 202) {
+        throw const DataLoadException(_loadRejectedMessage);
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return _saleResponseFromJson(data);
+    } on SessionExpiredException {
+      rethrow;
+    } on DataLoadException {
+      rethrow;
+    } on FormatException {
+      throw const DataLoadException(_loadUnexpectedMessage);
+    }
+  }
+
   Future<SaleResponse> registerSale({
     required String product,
     required String amount,
@@ -259,14 +283,7 @@ class SalesRepository {
       if (response.statusCode == 200 ||
           response.statusCode == 201 ||
           response.statusCode == 202) {
-        final bool approved = responseData['status'] == 'APPROVED';
-
-        return SaleResponse(
-          isApproved: approved,
-          operationNumber: responseData['transaction_number'] ?? 'OP-UNKNOWN',
-          message: responseData['user_message'] ?? 'Operación procesada',
-          errorCode: '00',
-        );
+        return _saleResponseFromJson(responseData);
       } else {
         return SaleResponse(
           isApproved: false,
@@ -312,5 +329,50 @@ class SalesRepository {
         errorCode: 'UNKNOWN',
       );
     }
+  }
+
+  SaleResponse _saleResponseFromJson(Map<String, dynamic> data) {
+    final rawStatus = (data['status'] as String? ?? '').toUpperCase();
+    final SaleAuthorizationStatus authorizationStatus;
+    switch (rawStatus) {
+      case 'APPROVED':
+        authorizationStatus = SaleAuthorizationStatus.approved;
+      case 'DECLINED':
+        authorizationStatus = SaleAuthorizationStatus.declined;
+      case 'PENDING':
+        authorizationStatus = SaleAuthorizationStatus.pending;
+      case 'FAILED':
+      case 'NOT_SENT':
+      case 'INDETERMINATE':
+      default:
+        authorizationStatus = SaleAuthorizationStatus.failed;
+    }
+
+    final rawReason = (data['reason'] as String? ?? '').toUpperCase();
+    final PendingSaleReason? pendingReason;
+    switch (rawReason) {
+      case 'PROCESSING':
+        pendingReason = PendingSaleReason.processing;
+      case 'UNDER_REVIEW':
+        pendingReason = PendingSaleReason.underReview;
+      default:
+        pendingReason = null;
+    }
+
+    return SaleResponse(
+      isApproved: authorizationStatus == SaleAuthorizationStatus.approved,
+      operationNumber: data['transaction_number'] as String? ?? '',
+      message:
+          data['user_message'] as String? ??
+          data['message'] as String? ??
+          'Operación procesada',
+      errorCode: authorizationStatus == SaleAuthorizationStatus.approved
+          ? '00'
+          : rawStatus,
+      authorizationStatus: authorizationStatus,
+      pendingReason: pendingReason,
+      pollAfterSeconds: data['poll_after_seconds'] as int?,
+      mayStartNewSale: data['may_start_new_sale'] as bool? ?? true,
+    );
   }
 }

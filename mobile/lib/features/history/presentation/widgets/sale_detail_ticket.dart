@@ -22,6 +22,14 @@ class SaleDetailTicket extends StatelessWidget {
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
         statusTitle = 'VENTA RECHAZADA';
+      case PaymentResult.pending:
+        statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_top;
+        statusTitle = 'VENTA EN PROCESO';
+      case PaymentResult.failed:
+        statusColor = Colors.red;
+        statusIcon = Icons.error_outline;
+        statusTitle = 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:
         statusColor = Colors.orange;
         statusIcon = Icons.wifi_off;

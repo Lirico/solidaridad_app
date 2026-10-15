@@ -107,6 +107,16 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.error_outline;
         statusTitle = 'Transacción Rechazada';
         statusSubtitle = 'La terminal reportó un error en la autorización.';
+      case PaymentResult.pending:
+        statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_top;
+        statusTitle = 'Transacción en Proceso';
+        statusSubtitle = 'La autorización sigue en curso.';
+      case PaymentResult.failed:
+        statusColor = const Color(0xFFE74C3C);
+        statusIcon = Icons.error_outline;
+        statusTitle = 'Error de Autorización';
+        statusSubtitle = 'No fue posible completar la autorización.';
       case PaymentResult.connectionError:
         statusColor = const Color(0xFFFF8C00);
         statusIcon = Icons.wifi_off_outlined;

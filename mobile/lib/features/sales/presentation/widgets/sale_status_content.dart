@@ -214,6 +214,10 @@ class SaleStatusContent extends StatelessWidget {
         return '00 (Aprobado)';
       case PaymentResult.declined:
         return '51 (Fondos insuficientes)';
+      case PaymentResult.pending:
+        return 'PENDIENTE';
+      case PaymentResult.failed:
+        return 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:
         return '99 (Tiempo agotado)';
       case PaymentResult.voided:

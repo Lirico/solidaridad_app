@@ -4,7 +4,127 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-02
+Última revisión: 2026-10-15
+
+> ✅ **Último cambio (2026-10-15, RA-17):** la matriz determinista completa
+> prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
+> timeout y reclamo concurrente entre workers. El rollout por canary, rollback
+> sin borrar jobs y conciliación posterior quedaron documentados; el worker
+> conserva desactivación segura por defecto y puede iniciarse explícitamente en
+> una única instancia controlada. La activación real sigue requiriendo la
+> aprobación y ejecución de Operaciones/Riesgo en cada ambiente. Evidencia:
+> `api/tests/test_recovery_end_to_end.py`,
+> `docs/rollout-recuperacion-reversos.md` y `make -C api check`.
+
+> ✅ **Último cambio (2026-10-14, RA-15):** cuando la API proyecta
+> `PENDING / UNDER_REVIEW`, mobile detiene el polling, muestra un handoff de
+> verificación con casa central y no lo presenta como rechazo. Imprime un
+> comprobante específico con referencia, fecha/hora, comercio, terminal,
+> importe y PAN enmascarado, más la advertencia de no cobrar nuevamente. La
+> operación permanece en historial para consulta manual y el botón **NUEVA
+> VENTA** libera una venta independiente que genera otra `Idempotency-Key`.
+> Evidencia: `mobile/test/{sales_polling_test,receipt_formatter_test}.dart`,
+> `flutter analyze` (3 informes preexistentes) y `flutter test`.
+
+> ✅ **Decisión (2026-10-14, RA-12):** casa central consultará por ahora los
+> casos de recuperación mediante SQL operativo de solo lectura; no se incorpora
+> rol, provisionamiento ni endpoint administrativo en la API. Las consultas de
+> operación deben aplicar mínimo privilegio y no seleccionar PAN completo ni
+> vencimiento. Las acciones de resolución auditada y el reintento manual quedan
+> diferidos hasta que exista una herramienta administrativa. Ver G-P1-09.
+
+> ✅ **Último cambio (2026-10-14, RA-11):** la API ejecuta la recuperación
+> durable dentro de cada proceso FastAPI mediante un thread dedicado iniciado y
+> detenido por el lifespan. Cada vuelta abre y cierra su propia sesión de DB y
+> cliente HTTP, ejecuta el reverso y el monitor de `PROCESSING` abandonado, y
+> usa el intervalo persistido. El apagado evita reclamar trabajo nuevo y espera
+> un período de gracia por el job en curso; un error fatal degrada
+> `GET /health/ready` con estado, última iteración y error sanitizado, sin
+> quedar silencioso. El flag `EMBEDDED_RECOVERY_WORKER_ENABLED` permanece
+> desactivado por defecto. Cada worker Uvicorn tiene un loop propio y `--reload`
+> reinicia ese loop; los claims durables con `SKIP LOCKED` impiden duplicar
+> jobs. Evidencia: pruebas de lifecycle, shutdown, fallo fatal, sesiones por
+> vuelta y `make -C api check` (287 pruebas, 93.83% de cobertura). Pendiente:
+> resolución por casa central (RA-12). Ver G-P1-09.
+
+> ✅ **Último cambio (2026-10-14, RA-10):** la API detecta un job
+> `PROCESSING` que alcanza `processing_timeout_seconds` y lo mueve, con
+> `FOR UPDATE SKIP LOCKED`, a `MANUAL_REVIEW` sin reenviarlo al procesador.
+> La migración `20261014_0011` incorpora alertas durables `OPEN`, únicas por
+> job y causa; los timeouts, agotamientos, rechazos permanentes, ambigüedades
+> e inconsistencias que requieren revisión abren el caso y emiten un evento
+> operativo sanitizado. Las pruebas cubren el límite exacto, monitores
+> concurrentes, deduplicación, migración y finalización tardía. Su
+> calendarización/lifespan se incorporó en RA-11. Ver G-P1-09.
+
+> ✅ **Último cambio (2026-10-13, RA-04):** la API incorpora la cola durable
+> `processor_jobs` y la política persistida `payment_processing_config`, con
+> constraints de estados, unicidad, reclamo y valores operativos. La migración
+> crea la fila `default`; repositorios y dominio permiten crear y consultar
+> jobs y rechazan transiciones inválidas. Todavía no existe ningún loop ni
+> request que ejecute esos trabajos. Ver G-P1-09.
+
+> ✅ **Último cambio (2026-10-13, RA-03):** la API persiste PAN, vencimiento,
+> outcome técnico y cantidad de intentos antes de autorizar. La huella
+> idempotente usa el PAN normalizado completo; CVV no se persiste. PAN y
+> vencimiento quedan fuera de respuestas, eventos y `repr`. Las filas
+> históricas permanecen no recuperables, con datos de recuperación nulos. Ver
+> G-P1-09 y G-P1-15.
+
+> ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
+> lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
+> (`YYMM`) en Flutter. API y gateway ya no definen ni propagan `entry_mode` ni
+> Track 2; el gateway usa el ISO histórico (`DE22=0012`, DE2 y DE14) para
+> ventas y saldo. Se revirtieron las adaptaciones en `auth_mycli.c` que hacían
+> que el procesador leyera PAN/vencimiento de campos distintos para banda, así
+> como la relajación de la regla de última recarga. La política y bitácora de
+> excepciones del C están en `AGENTS.md` y
+> `payment_processor/LEGACY_CHANGELOG.md`. Ver G-P0-15 y G-P1-06.
+
+> ✅ **Último cambio (2026-10-06, consulta de saldo completa):** la API despacha
+> en paralelo las cinco consultas ISO de saldo (una por producto 993–997). La
+> agregación espera el resultado terminal del cliente gateway/ISO —incluidos los
+> reintentos que este implemente— y devuelve `FAILED`, sin filas parciales, si
+> cualquiera falla técnicamente (`FAILED`, `UNKNOWN` o excepción). El código
+> ISO `06` sigue siendo una respuesta de negocio válida y se representa como
+> saldo `0.00`. Tests cubren concurrencia y fallos parciales; ver G-P1-14.
+
+> ✅ **Último cambio (2026-09-28, VE-12):** cada `readCard` de
+> `PsdkCardReader` libera el PSDK (`cancelReadMsr` → `tearDown`) antes de
+> devolver el resultado, y `cancel()` es idempotente por sesión. El `dispose`
+> de la pantalla de espera (venta y saldo) solo aborta una lectura todavía en
+> curso: si la lectura ya terminó, no vuelve a apagar el SDK. Así la impresión
+> y la venta siguiente no chocan con un `tearDown` tardío. `ReceiptPrinter` no
+> cambia: inicializa en limpio cuando el lector ya soltó el hardware.
+> `flutter analyze` OK y `flutter test` OK en `mobile/` (28 tests; 13 en
+> `psdk_card_reader_test.dart`). TC-V-013 y TC-V-018 siguen siendo prueba
+> manual en el V660P. Ver G-P0-06 y G-P0-07.
+>
+> **2026-09-24 (VE-08, traído de master):** la cantidad de una venta no puede
+> superar lo que entra en DE4 (12 dígitos, **9.999.999.999,99**). La API lo
+> rechaza en `parse_amount`, el gateway en el esquema y en authorize/void, y
+> `pack_iso` falla con `IsoPackError` si un campo fijo no tiene su longitud.
+> El formulario no acepta más de 10 enteros ni 2 decimales. Ver G-P2-07.
+
+
+> ✅ **Último cambio (2026-09-28, VE-14):** un fallo al cargar el catálogo o el historial ya no se disfraza de datos. `fetchProducts` y `fetchHistory` lanzan `DataLoadException` (se eliminó el catálogo hardcodeado y la lista vacía ante error). El formulario y el historial muestran un aviso con **REINTENTAR**; si falla una página siguiente, la lista ya cargada se conserva. Los textos de cantidad usan `unit.plural` del catálogo. Ver G-P1-07.
+
+
+> ✅ **Último cambio (2026-09-30, VE-15):** el vencimiento de la banda se lee
+> como los primeros 4 dígitos después del `=` del track2 (`MsrCardData`).
+> Antes se exigía que entre `=` y `?` hubiera exactamente 4 caracteres, y la
+> banda real trae el service code pegado (`=3012101?`), así que el vencimiento
+> salía vacío y la venta se iba sin fecha. Si la pista no trae `=`, esos 4
+> dígitos son los que siguen al PAN ya leído (`PAN3012101` → `3012`); si no
+> alcanzan, la fecha sigue vacía. Si `tags.expiry` ya viene, ese valor sigue
+> teniendo prioridad. El bridge loguea el largo en bytes de la pista y si
+> apareció un nibble `D` y su posición, sin PAN ni track. Si ese `=` no deja
+> 4 dígitos, se usan los 4 que siguen al PAN. En el V660P (2026-09-30) el
+> pase fue `separatorIndex=17 tail=ddddsd`, con `digitsAfterEquals=4` y
+> `expiryLen=4`. El 400 de ese cobro fue el mensaje viejo que exigía track2
+> en banda; el proceso de la API no tenía cargado VE-01 y se reinició.
+> Tests en `mobile/test/msr_card_data_test.dart`. Ver G-P0-06.
+
 
 > **Último cambio (2026-09-25, VE-09):** la cantidad se valida según la unidad
 > del catálogo. Garrafas y tubos exigen un entero (la app lo bloquea en el
@@ -14,14 +134,10 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > incluye el código `13` (monto inválido) y los códigos `12`, `17`, `19`, `25`,
 > `30`, `89` y `95`. Ver G-P2-07.
 
-> ✅ **Último cambio (2026-09-24, VE-04 cobro sin confirmar):** un 201 con
-> `status: UNKNOWN` y un timeout del cliente quedan en `PaymentResult.unknown`.
-> La pantalla dice «No pudimos confirmar el cobro», ofrece ver la operación y
-> no muestra `REINTENTAR`. `FAILED` sigue como error de conexión. Ver G-P1-11.
-
 > ✅ **Último cambio (2026-09-24, VE-05 motivo en la pantalla de resultado):** el
-> rechazo ya no muestra el texto fijo ni el código 51. El subtítulo y la fila
-> de respuesta usan `userMessage` cuando el servidor lo envió. Ver G-P1-11.
+> rechazo y el fallo técnico ya no muestran el texto fijo ni el código 51. El
+> subtítulo y la fila de respuesta usan `userMessage` cuando el servidor lo
+> envió. Ver G-P1-11.
 
 > ✅ **Último cambio (2026-09-24, VE-06 mensajes de error de la API):** la app
 > leía solo `user_message`. Los 400/409 de venta y anulación responden
@@ -29,20 +145,23 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > emisora» / «Anulación rechazada por la entidad emisora». `apiUserMessage`
 > usa `user_message` y, si no viene, `message`. Ver G-P1-12.
 
-Última revisión: 2026-09-23 (VE-01 venta por banda sin track2)
+> ⚠️ **Historial sustituido (2026-10-05):** la solución provisional basada en
+> `entry_mode` quedó retirada. El contrato vigente es PAN + vencimiento `YYMM`,
+> sin Track 2, y se describe al inicio de este documento y en G-P1-06.
+Última revisión: 2026-10-06 (Cierre administrativo de lote en API)
 
-> ✅ **Último cambio (2026-09-23, VE-01):** la venta por banda vuelve a llegar al
-> procesador. `CreateTransaction._validate_entry_mode` acepta `entry_mode`
-> `"022"` con vencimiento y **sin** track2 (PAN + DE14, que es lo que envía el
-> terminal). El 400 `InvalidEntryMode` queda solo cuando faltan ambos, con el
-> mensaje "Faltan datos de la tarjeta: la banda no incluyó vencimiento". La app
-> muestra ese `message` en el error de `registerSale` cuando no hay
-> `user_message`. No se reenvía el track2 (el PAN de la banda de este terminal
-> no coincide con el registrado; ver G-P0-15). Tests en
-> `test_create_transaction.py`. Ver G-P1-06.
-Última revisión: 2026-09-23 (Cierre de Lote sin cierre local)
+> ✅ **Último cambio (2026-10-06, Cierre administrativo de lote):** la API
+> ahora delimita el lote vigente con `transactions.batch_close_id IS NULL` y
+> guarda cada corte en `batch_closes`, sin invocar ni modificar el procesador
+> legacy. El cierre persiste las operaciones incluidas, bloquea pagos
+> pendientes/ambiguos y prohíbe anulaciones posteriores. El endpoint de
+> listado devuelve sólo el lote actual; el endpoint de cierre devuelve el
+> comprobante de operaciones para impresión futura. El índice parcial de
+> PostgreSQL `ix_transactions_terminal_current` contiene solamente las filas
+> actuales (`WHERE batch_close_id IS NULL`), por lo que el historial no escanea
+> cortes históricos. Ver G-P2-10.
 
-> ✅ **Último cambio (2026-09-23, Cierre de Lote sin cierre local):** la pantalla
+> ✅ **Cambio anterior (2026-09-23, Cierre de Lote sin cierre local):** la pantalla
 > **Cierre de Lote** pasó a ser **informativa**: muestra el resumen del lote
 > (ventas aprobadas del día, `GET /v1/transactions`) y **no cierra nada**. Se
 > retiró el cierre local del prototipo anterior: `BatchCloseCubit.closeBatch()`,
@@ -104,6 +223,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > `mobile/test/sale_status_screen_test.dart`. El ciclo del PSDK (VE-12) sigue
 > abierto en G-P2-09.
 
+
 > ✅ **Último cambio (2026-10-09, refactor del lector MSR):** se extrajo el ciclo
 > delicado del PSDK Verifone a un servicio compartido,
 > `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`), para eliminar la
@@ -114,8 +234,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > `getStatus` + stream), `readCard()` (initialize → ready → `readMsr` → parseo,
 > con resultado tipado `CardReadSuccess`/`CardReadFailure`) y `cancel()`
 > (`cancelReadMsr` → `tearDown`, en ese orden). Se preservan los fixes previos:
-> éxito por `hasClearData`, guardas `mounted`/`_disposed`, `entry_mode` `022` sin
-> track2 y el mock `USE_MSR_MOCK`. `ReceiptPrinter` también consume
+> éxito por `hasClearData`, guardas `mounted`/`_disposed`, normalización de PAN
+> + vencimiento y el mock `USE_MSR_MOCK`. `ReceiptPrinter` también consume
 > `ensureReady(initializeIfNeeded: true)`, eliminando la tercera copia de la
 > espera de `sdiReady`. `MsrCardData` se movió de
 > `mobile/lib/features/sales/domain/` a `mobile/lib/psdk/msr_card_data.dart`.
@@ -143,8 +263,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > saldo end-to-end sin tocar el procesador (usa su `consulta_saldo`/MTI `0100`
 > existente). Gateway: `POST /v1/balance` (construye `0100`, DE3 `310000`, lee el
 > saldo de DE4 y los productos de DE63) con `BalanceCommand`/`BalanceResult` y
-> `make check` OK. API: `POST /v1/balance` (sin producto en body) itera el
-> catálogo (993–997), agrega una fila por producto y lista con `0.00` los que
+> `make check` OK. API: `POST /v1/balance` (sin producto en body) despacha en
+> paralelo el catálogo (993–997), agrega una fila por producto y lista con `0.00` los que
 > responden `06` (sin saldo asignado); `make check` OK. Mobile: se habilitó la
 > opción "Consultar saldo" del menú "⋯ Más" (antes deshabilitada) y se agregó el
 > flujo completo con la misma visual que la venta (captura Tarjeta/Ingreso manual
@@ -249,7 +369,7 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
 > `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
 > creó `mobile/lib/features/sales/domain/msr_card_data.dart` (`MsrCardData` con
-> `fromBridge`, `expiryYyMm`/`expiryMmYy`) y `SalesCubit.showReviewFromMsr()`;
+> `fromBridge`, `expiryYyMm`) y `SalesCubit.showReviewFromMsr()`;
 > la pantalla ya no parsea `tags`/`msr` ni convierte fechas. (2) **Reintento:**
 > botón "REINTENTAR" en `WaitingForCardContent` visible tras error/timeout que
 > vuelve a llamar a `_startReading()`. (3) **Cancelación de lectura:** se agregó
@@ -420,12 +540,12 @@ Verifone (banda + térmica).
 | G-P0-03 | Token de venta no enlazado a sesión real | done | `SalesCubit.loadHistory()`, `sendIsoMessage()` y `fetchProducts()` reciben el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | G-P0-04 | Sin listado/detalle de transacciones en API | done | `GET /v1/transactions` con paginación (limit/offset) implementado, filtrado por terminal (`installation_id`). Frontend reemplazó mock por datos reales. Ver `api/presentation/controllers/transactions_controller.py` y `mobile/lib/features/history/presentation/screens/sales_history_screen.dart`. |
 | G-P0-05 | Producto/especie y campos de tarjeta desalineados | done | Mobile: `ProductSelector` con catálogo de `GET /v1/products`. Payload envía `product`, `card_number`, `cvv`, `expiration_date`. Ya no envía `card_holder` ni `terminal_origin`. |
-| G-P0-06 | Lectura de banda (Verifone) | done | **Rama 1 (2026-11-08):** bridge PSDK portado del POC al mobile. `PsdkBridge.kt` + `MainActivity.kt` (canales `com.solidaridad.poc_verifone/psdk` y `psdk_events`) en `mobile/android/app/src/main/kotlin/`. Dart facade `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`. `.aar` PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`. `build.gradle.kts` con `minSdk=24` y dependencia `.aar`. `AndroidManifest.xml` con permisos Verifone. Build debug OK. **Rama 2 (2026-11-08):** `WaitingForCardScreen` como `StatefulWidget` conectado al PSDK (`initialize()` + `readMsr(timeoutSec: 30)`), mapea PAN/vencimiento a `showReview`. **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `flutter analyze` OK. **Rama 5 (2026-11-08):** fix de CVV para banda — la banda no contiene CVV, pero la API rechazaba `cvv: ''` (schema `min_length=3` → 422 y `_validate_cvv` → 400), por lo que la venta por banda fallaba antes de persistir (no aparecía en historial) aunque la tarjeta tuviera saldo. `cvv` ahora es opcional en `CreateTransactionRequest` y la validación se omite para `entry_mode='022'`. Tests en `test_create_transaction.py` y `test_transactions_http.py`; `make check` OK (118 tests, cobertura 95%). **2026-10-09 (refactor):** el ciclo del lector se extrajo a `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`: `ensureReady` + `readCard` + `cancel`), compartido por venta, consulta de saldo y `ReceiptPrinter`; `MsrCardData` se movió a `mobile/lib/psdk/msr_card_data.dart`. Nuevo `mobile/test/psdk_card_reader_test.dart` (9 casos). `flutter analyze` OK, `flutter test` OK (24 tests). |
+| G-P0-06 | Lectura de banda (Verifone) | done | **Rama 1 (2026-11-08):** bridge PSDK portado del POC al mobile. `PsdkBridge.kt` + `MainActivity.kt` (canales `com.solidaridad.poc_verifone/psdk` y `psdk_events`) en `mobile/android/app/src/main/kotlin/`. Dart facade `PsdkBridge` + mock `PsdkMsrMock` en `mobile/lib/psdk/`. `.aar` PaymentSDK-4.1.0-sdi en `mobile/android/app/libs/`. `build.gradle.kts` con `minSdk=24` y dependencia `.aar`. `AndroidManifest.xml` con permisos Verifone. Build debug OK. **Rama 2 (2026-11-08):** `WaitingForCardScreen` como `StatefulWidget` conectado al PSDK (`initialize()` + `readMsr(timeoutSec: 30)`), mapea PAN/vencimiento a `showReview`. **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `flutter analyze` OK. **Rama 5 (2026-11-08):** fix de CVV para banda — la banda no contiene CVV, pero la API rechazaba `cvv: ''` (schema `min_length=3` → 422 y `_validate_cvv` → 400), por lo que la venta por banda fallaba antes de persistir (no aparecía en historial) aunque la tarjeta tuviera saldo. `cvv` ahora es opcional en `CreateTransactionRequest` y la validación se omite para `entry_mode='022'`. Tests en `test_create_transaction.py` y `test_transactions_http.py`; `make check` OK (118 tests, cobertura 95%). **2026-10-09 (refactor):** el ciclo del lector se extrajo a `mobile/lib/psdk/psdk_card_reader.dart` (`PsdkCardReader`: `ensureReady` + `readCard` + `cancel`), compartido por venta, consulta de saldo y `ReceiptPrinter`; `MsrCardData` se movió a `mobile/lib/psdk/msr_card_data.dart`. Nuevo `mobile/test/psdk_card_reader_test.dart` (9 casos). `flutter analyze` OK, `flutter test` OK (24 tests). **2026-09-28 (VE-12):** `readCard` espera `cancelReadMsr` → `tearDown` antes de devolver éxito o fallo, y `cancel()` no vuelve a apagar el SDK si esa sesión ya se liberó. El `dispose` de `WaitingForCardScreen` y `BalanceWaitingForCardScreen` usa `unawaited(cancel())` solo para abortar una lectura en curso. **2026-09-30 (VE-15):** `MsrCardData` toma los primeros 4 dígitos posteriores al `=` aunque el service code venga pegado (`=YYMMSSS?`); el formato corto `=YYMM?` y un `tags.expiry` ya presente se conservan. Si no hay `=`, los 4 dígitos que siguen al PAN son el vencimiento (`PANYYMM…` → `YYMM`); si no alcanzan, queda vacío. `PsdkBridge` loguea largo en bytes y si la pista BCD trae nibble `D`, sin PAN ni track. Si el `=` no deja 4 dígitos, esos 4 son los que siguen al PAN. `PsdkBridge` también loguea `separatorIndex`. Pase en V660P (2026-09-30): `length=12 separatorD=true` y `tags.expiry` vacío. Tests en `mobile/test/msr_card_data_test.dart`. |
 
 
 
 
-| G-P0-07 | Impresión de ticket en térmica (Verifone) | done | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. **2026-08-15:** fix de crash en `SaleStatusScreen` — `ModalRoute.of(context)` se llamaba en `initState()` (prohibido: usa `dependOnInheritedWidgetOfExactType`); se movió la lectura de argumentos y el disparo de impresión a `didChangeDependencies()` con flag `_initialized`. `flutter analyze` OK. Pendiente: verificación física en V660P. |
+| G-P0-07 | Impresión de ticket en térmica (Verifone) | done | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. **2026-08-15:** fix de crash en `SaleStatusScreen` — `ModalRoute.of(context)` se llamaba en `initState()` (prohibido: usa `dependOnInheritedWidgetOfExactType`); se movió la lectura de argumentos y el disparo de impresión a `didChangeDependencies()` con flag `_initialized`. `flutter analyze` OK. Pendiente: verificación física en V660P. **2026-09-28 (VE-12):** el lector suelta el PSDK al terminar la lectura, antes de que `ReceiptPrinter` vuelva a inicializar para el ticket. TC-V-013 y TC-V-018 (impresión tras banda, y tres ventas seguidas) siguen pendientes de prueba en el equipo. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-08-08:** default de `dev-term` → `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (terminal real GOBIERNO del demo; `dev-term` no existe en `terminales` → código 89). Pendiente: lectura runtime desde config del device. |
 | G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
 | G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
@@ -434,7 +554,7 @@ Verifone (banda + térmica).
 | G-P0-12 | Endpoint de detalle de transacción no implementado | open | `GET /v1/transactions/{id}` no existe. Solo hay listado (`GET /v1/transactions`) y creación (`POST /v1/transactions`). La app mobile podría necesitarlo para mostrar detalle desde el historial. Ver hallazgo #9 en `docs/test_cases_index.md`. |
 | G-P0-13 | Tests automatizados del gateway fallan por código 96 | done | **Fix aplicado (2026-08-04):** los tests `test_authorize_http_approved_mock` y `test_authorize_http_declined_mock` ahora fuerzan el `MockIsoProcessor` vía `dependency_overrides` en `payment-gateway/tests/test_authorize_http.py`, haciéndolos deterministas independientemente del `.env` local (`ISO_TRANSPORT=tcp`). `make check` pasa: lint ✓, typecheck ✓, 34 tests ✓, cobertura 98.75% ✓. Ver hallazgo #20 en `docs/test_cases_index.md`. |
 | G-P0-14 | Procesador no setea DE39 (código de respuesta) en varios escenarios | open | El procesador C solo setea `respcode_39` en algunos casos (ej: código 05 para TRANS_DENY). En otros escenarios (monto $100, terminal inválida, tarjeta sin saldo, tarjeta vencida) el DE39 queda vacío. El gateway interpreta DE39 vacío como código 96 (`response_mapper.py` línea 22: `code = (iso.respcode_39 or "").strip() or "96"`). Esto causa que el gateway devuelva `FAILED` en lugar de `DECLINED` con el código correcto. Requiere fix en `auth_thread.c` para asegurar que DE39 siempre tenga un código de respuesta válido. |
-| G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | done | **2026-08-13 (corrección de diagnóstico):** el rechazo por banda magnética en V660p NO era "fondos insuficientes" (51) sino código **14 "Tarjeta inválida"** (`TIT_DES_SUP`). El log `authkig.log` mostraba `TRACK II DATA: 4606300701400740...` (banda) mientras la pantalla leía el PAN correcto `6063007014007403`: el track2 (DE35) de esta terminal trae un PAN distinto al registrado y `getCardNumber()` copiaba los primeros 16 chars del track2 para `entry_mode='022'`, por lo que `valida_usuario_existe()` no encontraba la tarjeta → 14. **Fix en 3 capas:** (1) `getCardNumber()` prefiere DE2 (PAN) cuando viene presente y usa track2 solo si no hay DE2 (`auth_mycli.c`); (2) `WaitingForCardScreen` envía PAN + vencimiento con `entry_mode='022'` y ya no manda track2; (3) **gateway `build_purchase_request` ahora SIEMPRE envía DE2 (PAN) + DE14 y agrega DE35 (track2) solo si viene, en lugar de enviar DE35 EN LUGAR de DE2** (`payment-gateway/infrastructure/iso/message_builder.py`). El punto (3) es el que faltaba: con el APK viejo (que sí manda track2) el gateway descartaba DE2 y el autorizador caía al track2 → 14. Verificado con curl al gateway enviando `track2` (simula APK viejo): `{"status":"APPROVED","response_code":"00",...}` y log con `PRIMARY ACCOUNT NUMBER: 6063007014007403` + `TRACK II DATA: 4606300701400740...` + `RESPONSE CODE: 00` + `FIELD 63: MONTO A PAGAR BENEFICIARIO 400.00` (llegó a `venta_cupon()`). `make check` OK en gateway (55 tests, cobertura 98.96%). Ver hallazgo #21 en `docs/test_cases_index.md`. |
+| G-P0-15 | Flujo completo app → API → gateway → procesador funciona en dispositivo real | partial | **2026-10-05:** se retiró la adaptación del procesador por la discrepancia entre el PAN del tag Verifone y el Track 2. La app usa el PAN/vencimiento leídos para completar el contrato existente; API/gateway emiten el layout manual histórico (`DE22=0012`, DE2/DE14, sin DE35), de modo que `authkig` no cambia. Pendiente: verificar una venta y una consulta de saldo en V660P contra el procesador restaurado. |
 
 | G-P0-17 | App mobile no maneja tokens expirados (401) | done | **Fix aplicado (2026-08-05):** `SalesRepository` y `AuthRepository` detectan 401 y propagan `SessionExpiredException` / `sessionExpired=true`. Los cubits emiten `SalesSessionExpired` / `AuthSessionExpired` y las pantallas (`SaleProcessingScreen`, `SalesHistoryScreen`, `SaleFormScreen`, `ChangePasswordScreen`) hacen logout y redirigen a login limpiando la pila. Ver hallazgo #22 y TC-060 en `docs/test_cases_index.md`. |
 
@@ -449,21 +569,80 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. El endpoint `POST /v1/auth/register` se mantiene para que la empresa pueda registrar usuarios vía Postman. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | partial | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. **Pendiente:** manejar HTTP 202 (ACCEPTED). Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-10-14 (RA-14):** `202 PENDING` queda en curso y se consulta por número de operación; los intervalos vienen de la API, los fallos transitorios no reenvían el `POST` y una venta pendiente del historial se retoma solo con `GET`. **2026-10-14 (RA-15):** `UNDER_REVIEW` tiene pantalla y ticket de verificación propios, detiene el polling, conserva la consulta manual y habilita una venta nueva con clave distinta. **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. Ver TC-069 en `docs/test_cases_index.md`. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
-| G-P1-07 | Fallback silencioso en errores de red de mobile | open | `SalesRepository.fetchProducts()` devuelve productos default hardcodeados ante cualquier excepción. `SalesRepository.fetchHistory()` devuelve lista vacía. Ningún repositorio muestra mensaje de error ni opción de reintentar al usuario. TC-062 y TC-072 esperaban "mensaje de error y opción de reintentar", pero la app usa fallback silencioso. Considerar agregar indicador visual cuando se usan datos fallback. Ver hallazgo #23 en `docs/test_cases_index.md`. |
+| G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
 | G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
-| G-P1-06 | Entry mode ISO acorde al modo de captura | done | **Rama 3 (2026-11-08):** gateway DE22 dinámico (`entry_mode` "012"/"022", DE35 track2 para banda) + API `entry_mode`/`track2` en `CreateTransactionRequest`. `make check` OK en gateway y API. **Rama 4 (2026-11-08):** mobile `registerSale` envía `entry_mode` ("022" banda / "012" manual) y `track2` (si está disponible) en el payload. `WaitingForCardScreen` pasa `entry_mode: '022'` + `track2`; `SaleManualCardScreen` pasa `entry_mode: '012'`. `flutter analyze` OK. **Rama 5 (2026-11-08):** la banda no contiene CVV; la API ahora acepta `cvv` vacío para `entry_mode='022'` (schema `cvv` opcional + validación condicional en `create_transaction.py`). El gateway/procesador no usan CVV. `make check` OK (118 tests, cobertura 95%). |
+| G-P1-06 | Captura de tarjeta y layout ISO | done | **2026-10-05:** se descartó el diseño de `entry_mode`/Track 2 dinámicos porque adaptaba el C legacy al cliente. La banda y el ingreso manual comparten el contrato API de PAN + vencimiento `YYMM`; el CVV queda opcional por compatibilidad y no se reenvía. El gateway siempre arma el formato histórico (`DE22=0012`, DE2/DE14, sin DE35) y el procesador queda sin adaptaciones de captura. |
 
 
 | G-P1-08 | UI mobile de anulación | done | Flujo completo en mobile: botón "ANULAR VENTA" en el detalle (solo ventas aprobadas), reingreso de tarjeta (`VoidCardScreen`), resultado con 4 estados (`VoidResultScreen`), y actualización del historial con el estado real de la API. Ver `mobile/lib/features/history/presentation/screens/` y `mobile/lib/features/sales/data/sales_repository.dart`. |
-| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | open | Fuera del alcance de la anulación de comercio. El procesador soporta `reverso()`; gateway/API no lo exponen. |
-| G-P1-11 | Resultado de venta con texto y código fijos | done | **2026-09-24 (VE-05):** `SaleStatusScreen` muestra `userMessage` en el subtítulo del rechazo y del error de conexión. La fila de un rechazo usa ese texto, o «Rechazada» si no hay mensaje; ya no pinta `51 (Fondos insuficientes)`. **2026-09-24 (VE-04):** `UNKNOWN` (y el timeout del cliente) es `PaymentResult.unknown`: aviso «No pudimos confirmar el cobro», botón «VER OPERACIÓN» y sin `REINTENTAR`. |
-| G-P1-12 | Errores 400/409 de la API no llegan al operador | done | **2026-09-24 (VE-06):** `SalesRepository` lee `user_message` o `message` en el rechazo de venta y de anulación. Si el servidor no manda texto, se mantiene el fallback genérico. Test: `mobile/test/sales_repository_messages_test.dart`. |
-| G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `GATEWAY_RESULT`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migración `20260807_0006`. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). |
+| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias y ejecución contra `authkig` + MySQL locales. **Decisión 2026-10-13:** el `0400` solo se genera para un `0200` previamente enviado y `0410/00` se acepta como confirmación; un `0400` sin original no interviene en el cálculo de saldo, reportes ni cierre. **RA-01:** se agregaron `ReverseCommand`, `ReversalResult`, `IsoProcessor.reverse`, mock, transporte TCP de un solo intento y `build_reversal_request` separado de la anulación. **RA-02:** `POST /v1/reverse` ejecuta un intento y distingue `NOT_SENT` de `INDETERMINATE`. **RA-03 (2026-10-13):** `transactions` persiste datos y outcome de recuperación antes del efecto externo; filas históricas quedan fuera de recuperación automática. **RA-04 (2026-10-13):** migración `20261013_0009`, modelos y repositorios agregan `processor_jobs` y `payment_processing_config`, fila `default`, constraints y validación de transiciones, sin ejecutar aún un worker. **RA-05 (2026-10-13):** la API tipa autorización como `APPROVED`/`DECLINED`/`NOT_SENT`/`INDETERMINATE`, incorpora el puerto y cliente HTTP de `/v1/reverse`, clasifica fallos de transporte/HTTP y conserva contratos separados para balance y anulación. **RA-06 (2026-10-14):** la API toma un snapshot de política, reintenta el mismo `0200` solo tras `NOT_SENT`, conserva STAN, ticket e `Idempotency-Key`, aplica backoff/jitter dentro del presupuesto síncrono y publica `FAILED` únicamente al agotar resultados no enviados. Cada intento queda registrado sin PAN, vencimiento ni clave de idempotencia. **RA-07 (2026-10-14):** un resultado `INDETERMINATE` mantiene la venta en `PENDING` y, antes de responder `202`, persiste atómicamente el resultado, un único job `REVERSE/READY` con STAN de reverso y evento de auditoría. No se llama a `reverse()` durante el request. Un watchdog explícito bloquea pendientes envejecidas sin job y las encola conservadoramente. **RA-08 (2026-10-14):** `GET /v1/transactions/{transaction_number}` queda aislado a la terminal autenticada y proyecta `READY`/`PROCESSING`/`RETRY` como `PENDING / PROCESSING` (polling de 2 s, sin nueva venta) y `MANUAL_REVIEW` como `PENDING / UNDER_REVIEW` (sin polling, nueva venta permitida), sin exponer detalles del job. El `POST` y su replay devuelven la misma proyección; `VOIDED` conserva su contrato de anulación independiente. Evidencia: pruebas de contratos públicos, aislamiento y OpenAPI. **RA-09 (2026-10-14):** `ReversalJobWorker.run_once()` reclama a lo sumo un `REVERSE` vencido con `FOR UPDATE SKIP LOCKED`, confirma el claim antes de red y lo protege con `claim_token`; reconstruye el `0400` desde Postgres, reintenta solo `NOT_SENT` con backoff, confirma `FAILED` tras `REVERSED_CONFIRMED` y pasa rechazo, agotamiento, ambigüedad o datos faltantes a `MANUAL_REVIEW`. **RA-10 (2026-10-14):** el monitor mueve un `PROCESSING` vencido a `MANUAL_REVIEW` y abre una alerta durable única. **RA-11 (2026-10-14):** cada proceso FastAPI puede activar un thread de recuperación con sesión y cliente por vuelta; lifecycle, shutdown con gracia, monitoreo de jobs abandonados y readiness observable quedan cubiertos. La activación queda explícitamente deshabilitada por defecto. **RA-12 (2026-10-14):** casa central consulta temporalmente por SQL de solo lectura, sin rol ni endpoints de API; la resolución auditada y el reintento manual quedan diferidos. **Pendiente:** guardia de cierre (RA-13) y herramienta administrativa de resolución. Última revisión: 2026-10-14. |
+| G-P1-15 | PAN de recuperación persistido en texto plano amplía deuda PCI | open | **RA-03 (2026-10-13):** aceptación de riesgo ya definida en `plan-reversos-automaticos.md`. El PAN y vencimiento se guardan para recuperación durable, pero se excluyen de respuestas, eventos, errores y `repr`; CVV nunca se persiste. Pendiente: cifrado/tokenización a nivel aplicación, política de retención/borrado, controles y auditoría de acceso a DB/backups. |
+| G-P1-16 | Métricas y alertas automáticas de recuperación | open | **RA-16 (2026-10-15):** se difiere la exposición de métricas por estado, antigüedad, intentos y tiempo de resolución. Mientras tanto, operación usa `GET /health/ready`, alertas durables `recovery_alerts` y eventos estructurados sin datos sensibles; ver `docs/runbook-recuperacion-pagos.md`. |
+| G-P1-11 | Resultado de venta con texto y código fijos | done | **2026-09-24 (VE-05):** el rechazo, el fallo técnico y el error de conexión muestran `userMessage` en el subtítulo. La fila de un rechazo usa ese texto, o «Rechazada» si no hay mensaje; ya no pinta `51 (Fondos insuficientes)`. **2026-10-15:** un `status: UNKNOWN` queda en `PaymentResult.failed` y un `PENDING` sigue en curso. El timeout del cliente permanece como error de conexión para reintentar con la misma clave. |
+| G-P1-12 | Errores 400/409 de la API no llegan al operador | done | **2026-09-24 (VE-06):** `apiUserMessage` lee `user_message` y, si no viene, `message`, en la venta y en la anulación. Si el servidor no manda texto, se mantiene el fallback genérico. Test: `mobile/test/sales_repository_messages_test.dart`. |
+| G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `AUTHORIZATION_ATTEMPT`, `GATEWAY_RESULT`, `REVERSAL_ENQUEUED`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migraciones `20260807_0006` y `20261014_0010`; esta última agrega número y outcome de cada intento de autorización sin PAN, vencimiento ni `Idempotency-Key`. **RA-07 (2026-10-14):** el resultado ambiguo y el enqueue del job de reverso quedan auditados antes de responder. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). Última revisión: 2026-10-14. |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
+| G-P1-14 | Consulta de saldo parcial presentada como completa | done | **2026-10-06:** antes la API llamaba los cinco productos en serie y devolvía `APPROVED` con las filas que alcanzaban a responder. Ahora las despacha concurrentemente, espera los resultados terminales del gateway/cliente ISO y devuelve `FAILED` sin saldos si cualquiera tuvo un fallo técnico terminal (`FAILED`, `UNKNOWN` o excepción). El código `06` no es fallo técnico: conserva la fila en `0.00`. Tests en `api/tests/test_check_balance.py`. |
+
+### Actualización G-P1-09 — 2026-10-14
+
+**RA-13:** el cierre normal bloquea, en la misma transacción y con las
+transacciones actuales bloqueadas, cualquier lote con una transacción `PENDING`,
+outcome `INDETERMINATE` o job de reverso `READY`, `PROCESSING`, `RETRY` o
+`MANUAL_REVIEW`. El conflicto no expone datos sensibles e indica esperar la
+finalización o solicitar la futura resolución administrativa. La inserción del
+job queda serializada por el lock de la transacción; las ventas creadas después
+del snapshot no son parte del cierre y permanecen en el lote siguiente.
+
+**Evidencia:** `api/tests/test_transaction_repository.py` verifica el orden de
+lock y consulta, los cuatro estados de job bloqueantes, `PENDING` e
+`INDETERMINATE`, y que una operación confirmada sin job abierto puede cerrar.
+La nota anterior que marcaba RA-13 como pendiente queda reemplazada por esta
+actualización. Pendiente: operación/resolución auditada por casa central.
+
+**RA-14:** la terminal consulta la proyección pública aislada por terminal de
+una autorización `PENDING` por su `transaction_number`. Conserva esa referencia
+y su idempotencia inicial, respeta `poll_after_seconds`, no envía un nuevo
+`0200` durante polling ni ante fallos transitorios, y puede reanudar desde el
+historial tras reinicio. `UNDER_REVIEW` detiene la consulta automática.
+
+**RA-15:** `UNDER_REVIEW` se representa como una verificación, no un rechazo.
+La terminal entrega e imprime un comprobante con la referencia y el PAN siempre
+enmascarado, alerta sobre el posible cobro duplicado, conserva la operación en
+historial para consulta manual y habilita una nueva venta con otra
+`Idempotency-Key`.
+
+**RA-16 (actualizado 2026-10-15):** Readiness se degrada si el loop queda stale; los eventos incluyen
+`transaction_number`, job, estado y código sanitizado. Las pruebas impiden que
+un PAN sintético completo alcance logs, eventos, persistencia operacional o
+respuestas. El procedimiento de alerta durable, revisión manual y lote
+bloqueado está en `docs/runbook-recuperacion-pagos.md`. Pendiente: métricas y
+alertas automáticas de recuperación, más resolución administrativa auditada por
+casa central.
+
+**RA-17 (2026-10-15):** la matriz integral determinista cubre aprobación,
+rechazo, agotamiento `NOT_SENT`, autorización ambigua, reverso confirmado,
+reintento de reverso, respuesta ambigua, crash/timeout con alerta y dos workers
+compitiendo por el mismo job. El procedimiento de
+`docs/rollout-recuperacion-reversos.md` fija los valores iniciales, la
+activación canary, el rollback que sólo detiene nuevos claims y la conciliación
+sin PAN. El gap sigue `partial`: falta ejecutar la activación controlada en los
+ambientes reales y una resolución administrativa autenticada/auditada para
+`MANUAL_REVIEW`.
+
+### Actualización G-P1-15 — 2026-10-14
+
+**RA-16:** continúa abierta la deuda PCI por PAN y vencimiento en texto plano,
+pero ahora existen un detector de fugas con PAN sintético y un procedimiento
+para que operación consulte sólo campos no sensibles. El runbook exige mínimo
+privilegio, revisión de grants, cifrado/custodia de backups, prohibición de
+dumps no autorizados y datos sintéticos fuera de producción. Pendiente aplicar
+los controles en infraestructura, tokenizar/cifrar a nivel aplicación,
+retención/borrado y auditoría efectiva de accesos.
 
 ---
 
@@ -472,15 +651,16 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P2-01 | UX: manual solo como fallback | partial | La opción **Tarjeta** ya navega a `WaitingForCardScreen` (UI de espera). Sigue sin lectura real de banda/chip/NFC (G-P0-06). **Ingreso manual** sigue siendo el único camino que completa el cobro. QR muestra aviso “disponible pronto” (G-P2-03). |
-| G-P2-02 | Track2 en authorize cuando hay swipe | open | Packer puede soportar DE35 en tests; el builder de purchase no envía track desde swipe. |
+| G-P2-02 | Track2 en authorize cuando hay swipe | invalidated | **2026-10-05:** se decidió no transportar Track 2 fuera de la capa de captura. El procesador recibe el layout manual histórico con PAN y vencimiento; ver G-P1-06. |
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-05 | OCR / NFC / iOS | open | Extras del PDF; fuera del MVP Verifone Android. |
 | G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). |
 | G-P2-06 | Branding (logo en cabecera) + barra inferior en pantallas interactivas | done | **2026-11-09 (mockup `mobile/assets/Screen 1.jpg`):** se registró `assets/logo.png` en `pubspec.yaml`. Nuevos widgets `mobile/lib/core/widgets/brand_logo_image.dart` (logo blanco) y `mobile/lib/core/widgets/app_bottom_nav_bar.dart` (barra fija: ← atrás | botón VENTA → `AppRoutes.saleForm` | ⋯ "más" que abre desplegable blanco vía `HeaderMenuButton`). El logo se incorporó a las cabeceras de las **13 screens interactivas con ícono de usuario** (misma línea que el ícono; en `AuthHeader` se parametrizó `showLogo`) y la barra inferior se conectó al `Scaffold` de todas las pantallas interactivas (no está en Login/Registro, por no haber sesión ni barra útil; flecha atrás oculta en Procesando/Resultados). El ⋮ superior de las cabeceras se reemplazó por el "más" inferior y se eliminó `waiting_for_card_bottom_bar.dart` (el "VOLVER" ahora lo da la barra; el pop cancela la lectura MSR en `dispose`). `flutter analyze` OK + test de humo `mobile/test/app_bottom_nav_bar_test.dart`. Alcance actualizado en `docs/alcance.md`. **2026-11-09 (ajuste de menú):** el ⋯ "más" quedó con **Consultar saldo** y **Cerrar Lote** deshabilitados (pendientes de definición con el cliente) + **Historial de ventas**; "Cambiar Contraseña" se movió al menú del ícono de usuario (`UserMenuButton`). **2026-11-09 (ajuste):** el logo se removió de **Login** (`AuthHeader(showLogo: false)`) porque esa pantalla no tiene fila de ícono de usuario y el logo ocupaba una fila extra (desborde vertical); en su lugar, Login muestra `solidaridad_logo.png` centrado (`useSolidaridadLogo: true`) reemplazando el bloque "GAS TERMINAL". Registro conserva el logo. **2026-10-09 (refactor):** el menú "⋯ Más" quedó como UI pura: `MoreMenu` ya no navega (no importa `AppRoutes`), `MoreMenu.show` devuelve `MoreMenuOption?` y la navegación vive en `HeaderMenuButton`; los 3 callbacks propagados (`onClose`/`onBalanceSelected`/`onHistorySelected`) se unificaron en un único `onSelected`. `flutter analyze` OK, `flutter test` OK (24 tests). **2026-09-22 (cierre de lote):** el ítem **Cerrar Lote** del menú quedó **habilitado** y navega a la pantalla de resumen/cierre del lote actual; ver G-P2-10. **2026-09-23:** el subtítulo del ítem pasó a "Resumen del lote actual": la pantalla es informativa y no cierra el lote. |
-| G-P2-07 | Decimales de cantidad según la unidad del producto y mensaje del DE39 `13` (VE-09) | done | **2026-09-25:** el formulario usa `unit` del catálogo (`unidad` entero, `m3` hasta 2 decimales). `CreateTransaction` rechaza una cantidad no entera en garrafas y tubos. `response_messages.py` y `response_mapper.py` traducen el DE39 `13` a «Monto inválido». |
-| G-P2-09 | Resultado de venta sin datos y ciclo del PSDK entre lectura e impresión | partial | **2026-09-28 (VE-11):** `SaleStatusScreen` sin `OperationModel` ya no se dibuja como «¡Transacción Aprobada!»: avisa que faltan datos y vuelve atrás (`Navigator.maybePop`), igual que `sale_detail_screen.dart`. Test `mobile/test/sale_status_screen_test.dart`. **Pendiente (VE-12):** la pantalla de espera de banda sigue viva tras el `push` y su `dispose` llama `cancel()`/`tearDown` sin `await`, con riesgo de tumbar la impresión que usa el mismo SDK. |
-| G-P2-10 | Cierre de lote real contra el procesador (hoy la pantalla sólo muestra el resumen) | open | **2026-09-23:** mobile ya muestra el resumen del lote actual leyendo `GET /v1/transactions`, pero **no cierra nada**: se retiró el cierre local que tenía el prototipo completo (diálogo de confirmación, `closeBatch()`, la pantalla de resultado `batch_close_status_*` y la ruta `batchCloseStatus`), el botón CERRAR LOTE queda inerte y el Nº de lote es una constante provisoria de la app (`BatchCloseCubit.provisionalBatchNumber`). **Falta el contrato real:** (1) la API no expone lote/cierre — `api/persistence/models/transaction.py` no tiene `lote`, `id_cierre` ni `marca_cierre` (esos campos existen solo en la base del procesador, `payment_processor/docker/mysql/01_schema.sql`) y no hay `POST /v1/batch/close`; (2) el gateway no implementa MTI `0500` (solo `0100`, `0200`/`0210` y reverso `0400`): `payment-gateway/infrastructure/iso/**`; (3) el procesador responde `00` ante un cierre con diferencia detectada (BN-12) y `00`/`19` según marca ante fallo (`payment_processor/legacy/bin/auth_thread.c:295-311`), así que un cierre descuadrado se reportaría como exitoso. **Datos del mockup sin fuente:** el **total en pesos** no es calculable porque `amount` es cantidad y no importe (decisión abierta **D-3** en `docs/errores-ventas.md`; el precio por kg solo existe en MySQL del procesador, `precio_kg_gas`), por eso la pantalla muestra el total en **kg**; el **peso por producto** (10/15/30/45 kg) está hardcodeado en `mobile/lib/features/batch_close/domain/batch_close_model.dart` (`batchKgPerUnit`) porque `packages/catalog` solo expone `label`/`unit` (y `GRANEL` es m³, que el mockup muestra como kg). **2026-09-23:** queda pendiente confirmar el endpoint del backend que expone el peso: hoy no existe — `GET /v1/products` devuelve `code`/`label`/`unit` sin peso, y el valor real vive en el MySQL del procesador (`sgas_productos.kgas_carga`), sin HTTP en este repo; el **Nº de lote** es provisorio (constante de la app) hasta que la API o el procesador lo expongan. **Además:** falta el ticket de cierre (el `ReceiptPrinter` actual imprime ventas de a una). **Se numera G-P2-10** (y no G-P2-07) para no colisionar con el trabajo pendiente de otros gaps. **2026-09-23 (paginación):** el resumen pagina `GET /v1/transactions` con `limit`/`offset` sobre una lista ordenada por `created_at DESC`; si entra una venta entre dos páginas la API puede repetir un ítem ya cargado, así que el repositorio **deduplica por Nº de operación** (`seenIds` en `mobile/lib/features/batch_close/data/batch_close_repository.dart`). **Pendiente de backend (fuera de este PR):** desempate `ORDER BY created_at DESC, id DESC` y, cuando exista el contrato de cierre, un agregado del lado del servidor (keyset/cursor o `GET /v1/batch/...`) que elimine la paginación del cliente. **2026-09-23 (precisión):** las cantidades y los kg se muestran con la precisión necesaria (hasta 2 decimales y sin ceros finales, `formatQuantityEsExact` en `mobile/lib/core/formatters/quantity_formatter.dart`), alineado con `AMOUNT_EXPONENT = 2` de `api/domain/money.py`; antes se redondeaba a entero (37,5 kg se veía como 38 kg y 5,5 unidades como 6). Mantener esta precisión cuando el agregado del backend devuelva los kg. Evidencia: `mobile/lib/features/batch_close/**`; tests `mobile/test/batch_close_{summary,repository,content}_test.dart` y `mobile/test/quantity_formatter_test.dart` (`flutter analyze` sin issues y `flutter test` OK: 53 tests). |
+| G-P2-07 | Tope de DE4 y decimales de cantidad según la unidad (VE-08 / VE-09) | done | **2026-09-24 (VE-08):** tope único `9.999.999.999,99` (`MAX_AMOUNT_MINOR`) en `api/domain/money.py`, `payment-gateway/domain/amount.py` (esquema + authorize/void) y `AmountInputFormatter`. `pack_iso` valida la longitud fija de los campos ISO antes de armar la trama. **2026-09-25 (VE-09):** el formulario usa `unit` del catálogo (`unidad` entero, `m3` hasta 2 decimales). `CreateTransaction` rechaza una cantidad no entera en garrafas y tubos. `response_messages.py` y `response_mapper.py` traducen el DE39 `13` a «Monto inválido». |
+| G-P2-09 | Resultado de venta sin datos y ciclo del PSDK entre lectura e impresión | done | **2026-09-28 (VE-11):** `SaleStatusScreen` sin `OperationModel` ya no se dibuja como «¡Transacción Aprobada!»: avisa que faltan datos y vuelve atrás (`Navigator.maybePop`), igual que `sale_detail_screen.dart`. Test `mobile/test/sale_status_screen_test.dart`. **2026-09-28 (VE-12):** `readCard` libera el PSDK (`cancelReadMsr` → `tearDown`) antes de devolver el resultado, y el `dispose` de la pantalla de espera solo aborta una lectura todavía en curso. Ver G-P0-06 y G-P0-07. |
+| G-P2-10 | Cierre administrativo de lote y comprobante impreso | partial | **2026-10-06:** se decidió no integrar el cierre ISO `0500` ni modificar `payment_processor/legacy/`: para Solidaridad el lote es un corte administrativo, no una secuencia financiera rotativa. La migración `20261006_0007_administrative_batch_closes.py` crea `batch_closes`; `transactions.batch_close_id IS NULL` define el lote actual. `POST /v1/transactions/batch-close` se asocia al usuario y la terminal del token, exige `Idempotency-Key`, bloquea las filas actuales, rechaza pagos `PENDING`/`UNKNOWN`, crea el corte y devuelve las operaciones incluidas. `GET /v1/transactions` ahora devuelve sólo ese lote actual y `VoidTransaction` rechaza transacciones con `batch_close_id`, por lo que una venta cerrada no se anula desde la terminal. Flutter confirma el corte, conserva la misma clave para reintentos ambiguos y recibe el listado para conectarlo a impresión futura; ya no aplica un corte por día. El identificador visible es `ACTUAL`; el identificador durable del corte es `batch_close_id`, no el número fijo del procesador. **Pendiente:** ticket de cierre con `ReceiptPrinter`, consulta de cortes históricos/exportación y peso por producto desde backend. El total sigue en kg porque `amount` es cantidad y no hay precio público (D-3 de `docs/errores-ventas.md`); `batchKgPerUnit` sigue local. El cierre forzado legacy queda como antecedente operativo, pero no participa de este flujo. Evidencia: `api/{application/payments/close_batch.py,persistence/models/batch_close.py,persistence/repositories/transaction_repository.py}` y `mobile/lib/features/batch_close/**`; `make -C api check` OK (146 tests, cobertura 93%). |
+| G-P2-11 | Índices históricos de API ausentes de metadata ORM | open | **Detectado 2026-10-13 durante RA-04:** `alembic check` propone eliminar `ix_transaction_status_events_created_at`, `ix_transaction_status_events_transaction_id_created_at` e `ix_transactions_user_created_at` porque existen por migraciones previas pero no están declarados en los modelos SQLAlchemy. No afecta runtime ni el gate actual, pero vuelve riesgosa una futura autogeneración. El índice nuevo `ix_processor_jobs_available` sí quedó alineado entre migración y metadata. |
 
 ---
 
@@ -511,6 +691,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | ProductSelector con catálogo del backend | `ProductSelector` widget consume `GET /v1/products` y muestra productos de gas (GARRAFA_10, etc.) en vez de ARS/USD. Payload de venta envía `product`. |
 | Token de venta enlazado a sesión real | `sendIsoMessage()`, `fetchProducts()` y `loadHistory()` usan el token JWT desde `AuthCubit`. Ver `mobile/lib/features/sales/presentation/cubit/sales_cubit.dart`, `mobile/lib/features/sales/presentation/screens/sale_review_screen.dart`, `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart`. |
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
+| Aviso al fallar la carga de productos o historial | `DataLoadException` en lugar del catálogo fijo o del historial vacío. Aviso con REINTENTAR en el formulario y en el historial; la paginación no borra lo ya cargado. Cantidad con la unidad del catálogo. Ver G-P1-07. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
 | UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo navega al flujo de saldo, Cerrar Lote deshabilitado + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 

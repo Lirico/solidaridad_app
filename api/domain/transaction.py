@@ -1,8 +1,9 @@
 """Payment transaction entity."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
+from domain.authorization_outcome import AuthorizationOutcome
 from domain.product import Product
 from domain.transaction_status import TransactionStatus
 
@@ -30,3 +31,8 @@ class Transaction:
     updated_at: datetime
     processor_ticket: str | None = None
     void_idempotency_key: str | None = None
+    batch_close_id: int | None = None
+    card_number: str | None = field(default=None, repr=False)
+    expiration_date: str | None = field(default=None, repr=False)
+    authorization_outcome: AuthorizationOutcome | None = None
+    authorization_attempt_count: int = 0

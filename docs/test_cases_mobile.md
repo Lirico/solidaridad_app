@@ -104,18 +104,17 @@ Puente Verifone PaymentSDK portado del POC al `mobile/` (ver `docs/psdk-bridge-p
 
 ---
 
-## Módulo: Rama 4 — `entry_mode` en mobile (registerSale)
+## Módulo: Captura de tarjeta en mobile
 
-La app mobile ahora envía `entry_mode` ("022" banda / "012" manual) y `track2`
-(si está disponible) al registrar la venta. Ver `docs/rama3-entry-mode.md` y
-`docs/gaps.md` (G-P0-06 y G-P1-06 → `done`).
+La banda completa el mismo formulario funcional que la carga manual: PAN y
+vencimiento `YYMM`. La app no envía `entry_mode` ni Track 2. Ver
+[`entry-mode.md`](entry-mode.md) y `docs/gaps.md` (G-P0-06 y G-P1-06).
 
 | Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
 |-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
-| 111 | Rama 4 | Lectura por banda → `entry_mode` "022" | Pasar tarjeta por MSR en `WaitingForCardScreen` | `showReview` recibe `entryMode: '022'` y `track2` (de `tags['track2']` o `msr['track2']`) | No probado | Pendiente | Verificar en `sale_waiting_for_card_screen.dart`. La banda NO contiene CVV (se envía vacío). |
-| 112 | Rama 4 | Ingreso manual → `entry_mode` "012" | Completar formulario manual en `SaleManualCardScreen` | `showReview` recibe `entryMode: '012'` y sin `track2` | No probado | Pendiente | Verificar en `sale_manual_card_screen.dart`. |
-| 113 | Rama 4 | `registerSale` envía `entry_mode` en payload | Confirmar venta en `SaleReviewScreen` | `POST /v1/transactions` incluye `entry_mode` ("022" o "012") en el body | No probado | Pendiente | Verificar en `sales_repository.dart` (`bodyPayload['entry_mode']`). |
-| 114 | Rama 4 | `registerSale` envía `track2` solo si está disponible | Venta por banda con `track2` presente | `POST /v1/transactions` incluye `track2` en el body | No probado | Pendiente | Verificar en `sales_repository.dart`: `track2` solo se agrega si no es null/vacío. |
+| 111 | Captura | Lectura por banda normaliza vencimiento | Pasar tarjeta por MSR en `WaitingForCardScreen` | `showReview` recibe PAN y vencimiento `YYMM`; no conserva la pista. | No probado | Pendiente | Verificar en `sale_waiting_for_card_screen.dart`. La banda no contiene CVV. |
+| 112 | Captura | Ingreso manual normaliza vencimiento | Completar formulario manual en `SaleManualCardScreen` | `showReview` recibe PAN y convierte `MM/YY` a `YYMM`. | No probado | Pendiente | Verificar en `sale_manual_card_screen.dart`. |
+| 113 | Captura | `registerSale` usa contrato reducido | Confirmar venta en `SaleReviewScreen` | `POST /v1/transactions` incluye PAN y vencimiento; no incluye modo de captura ni pista. | No probado | Pendiente | Verificar en `sales_repository.dart`. |
 
 ---
 
@@ -127,7 +126,6 @@ La app mobile ahora envía `entry_mode` ("022" banda / "012" manual) y `track2`
 | Mobile | 33 | 20 | 1 | 0 | 2 | 10 |
 | POC Verifone | 7 | 7 | 0 | 0 | 0 | 0 |
 | Bridge PSDK (Rama 1) | 18 | 1 | 0 | 0 | 0 | 17 |
-| Rama 4 (entry_mode) | 4 | 0 | 0 | 0 | 0 | 4 |
+| Captura de tarjeta | 3 | 0 | 0 | 0 | 0 | 3 |
 | **Total** | **62** | **28** | **1** | **0** | **2** | **31** |
-
 

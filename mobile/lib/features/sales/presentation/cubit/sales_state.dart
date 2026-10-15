@@ -9,8 +9,6 @@ sealed class SalesState {
   final String cardNumber;
   final String cvv;
   final String expirationDate;
-  final String entryMode;
-  final String? track2;
   final List<OperationModel> history;
 
   /// Identificador de la operación. Se genera al abrir la revisión y se
@@ -24,8 +22,6 @@ sealed class SalesState {
     required this.cardNumber,
     required this.cvv,
     required this.expirationDate,
-    this.entryMode = '012',
-    this.track2,
     required this.history,
     this.idempotencyKey = '',
   });
@@ -76,8 +72,6 @@ class SalesReviewing extends SalesState {
     required super.cardNumber,
     required super.cvv,
     required super.expirationDate,
-    super.entryMode,
-    super.track2,
     required super.history,
     super.idempotencyKey,
   });
@@ -91,10 +85,36 @@ class SalesProcessing extends SalesState {
     required super.cardNumber,
     required super.cvv,
     required super.expirationDate,
-    super.entryMode,
-    super.track2,
     required super.history,
     super.idempotencyKey,
+  });
+}
+
+/// Una autorización ya fue aceptada por la API, pero aún no tiene un resultado
+/// final. Mientras este estado esté activo no se puede enviar otro `0200`.
+class SalesAwaitingAuthorization extends SalesState {
+  final String operationNumber;
+  final PendingSaleReason? pendingReason;
+  final int? pollAfterSeconds;
+  final bool mayStartNewSale;
+  final String message;
+  final bool pollingStopped;
+
+  const SalesAwaitingAuthorization({
+    required super.productCode,
+    required super.productLabel,
+    required super.amount,
+    required super.cardNumber,
+    required super.cvv,
+    required super.expirationDate,
+    required super.history,
+    required super.idempotencyKey,
+    required this.operationNumber,
+    required this.pendingReason,
+    required this.pollAfterSeconds,
+    required this.mayStartNewSale,
+    required this.message,
+    this.pollingStopped = false,
   });
 }
 
@@ -111,8 +131,6 @@ class SalesCompleted extends SalesState {
     required super.cardNumber,
     required super.cvv,
     required super.expirationDate,
-    super.entryMode,
-    super.track2,
     required super.history,
     super.idempotencyKey,
     required this.result,
@@ -133,6 +151,22 @@ class SalesInitialWithHistory extends SalesState {
         cardNumber: '',
         cvv: '',
         expirationDate: '',
+      );
+}
+
+/// La primera página del historial no se pudo cargar.
+class SalesHistoryLoadFailed extends SalesState {
+  final String message;
+
+  const SalesHistoryLoadFailed({required this.message})
+    : super(
+        productCode: '',
+        productLabel: '',
+        amount: 0.0,
+        cardNumber: '',
+        cvv: '',
+        expirationDate: '',
+        history: const [],
       );
 }
 

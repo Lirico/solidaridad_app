@@ -119,7 +119,6 @@ Future<void> _pumpScreen(
   when(
     () => repository.loadOperations(
       token: any(named: 'token'),
-      now: any(named: 'now'),
     ),
   ).thenAnswer(
     (_) async => BatchCloseLoadResult(
@@ -276,27 +275,21 @@ void main() {
     await _pumpScreen(tester, MockBatchCloseRepository());
 
     expect(find.text('Lote Actual'), findsOneWidget);
-    expect(find.text('000001'), findsOneWidget);
+    expect(find.text('ACTUAL'), findsOneWidget);
     expect(find.text('Garrafa 10 kg'), findsOneWidget);
     expect(find.text('CERRAR LOTE'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('CERRAR LOTE no cierra ni navega (botón inerte)', (tester) async {
+  testWidgets('CERRAR LOTE pide confirmación antes de cerrar', (tester) async {
     await _pumpScreen(tester, MockBatchCloseRepository());
 
     await tester.tap(find.text('CERRAR LOTE'));
     await tester.pumpAndSettle();
 
-    // Sin contrato de cierre no hay diálogo, ni comprobante, ni navegación.
-    expect(find.text('Cerrar lote'), findsNothing);
-    expect(find.text('CONFIRMAR'), findsNothing);
-    expect(find.text('Resultado del Cierre'), findsNothing);
-    expect(find.text('¡Lote Cerrado!'), findsNothing);
-
-    // La pantalla sigue mostrando el resumen del lote actual.
-    expect(find.text('Lote Actual'), findsOneWidget);
-    expect(find.text('000001'), findsOneWidget);
+    expect(find.text('Cerrar lote'), findsOneWidget);
+    expect(find.text('CONFIRMAR'), findsOneWidget);
+    expect(find.text('CANCELAR'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

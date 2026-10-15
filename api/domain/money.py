@@ -6,6 +6,9 @@ from decimal import Decimal, InvalidOperation
 from domain.exceptions import InvalidAmount
 
 AMOUNT_EXPONENT = 2
+# DE4 is 12 BCD digits with 2 implied decimals (9_999_999_999.99).
+MAX_AMOUNT_MINOR = 999_999_999_999
+MAX_AMOUNT_TEXT = "9999999999.99"
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,4 +33,6 @@ def parse_amount(value: str) -> Money:
     amount_minor = int(amount * (10**AMOUNT_EXPONENT))
     if amount_minor <= 0:
         raise InvalidAmount()
+    if amount_minor > MAX_AMOUNT_MINOR:
+        raise InvalidAmount("La cantidad supera el máximo permitido")
     return Money(amount_minor=amount_minor)

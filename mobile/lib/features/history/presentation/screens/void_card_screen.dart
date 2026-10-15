@@ -45,7 +45,10 @@ class _VoidCardScreenState extends State<VoidCardScreen> {
     if (user == null) return;
 
     final cardNumber = _cardNumberController.text;
-    final expiration = _expiryController.text.replaceAll('/', '');
+    final enteredExpiry = _expiryController.text.replaceAll('/', '');
+    final expiration = enteredExpiry.length == 4
+        ? '${enteredExpiry.substring(2)}${enteredExpiry.substring(0, 2)}'
+        : enteredExpiry;
 
     final voidResult = await context.read<SalesCubit>().voidSale(
       token: user.token,

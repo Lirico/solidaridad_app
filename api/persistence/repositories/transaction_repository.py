@@ -2,9 +2,12 @@
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
+from domain.authorization_outcome import AuthorizationOutcome
+from domain.batch_close import BatchClose
+from domain.processor_job import ProcessorJobState, ProcessorOperationType
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -12,6 +15,8 @@ from domain.transaction_status_event import (
     TransactionStatusActorType,
     TransactionStatusEventType,
 )
+from persistence.models.batch_close import BatchClose as BatchCloseModel
+from persistence.models.processor_job import ProcessorJob as ProcessorJobModel
 from persistence.models.transaction import Transaction as TransactionModel
 from persistence.models.transaction import TransactionNumberCounter
 from persistence.models.transaction_status_event import TransactionStatusEvent
@@ -34,6 +39,14 @@ def _to_domain(row: TransactionModel) -> Transaction:
         amount_minor=row.amount_minor,
         status=TransactionStatus(row.status),
         card_last4=row.card_last4,
+        card_number=row.card_number,
+        expiration_date=row.expiration_date,
+        authorization_outcome=(
+            AuthorizationOutcome(row.authorization_outcome)
+            if row.authorization_outcome is not None
+            else None
+        ),
+        authorization_attempt_count=row.authorization_attempt_count,
         stan=row.stan,
         auth_id=row.auth_id,
         retrieval_reference=row.retrieval_reference,
@@ -45,6 +58,18 @@ def _to_domain(row: TransactionModel) -> Transaction:
         updated_at=row.updated_at,
         processor_ticket=row.processor_ticket,
         void_idempotency_key=row.void_idempotency_key,
+        batch_close_id=row.batch_close_id,
+    )
+
+
+def _to_batch_close(row: BatchCloseModel) -> BatchClose:
+    return BatchClose(
+        id=row.id,
+        installation_id=row.installation_id,
+        terminal_id=row.terminal_id,
+        closed_by_user_id=row.closed_by_user_id,
+        idempotency_key=row.idempotency_key,
+        closed_at=row.closed_at,
     )
 
 
@@ -62,6 +87,8 @@ class TransactionRepository:
         actor_type: TransactionStatusActorType,
         actor_user_id: int | None = None,
         processor_response_code: str | None = None,
+        authorization_outcome: AuthorizationOutcome | None = None,
+        attempt_number: int | None = None,
         user_message: str | None = None,
         idempotency_key: str | None = None,
     ) -> None:
@@ -74,6 +101,12 @@ class TransactionRepository:
                 actor_type=actor_type.value,
                 actor_user_id=actor_user_id,
                 processor_response_code=processor_response_code,
+                authorization_outcome=(
+                    authorization_outcome.value
+                    if authorization_outcome is not None
+                    else None
+                ),
+                attempt_number=attempt_number,
                 user_message=user_message,
                 idempotency_key=idempotency_key,
                 created_at=datetime.now(UTC),
@@ -95,6 +128,56 @@ class TransactionRepository:
             return None
         return _to_domain(row)
 
+    def get_by_id(self, *, transaction_id: int) -> Transaction | None:
+        row = self._session.get(TransactionModel, transaction_id)
+        return _to_domain(row) if row is not None else None
+
+    def get_by_id_for_update(self, *, transaction_id: int) -> Transaction:
+        """Lock one transaction before attaching recovery work to it."""
+        row = self._session.scalar(
+            select(TransactionModel)
+            .where(TransactionModel.id == transaction_id)
+            .with_for_update()
+        )
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        return _to_domain(row)
+
+    def start_authorization_retry(self, *, transaction_id: int) -> int:
+        """Persist the next attempt number before its external effect."""
+        row = self._session.get(TransactionModel, transaction_id)
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        row.authorization_attempt_count += 1
+        row.updated_at = datetime.now(UTC)
+        self._session.flush()
+        return row.authorization_attempt_count
+
+    def record_authorization_attempt(
+        self,
+        *,
+        transaction_id: int,
+        attempt_number: int,
+        outcome: AuthorizationOutcome,
+        processor_response_code: str | None = None,
+    ) -> None:
+        """Append a sanitized outcome for one authorization attempt."""
+        row = self._session.get(TransactionModel, transaction_id)
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        self._append_status_event(
+            transaction_id=row.id,
+            from_status=row.status,
+            to_status=row.status,
+            event_type=TransactionStatusEventType.AUTHORIZATION_ATTEMPT,
+            actor_type=TransactionStatusActorType.SYSTEM,
+            actor_user_id=row.user_id,
+            processor_response_code=processor_response_code,
+            authorization_outcome=outcome,
+            attempt_number=attempt_number,
+        )
+        self._session.flush()
+
     def get_by_transaction_number(
         self,
         *,
@@ -109,6 +192,39 @@ class TransactionRepository:
         if row is None:
             return None
         return _to_domain(row)
+
+    def list_stale_pending_without_reverse_job(
+        self,
+        *,
+        created_before: datetime,
+    ) -> list[Transaction]:
+        """Lock recoverable pending payments stranded before classification.
+
+        A row is selected only when no reversal job exists.  The row lock makes
+        the subsequent status update and job insert safe against a concurrent
+        request or watchdog instance.
+        """
+        reverse_job_exists = exists(
+            select(ProcessorJobModel.id).where(
+                ProcessorJobModel.transaction_id == TransactionModel.id,
+                ProcessorJobModel.operation_type
+                == ProcessorOperationType.REVERSE.value,
+            )
+        )
+        stmt = (
+            select(TransactionModel)
+            .where(
+                TransactionModel.status == TransactionStatus.PENDING.value,
+                TransactionModel.authorization_outcome
+                == AuthorizationOutcome.PENDING.value,
+                TransactionModel.created_at <= created_before,
+                TransactionModel.stan.is_not(None),
+                TransactionModel.processor_ticket.is_not(None),
+                ~reverse_job_exists,
+            )
+            .with_for_update(skip_locked=True)
+        )
+        return [_to_domain(row) for row in self._session.scalars(stmt).all()]
 
     def next_transaction_number(self, business_date: date) -> str:
         """Atomically allocate OP-YYMMDD-NNNNNNNN for the business date.
@@ -147,6 +263,8 @@ class TransactionRepository:
         processor_product_code: str,
         amount_minor: int,
         card_last4: str,
+        card_number: str,
+        expiration_date: str | None,
         stan: str,
         processor_ticket: str,
         idempotency_key: str,
@@ -164,6 +282,10 @@ class TransactionRepository:
             amount_minor=amount_minor,
             status=TransactionStatus.PENDING.value,
             card_last4=card_last4,
+            card_number=card_number,
+            expiration_date=expiration_date,
+            authorization_outcome=AuthorizationOutcome.PENDING.value,
+            authorization_attempt_count=1,
             stan=stan,
             processor_ticket=processor_ticket,
             user_message=user_message,
@@ -197,8 +319,11 @@ class TransactionRepository:
         """Return transactions for a terminal, newest first, plus total count."""
         stmt = (
             select(TransactionModel)
-            .where(TransactionModel.terminal_id == terminal_id)
-            .order_by(TransactionModel.created_at.desc())
+            .where(
+                TransactionModel.terminal_id == terminal_id,
+                TransactionModel.batch_close_id.is_(None),
+            )
+            .order_by(TransactionModel.created_at.desc(), TransactionModel.id.desc())
             .limit(limit)
             .offset(offset)
         )
@@ -206,16 +331,132 @@ class TransactionRepository:
 
         count_stmt = select(func.count()).select_from(TransactionModel).where(
             TransactionModel.terminal_id == terminal_id,
+            TransactionModel.batch_close_id.is_(None),
         )
         total = self._session.scalar(count_stmt) or 0
 
         return [_to_domain(r) for r in rows], total
+
+    def close_current_batch(
+        self,
+        *,
+        terminal_id: str,
+        closed_by_user_id: int,
+        idempotency_key: str,
+    ) -> tuple[BatchClose, list[Transaction]] | str | None:
+        """Atomically move the terminal's current operations into a close.
+
+        New operations inserted after this locked snapshot stay in the next
+        current batch. Pending or ambiguous processor outcomes block the close
+        so a later approval cannot alter an already printed summary.
+        """
+        existing = self._session.scalar(
+            select(BatchCloseModel).where(
+                BatchCloseModel.terminal_id == terminal_id,
+                BatchCloseModel.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is not None:
+            rows = list(
+                self._session.scalars(
+                    select(TransactionModel)
+                    .where(TransactionModel.batch_close_id == existing.id)
+                    .order_by(
+                        TransactionModel.created_at.asc(),
+                        TransactionModel.id.asc(),
+                    )
+                ).all()
+            )
+            return _to_batch_close(existing), [_to_domain(row) for row in rows]
+
+        current = list(
+            self._session.scalars(
+                select(TransactionModel)
+                .where(
+                    TransactionModel.terminal_id == terminal_id,
+                    TransactionModel.batch_close_id.is_(None),
+                )
+                .order_by(TransactionModel.created_at.asc(), TransactionModel.id.asc())
+                .with_for_update()
+            ).all()
+        )
+        if not current:
+            return None
+
+        if any(
+            row.status
+            in {TransactionStatus.PENDING.value, TransactionStatus.UNKNOWN.value}
+            or row.authorization_outcome == AuthorizationOutcome.INDETERMINATE.value
+            for row in current
+        ):
+            return "in_flight"
+
+        # The transaction-row locks above serialize this check with recovery-job
+        # creation: an insert referencing a current transaction needs a
+        # conflicting key-share lock.  Do not lock jobs here, because a worker
+        # finalizes a job before updating its transaction and that lock order
+        # would permit a deadlock.  Seeing a job complete after this query only
+        # rejects this close conservatively; it never closes an open recovery.
+        open_recovery_job = self._session.scalar(
+            select(ProcessorJobModel.id)
+            .where(
+                ProcessorJobModel.transaction_id.in_([row.id for row in current]),
+                ProcessorJobModel.operation_type
+                == ProcessorOperationType.REVERSE.value,
+                ProcessorJobModel.state.in_(
+                    (
+                        ProcessorJobState.READY.value,
+                        ProcessorJobState.PROCESSING.value,
+                        ProcessorJobState.RETRY.value,
+                        ProcessorJobState.MANUAL_REVIEW.value,
+                    )
+                ),
+            )
+            .limit(1)
+        )
+        if open_recovery_job is not None:
+            return "in_flight"
+
+        installation_id = current[0].installation_id
+        existing = self._session.scalar(
+            select(BatchCloseModel).where(
+                BatchCloseModel.installation_id == installation_id,
+                BatchCloseModel.idempotency_key == idempotency_key,
+            )
+        )
+        if existing is not None:
+            rows = list(
+                self._session.scalars(
+                    select(TransactionModel)
+                    .where(TransactionModel.batch_close_id == existing.id)
+                    .order_by(
+                        TransactionModel.created_at.asc(),
+                        TransactionModel.id.asc(),
+                    )
+                ).all()
+            )
+            return _to_batch_close(existing), [_to_domain(row) for row in rows]
+
+        close = BatchCloseModel(
+            installation_id=installation_id,
+            terminal_id=terminal_id,
+            closed_by_user_id=closed_by_user_id,
+            idempotency_key=idempotency_key,
+            closed_at=datetime.now(UTC),
+        )
+        self._session.add(close)
+        self._session.flush()
+        for row in current:
+            row.batch_close_id = close.id
+        self._session.flush()
+        return _to_batch_close(close), [_to_domain(row) for row in current]
 
     def update_result(
         self,
         *,
         transaction_id: int,
         status: TransactionStatus,
+        authorization_outcome: AuthorizationOutcome,
         user_message: str,
         processor_response_code: str | None = None,
         auth_id: str | None = None,
@@ -226,6 +467,7 @@ class TransactionRepository:
             raise LookupError(f"transaction {transaction_id} not found")
         from_status = row.status
         row.status = status.value
+        row.authorization_outcome = authorization_outcome.value
         row.user_message = user_message
         row.processor_response_code = processor_response_code
         row.auth_id = auth_id
@@ -239,11 +481,30 @@ class TransactionRepository:
             actor_type=TransactionStatusActorType.SYSTEM,
             actor_user_id=row.user_id,
             processor_response_code=processor_response_code,
+            authorization_outcome=authorization_outcome,
             user_message=user_message,
             idempotency_key=row.idempotency_key,
         )
         self._session.flush()
         return _to_domain(row)
+
+    def record_reversal_enqueued(self, *, transaction_id: int) -> None:
+        """Audit creation of the durable compensation work item."""
+        row = self._session.get(TransactionModel, transaction_id)
+        if row is None:
+            raise LookupError(f"transaction {transaction_id} not found")
+        self._append_status_event(
+            transaction_id=row.id,
+            from_status=row.status,
+            to_status=row.status,
+            event_type=TransactionStatusEventType.REVERSAL_ENQUEUED,
+            actor_type=TransactionStatusActorType.SYSTEM,
+            actor_user_id=row.user_id,
+            authorization_outcome=AuthorizationOutcome.INDETERMINATE,
+            user_message=row.user_message,
+            idempotency_key=row.idempotency_key,
+        )
+        self._session.flush()
 
     def apply_void_result(
         self,

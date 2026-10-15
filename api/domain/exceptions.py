@@ -72,13 +72,6 @@ class InvalidCvv(DomainError):
         super().__init__(message)
 
 
-class InvalidEntryMode(DomainError):
-    """Raised when entry_mode is not "012"/"022" or is inconsistent with track2."""
-
-    def __init__(self, message: str = "Modo de entrada inválido") -> None:
-        super().__init__(message)
-
-
 class MissingIdempotencyKey(DomainError):
     """Raised when Idempotency-Key header is absent."""
 
@@ -122,6 +115,36 @@ class TransactionNotVoidable(DomainError):
     def __init__(
         self,
         message: str = "Solo se pueden anular transacciones aprobadas",
+    ) -> None:
+        super().__init__(message)
+
+
+class TransactionBatchClosed(DomainError):
+    """Raised when an operation belongs to an administrative close."""
+
+    def __init__(
+        self,
+        message: str = "No se pueden anular transacciones de un lote cerrado",
+    ) -> None:
+        super().__init__(message)
+
+
+class BatchIsEmpty(DomainError):
+    """Raised when there is no current terminal activity to close."""
+
+    def __init__(self, message: str = "No hay transacciones para cerrar") -> None:
+        super().__init__(message)
+
+
+class BatchCloseHasInFlightTransactions(DomainError):
+    """Raised when payment processing has not reached a final state."""
+
+    def __init__(
+        self,
+        message: str = (
+            "No se puede cerrar el lote: hay recuperaciones pendientes. "
+            "Espere a que finalicen o solicite una resolución administrativa"
+        ),
     ) -> None:
         super().__init__(message)
 

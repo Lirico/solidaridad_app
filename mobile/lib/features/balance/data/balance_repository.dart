@@ -19,20 +19,14 @@ class BalanceRepository {
     required String token,
     required String cardNumber,
     required String expirationDate,
-    String entryMode = '012',
-    String? track2,
   }) async {
     final url = Uri.parse('$_baseUrl/balance');
 
     final Map<String, dynamic> bodyPayload = {
       'card_number': cardNumber.replaceAll(' ', ''),
-      'entry_mode': entryMode,
     };
     if (expirationDate.isNotEmpty) {
       bodyPayload['expiration_date'] = expirationDate;
-    }
-    if (track2 != null && track2.isNotEmpty) {
-      bodyPayload['track2'] = track2;
     }
 
     try {

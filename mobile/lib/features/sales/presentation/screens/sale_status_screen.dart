@@ -40,8 +40,10 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is OperationModel) {
       _operation = args;
-      // Impresión automática al aprobar la venta.
-      if (args.result == PaymentResult.approved) {
+      // El comercio recibe un comprobante tanto de una aprobación como de una
+      // verificación manual; el segundo nunca afirma un resultado financiero.
+      if (args.result == PaymentResult.approved ||
+          args.result == PaymentResult.underReview) {
         _printTicket();
       }
     }
@@ -90,12 +92,16 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     }
 
     final PaymentResult result = operation.result;
+    final serverMessage = operation.userMessage?.trim();
+    String withServerMessage(String fallback) =>
+        (serverMessage != null && serverMessage.isNotEmpty)
+        ? serverMessage
+        : fallback;
 
     final Color statusColor;
     final IconData statusIcon;
     final String statusTitle;
     final String statusSubtitle;
-    final serverMessage = operation?.userMessage?.trim();
 
     switch (result) {
       case PaymentResult.approved:
@@ -107,28 +113,39 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
         statusTitle = 'Transacción Rechazada';
-        statusSubtitle = (serverMessage != null && serverMessage.isNotEmpty)
-            ? serverMessage
-            : 'La terminal reportó un error en la autorización.';
+        statusSubtitle = withServerMessage(
+          'La terminal reportó un error en la autorización.',
+        );
+      case PaymentResult.pending:
+        statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_top;
+        statusTitle = 'Transacción en Proceso';
+        statusSubtitle = 'La autorización sigue en curso.';
+      case PaymentResult.underReview:
+        statusColor = Colors.orange.shade800;
+        statusIcon = Icons.manage_search;
+        statusTitle = 'Verificación requerida';
+        statusSubtitle =
+            'Verifique la operación con casa central. El cobro podría haberse procesado.';
+      case PaymentResult.failed:
+        statusColor = const Color(0xFFE74C3C);
+        statusIcon = Icons.error_outline;
+        statusTitle = 'Error de Autorización';
+        statusSubtitle = withServerMessage(
+          'No fue posible completar la autorización.',
+        );
       case PaymentResult.connectionError:
         statusColor = const Color(0xFFFF8C00);
         statusIcon = Icons.wifi_off_outlined;
         statusTitle = 'Error de Conexión';
-        statusSubtitle = (serverMessage != null && serverMessage.isNotEmpty)
-            ? serverMessage
-            : 'No se pudo contactar con el procesador. Verifique su conectividad y reintente.';
+        statusSubtitle = withServerMessage(
+          'No se pudo contactar con el procesador. Verifique su conectividad y reintente.',
+        );
       case PaymentResult.voided:
         statusColor = Colors.grey;
         statusIcon = Icons.undo;
         statusTitle = 'Transacción Anulada';
         statusSubtitle = 'La venta fue anulada correctamente.';
-      case PaymentResult.unknown:
-        statusColor = const Color(0xFFB9770E);
-        statusIcon = Icons.help_outline;
-        statusTitle = 'No pudimos confirmar el cobro';
-        statusSubtitle = (serverMessage != null && serverMessage.isNotEmpty)
-            ? serverMessage
-            : 'Consulte la operación antes de volver a cobrar.';
     }
 
     return Scaffold(
@@ -151,16 +168,21 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             operation: operation,
             printStatus: _printStatus,
             printMessage: _printMessage,
-            onRetryPrint: result == PaymentResult.approved
+            onRetryPrint:
+                result == PaymentResult.approved ||
+                    result == PaymentResult.underReview
                 ? _printTicket
-                : null,
-            onViewOperation: result == PaymentResult.unknown
-                ? () => Navigator.pushNamed(context, AppRoutes.salesHistory)
                 : null,
             onRetry: result == PaymentResult.connectionError
                 ? () => _retrySale(context)
                 : null,
+            finalizeLabel: result == PaymentResult.underReview
+                ? 'NUEVA VENTA'
+                : 'FINALIZAR',
             onFinalize: () {
+              if (result == PaymentResult.underReview) {
+                context.read<SalesCubit>().startNewSaleAfterReview();
+              }
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.saleForm,

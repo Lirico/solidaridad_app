@@ -42,31 +42,6 @@ void main() {
 
     expect(find.text('Tarjeta vencida'), findsWidgets);
     expect(find.text('51 (Fondos insuficientes)'), findsNothing);
-  });
-
-  testWidgets('un cobro sin confirmar no ofrece reintentar', (tester) async {
-    tester.view.physicalSize = const Size(720, 1440);
-    tester.view.devicePixelRatio = 2.0;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SaleStatusContent(
-            result: PaymentResult.unknown,
-            statusColor: const Color(0xFFB9770E),
-            statusIcon: Icons.help_outline,
-            statusTitle: 'No pudimos confirmar el cobro',
-            statusSubtitle: 'Consulte la operación.',
-            onViewOperation: () {},
-            onFinalize: () {},
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('VER OPERACIÓN'), findsOneWidget);
     expect(find.text('REINTENTAR'), findsNothing);
-    expect(find.text('FINALIZAR'), findsOneWidget);
   });
 }

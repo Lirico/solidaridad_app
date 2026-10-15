@@ -33,8 +33,8 @@ entregar solo el flujo de celular del MVP:
   entregable principal de comprobante es el **ticket impreso**.
 
 El backend (API → gateway ISO → procesador) sigue siendo la columna vertebral;
-el cambio de producto impacta sobre todo la **capa de app / nativa** y el
-**modo de entrada** hacia el mensaje ISO.
+el cambio de producto impacta sobre todo la **capa de app / nativa**. La
+lectura de banda completa PAN y vencimiento; no cambia el contrato ISO legado.
 
 ---
 
@@ -89,17 +89,17 @@ las pantallas interactivas incluyen:
   panel ocupa el 100% del ancho y termina pegado al borde superior de la barra
   inferior. Este patrón reemplaza a las tarjetas flotantes blancas con radio
   16dp y sombra sobre fondo gris `#F4F6F9`.
-- el **Cierre de Lote** (menú ⋯ "más") es una pantalla **informativa**: muestra el
-  **resumen del lote actual** (Nº de lote, cantidad de ventas, total y ventas por
-  producto con su cantidad y su equivalente en kg) leyendo las **ventas aprobadas
-  del día** de la terminal (`GET /v1/transactions`). **No cierra el lote**: el
-  botón CERRAR LOTE se dibuja como en el mockup (visible y habilitado) pero queda
-  **inerte**, y el Nº de lote es provisorio, porque la API todavía no expone
-  lote/cierre ni hay contrato de cierre con el procesador (ISO `0500`). El total
-  se expresa en **kg**: la API no publica importe/precio por producto. El cierre
-  efectivo, el total en pesos, el peso por producto desde el backend y el ticket
-  impreso quedan pendientes de definición de contrato (ver `docs/gaps.md`,
-  G-P2-10).
+- el **Cierre de Lote** (menú ⋯ "más") es un **corte administrativo** de la
+  terminal, no un cierre financiero contra el procesador. `GET
+  /v1/transactions` muestra exclusivamente el lote vigente; `POST
+  /v1/transactions/batch-close` asocia de forma atómica sus operaciones al corte
+  persistido y devuelve el listado que integrará la impresión futura. Después del
+  corte esas operaciones ya no aparecen en el historial actual ni se pueden
+  anular desde la terminal. El botón pide confirmación y rechaza el cierre si hay
+  pagos `PENDING` o `UNKNOWN`, para no imprimir un resumen que pueda cambiar. El
+  total se expresa en **kg**: la API no publica importe/precio por producto. El
+  ticket impreso y el peso por producto desde backend quedan pendientes (ver
+  `docs/gaps.md`, G-P2-10).
 
 Excepciones: la pantalla de presentación (splash), la pantalla "Iniciando"
 (spinner) y **Login/Registro** no llevan la barra inferior (en auth no hay
@@ -159,8 +159,11 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - Timeouts y errores de comunicación.
 - Respuesta normalizada hacia la API.
 - Registro técnico request/response para soporte, sin PAN/CVV/track completos.
-- Entry mode coherente con la captura real (manual vs banda / track cuando
-  aplique).
+- Para ventas y consultas, usa el layout histórico del procesador: `DE22=0012`,
+  PAN en `DE2` y vencimiento en `DE14`. No recibe ni reenvía Track 2.
+- El reverso técnico `0400` se genera únicamente para un `0200` previamente
+  enviado. `0410/DE39=00` se considera confirmación operativa del reverso; una
+  fila `0400` sin original no afecta saldo, reportes ni cierre.
 
 ### 2.4 Procesador existente (on-premises)
 
@@ -194,6 +197,7 @@ App Flutter (Verifone)
 | Alta de terminal | La valida el procesador en la autorización. |
 | Captura principal | Lectura de banda en Verifone. |
 | Captura fallback | Ingreso manual. |
+| Contrato de captura | Ambos flujos envían PAN y vencimiento (`YYMM`) a la API. La banda es un mecanismo de autocompletar esos datos; `entry_mode` y Track 2 no forman parte del contrato HTTP ni del mensaje ISO. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
 | Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |

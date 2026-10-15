@@ -25,7 +25,7 @@
 | Paso | Archivo | Qué ocurre |
 |------|---------|------------|
 | 1. Producto y cantidad | `mobile/lib/features/sales/presentation/screens/sale_form_screen.dart` | Catálogo `GET /v1/products`; la **cantidad** viaja como `amount` (string) |
-| 2. Captura | `sale_waiting_for_card_screen.dart` + `mobile/lib/psdk/psdk_card_reader.dart` (banda) / `sale_manual_card_screen.dart` (manual) | `entry_mode` `022` (banda, sin `track2`) o `012` (manual) |
+| 2. Captura | `sale_waiting_for_card_screen.dart` + `mobile/lib/psdk/psdk_card_reader.dart` (banda) / `sale_manual_card_screen.dart` (manual) | PAN + vencimiento `YYMM`; ambos flujos usan el mismo contrato. |
 | 3. Confirmación | `sale_review_screen.dart` → `sales_cubit.dart` (`sendIsoMessage`) | Emite `SalesProcessing` y navega a "Procesando" |
 | 4. Envío | `mobile/lib/features/sales/data/sales_repository.dart` (`registerSale`) | `POST /v1/transactions` + `Idempotency-Key` |
 | 5. API | `api/presentation/controllers/transactions_controller.py` → `api/application/payments/create_transaction.py` | Valida, persiste `PENDING`, llama al gateway |
@@ -48,13 +48,13 @@ PENDING ──► APPROVED ──► VOIDED
 
 | ID | Sev. | Hallazgo | Prueba | Traza |
 |----|:----:|----------|--------|-------|
-| VE-01 | P0 | La API rechaza `entry_mode=022` sin `track2` y el flujo MSR de la app envía exactamente eso → la venta por banda nunca llega al procesador | TC-V-002 | G-P0-19 · G-P1-06 · G-P0-15 |
+| VE-01 | P0 | Corregido: se eliminó el contrato artificial de modo de captura/pista; banda y carga manual mandan PAN + vencimiento `YYMM` | TC-V-002 | G-P0-15 · G-P1-06 |
 | VE-02 | P0 | Corregido: el cobro espera 45 s (más que los 35 s del backend). Si igual no hay respuesta, avisa pendiente de confirmación y no invita a reintentar. TC-V-009 sigue manual | TC-V-009 | G-P0-20 |
 | VE-03 | P0 | La `Idempotency-Key` se regenera en cada intento y la UI no tiene guard de reentrada (doble tap = doble venta) | TC-V-011 | G-P0-21 · G-P1-02 · hallazgo #24 |
 | VE-04 | P1 | Un resultado ambiguo (`UNKNOWN`) se muestra como "Transacción Rechazada / 51 Fondos insuficientes" | TC-V-012 | G-P1-11 · G-P1-09 |
 | VE-05 | P1 | La pantalla de resultado no muestra el `user_message` del backend y el código de respuesta es fijo por estado | TC-V-012 · TC-V-007 | G-P1-11 · hallazgo #20 |
 | VE-06 | P1 | Los 400/404/409 de la API se descartan en la app (`message` vs `user_message`) | TC-V-003 · TC-V-014 | G-P1-12 · BN-01 · BN-09 |
-| VE-07 | P1 | `expiration_date` no se valida en ninguna capa (formato MMYY, mes 01-12) | TC-V-014 | G-P1-14 |
+| VE-07 | P1 | `expiration_date` no se valida en ninguna capa (formato YYMM, mes 01-12) | TC-V-014 | G-P1-14 |
 | VE-08 | P2 | Sin cota superior de importe: DE4 puede desbordar 12 dígitos y desalinear el ISO | TC-V-005 | G-P2-07 |
 | VE-09 | P2 | Decimales de cantidad: el procesador exige enteros por producto (`validaIntMoneda`) y el mapeo de DE39 `13` falta en la API | TC-V-003 · TC-V-004 | G-P2-07 · BN-05 |
 | VE-10 | P2 | Tras una anulación ambigua (`UNKNOWN`) no hay camino de resolución: la venta no se puede volver a anular ni consultar | TC-V-016 | G-P2-08 · G-P0-12 |
@@ -67,41 +67,20 @@ PENDING ──► APPROVED ──► VOIDED
 
 ## 3. Fichas de hallazgos
 
-### VE-01 · P0 · La venta por banda se rechaza en la API antes de llegar al procesador
+### VE-01 · P0 · Resuelto: la venta por banda no debe tener un contrato paralelo
 
-**Síntoma.** Se pasa la tarjeta por banda (flujo principal del producto), la app
-llega a "Procesando" y el resultado es "Transacción Rechazada" con el texto
-genérico "Venta rechazada por la entidad emisora." **La venta no aparece en el
-historial** y el procesador nunca recibe un ISO.
+**Resolución (2026-10-05).** Se retiraron `entry_mode` y Track 2 del contrato
+HTTP y del gateway. La lectura por banda extrae PAN y vencimiento, y completa el
+mismo flujo que la carga manual. El gateway genera siempre el layout que espera
+el autorizador legacy: DE2/DE14, DE22 `0012`, sin DE35.
 
-**Evidencia.**
-- La API exige `track2` cuando `entry_mode="022"`:
-  `api/application/payments/create_transaction.py:97-100`
-  (`if entry_mode == "022" and not track2: raise InvalidEntryMode(...)`) y la
-  llamada en `:142` pasa **solo** `(entry_mode, track2)` — el `expiration_date`
-  que sí llega del POS no se considera, aunque el docstring (`:90-91`) y el
-  propio texto del error digan "requiere track2 **o vencimiento**".
-- La app **no manda `track2` a propósito**: `sales_cubit.dart:96-97`
-  (`entryMode: '022'`, `track2: null`) y `sales_repository.dart:209-211`
-  (agrega `track2` solo si no es nulo).
-- El único test que cubre la rama usa 022 **sin vencimiento**:
-  `api/tests/test_create_transaction.py:370-385`, por eso el gate pasó.
+**Motivo.** El contrato dinámico se había creado para adaptar el procesador al
+modo de captura del cliente. Eso introdujo una validación que bloqueaba el flujo
+MSR y llevó a cambios innecesarios en el C legacy. La responsabilidad de
+normalizar la lectura es de Flutter y de las capas de integración superiores.
 
-**Causa.** Regresión introducida por la validación de consistencia del
-`entry_mode` (commit `70d694c`, 2026-08-16) sobre un flujo que se había
-verificado el 2026-08-13 (G-P0-15) enviando PAN + vencimiento y **sin** track2,
-justamente porque el track2 de esta terminal trae un PAN distinto al registrado.
-
-**Impacto.** El modo de captura principal del MVP (`docs/alcance.md` §2.1) queda
-inoperante y el operador no tiene forma de saber por qué (ver VE-06).
-
-**Cómo se reproduce.** TC-V-002 (banda real o `USE_MSR_MOCK=true`).
-
-**Fix sugerido.** En `_validate_entry_mode`, aceptar el par cuando existe
-`track2` **o** `expiration_date` (`if entry_mode == "022" and not track2 and not
-expiration_date:`), pasando el vencimiento como tercer argumento. Alternativa
-(b): volver a enviar `track2` desde mobile — descartada porque revive el defecto
-de PAN distinto (G-P0-15) y el gateway ya manda DE2 siempre + DE35 solo si viene.
+**Validación pendiente.** Ejecutar TC-V-002 con una V660P real para venta y
+consulta de saldo; debe llegar PAN + vencimiento `YYMM`, sin pista ni CVV.
 
 ---
 
@@ -297,8 +276,8 @@ operador.
 **Cómo se reproduce.** TC-V-014 (vencimiento `3/25` → `325`, mes `00` si se
 envía `12`).
 
-**Fix sugerido.** Validar en la API `MMYY` (mes 01–12, longitud 4) y coherencia
-con el `entry_mode`; devolver 400 con mensaje específico (y mostrarlo, VE-06).
+**Fix sugerido.** Validar en la API `YYMM` (mes 01–12, longitud 4) y devolver
+400 con mensaje específico (y mostrarlo, VE-06).
 
 ---
 
@@ -526,7 +505,7 @@ make dev
 
 # 1) Gateway directo (saltea API): verifica el ISO y el DE39 del procesador
 curl -X POST http://127.0.0.1:8001/v1/authorize -H "Content-Type: application/json" \
-  -d '{"card_number":"6063007014007403","expiration_date":"1228","amount_minor":400,
+  -d '{"card_number":"6063007014007403","expiration_date":"2812","amount_minor":400,
        "product_code":"993","terminal_id":"05000001","stan":"000001","ticket_number":"0001"}'
 
 # 2) API (venta) — con el token del login y una clave nueva por prueba
@@ -534,14 +513,14 @@ curl -X POST http://127.0.0.1:8000/v1/transactions \
   -H "Content-Type: application/json" -H "Authorization: Bearer <JWT>" \
   -H "Idempotency-Key: manual-$(date +%s)" \
   -d '{"product":"GARRAFA_10","amount":"4.00","card_number":"6063007014007403",
-       "cvv":"878","expiration_date":"1228"}'
+       "cvv":"878","expiration_date":"2812"}'
 
-# 2b) Caso VE-01 (banda sin track2, con vencimiento) → hoy 400 InvalidEntryMode
+# 2b) Caso VE-01: lectura por banda ya normalizada a PAN + vencimiento YYMM.
 curl -X POST http://127.0.0.1:8000/v1/transactions \
   -H "Content-Type: application/json" -H "Authorization: Bearer <JWT>" \
   -H "Idempotency-Key: manual-$(date +%s)" \
   -d '{"product":"GARRAFA_10","amount":"1.00","card_number":"6063007014007403",
-       "entry_mode":"022","expiration_date":"1228"}'
+       "expiration_date":"2812"}'
 
 # 3) Estado real en Postgres (¿se cobró aunque la app diga error?)
 docker exec -i solidaridad-db psql -U solidaridad -d solidaridad -c \
@@ -575,7 +554,7 @@ docker pause solidaridad-processor-auth     # y luego: docker unpause solidarida
 
 | # | Decisión | Opciones | Impacto si no se define |
 |---|----------|----------|-------------------------|
-| D-1 | Criterio de validez de `entry_mode=022` (VE-01) | (a) aceptar `track2` **o** `expiration_date`; (b) enviar `track2` desde mobile | (a) desbloquea la banda con un cambio de una línea; (b) revive el defecto de PAN distinto (G-P0-15) |
+| D-1 | Contrato de captura por banda (VE-01) | **Cerrado (2026-10-05):** PAN + vencimiento `YYMM`, sin pista ni modo de captura | Evita volver a adaptar el procesador legacy al cliente. |
 | D-2 | Máximo de importe/cantidad por venta y por producto (VE-08/VE-09) | **Cerrado (2026-09-24):** tope único igual a DE4, `9.999.999.999,99`. Un tope por producto queda en VE-09. | sin tope, un error de tipeo puede generar un ISO inválido |
 | D-3 | ¿Qué es `amount` en la venta: cantidad o importe? (VE-09) | cantidad con 2 decimales (hoy) vs cantidad entera + precio calculado en el procesador | los textos de UI ("Cantidad de Unidades", m³) y los rechazos del procesador quedan sin regla explícita |
 | D-4 | `error_code` estable en API/gateway (VE-06, BN-01/BN-03/BN-04) | agregarlo ahora vs seguir con textos en español | cada cambio de copy rompe el cliente y el diagnóstico en campo |
@@ -615,9 +594,6 @@ docker pause solidaridad-processor-auth     # y luego: docker unpause solidarida
 - [`alcance.md`](alcance.md) (§2.1 flujo de venta, §3 aclaraciones de producto) ·
   [`entry-mode.md`](entry-mode.md) · [`demo-transaccion-aprobada.md`](demo-transaccion-aprobada.md) ·
   [`gaps.md`](gaps.md) (G-P0-19…G-P2-09).
-
-
-
 
 
 

@@ -12,15 +12,11 @@ class BalanceCubit extends Cubit<BalanceState> {
   void setCardData({
     required String cardNumber,
     required String expirationDate,
-    String entryMode = '012',
-    String? track2,
   }) {
     emit(
       BalanceCardCaptured(
         cardNumber: cardNumber,
         expirationDate: expirationDate,
-        entryMode: entryMode,
-        track2: track2,
       ),
     );
   }
@@ -31,8 +27,6 @@ class BalanceCubit extends Cubit<BalanceState> {
       BalanceChecking(
         cardNumber: current.cardNumber,
         expirationDate: current.expirationDate,
-        entryMode: current.entryMode,
-        track2: current.track2,
       ),
     );
 
@@ -40,8 +34,6 @@ class BalanceCubit extends Cubit<BalanceState> {
       token: token,
       cardNumber: current.cardNumber,
       expirationDate: current.expirationDate,
-      entryMode: current.entryMode,
-      track2: current.track2,
     );
 
     if (result.sessionExpired) {
@@ -53,8 +45,6 @@ class BalanceCubit extends Cubit<BalanceState> {
       BalanceCompleted(
         cardNumber: current.cardNumber,
         expirationDate: current.expirationDate,
-        entryMode: current.entryMode,
-        track2: current.track2,
         result: result,
       ),
     );

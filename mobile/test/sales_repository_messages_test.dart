@@ -45,9 +45,7 @@ void main() {
   }
 
   test('un 400 de venta muestra message cuando no hay user_message', () async {
-    stubPost(
-      jsonMapResponse({'message': 'Monto inválido'}, statusCode: 400),
-    );
+    stubPost(jsonMapResponse({'message': 'Monto inválido'}, statusCode: 400));
 
     final result = await register();
 
@@ -89,17 +87,16 @@ void main() {
     final result = await register();
 
     expect(result.isApproved, isFalse);
-    expect(result.isUnknown, isTrue);
+    expect(result.authorizationStatus, SaleAuthorizationStatus.failed);
     expect(result.connectionError, isFalse);
     expect(result.message, contains('No vuelva a intentarlo'));
   });
 
   test('un 400 de anulación muestra message', () async {
     stubPost(
-      jsonMapResponse(
-        {'message': 'Solo se pueden anular transacciones aprobadas'},
-        statusCode: 400,
-      ),
+      jsonMapResponse({
+        'message': 'Solo se pueden anular transacciones aprobadas',
+      }, statusCode: 400),
     );
 
     final result = await repository.voidTransaction(

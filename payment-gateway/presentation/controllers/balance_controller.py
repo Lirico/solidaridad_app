@@ -65,8 +65,6 @@ def balance(
         terminal_id=body.terminal_id,
         stan=body.stan,
         expiration_date=body.expiration_date,
-        entry_mode=body.entry_mode,
-        track2=body.track2,
     )
     try:
         result = use_case.execute(command)

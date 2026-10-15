@@ -11,8 +11,32 @@ import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 import '../cubit/sales_state.dart';
 
-class SaleProcessingScreen extends StatelessWidget {
+class SaleProcessingScreen extends StatefulWidget {
   const SaleProcessingScreen({super.key});
+
+  @override
+  State<SaleProcessingScreen> createState() => _SaleProcessingScreenState();
+}
+
+class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
+  SalesCubit? _salesCubit;
+  bool _reviewHandoffStarted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _salesCubit ??= context.read<SalesCubit>();
+  }
+
+  @override
+  void dispose() {
+    // La autorización continúa durablemente en la API, pero no dejamos un
+    // timer de UI vivo después de abandonar esta pantalla.
+    if (!_reviewHandoffStarted) {
+      _salesCubit?.cancelPendingSalePolling();
+    }
+    super.dispose();
+  }
 
   String _maskCardNumber(String cardNumber) {
     if (cardNumber.length < 4) return cardNumber;
@@ -21,6 +45,27 @@ class SaleProcessingScreen extends StatelessWidget {
 
   String _formatAmount(double amount) {
     return '\$${amount.toStringAsFixed(2)}';
+  }
+
+  OperationModel _operationFromReview(SalesAwaitingAuthorization state) {
+    final normalizedCard = state.cardNumber.replaceAll(' ', '');
+    final hiddenCard = normalizedCard.length >= 4
+        ? '•••• ${normalizedCard.substring(normalizedCard.length - 4)}'
+        : '•••• ----';
+    return OperationModel(
+      id: state.operationNumber,
+      productCode: state.productCode,
+      productLabel: state.productLabel,
+      amount: state.amount,
+      cardNumber: hiddenCard,
+      result: PaymentResult.underReview,
+      authorizationStatus: SaleAuthorizationStatus.pending,
+      pendingReason: PendingSaleReason.underReview,
+      pollAfterSeconds: null,
+      mayStartNewSale: state.mayStartNewSale,
+      date: DateTime.now(),
+      userMessage: state.message,
+    );
   }
 
   @override
@@ -42,6 +87,21 @@ class SaleProcessingScreen extends StatelessWidget {
           date: DateTime.now(),
           userMessage: salesState.errorMessage,
         );
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.saleStatus,
+          arguments: operation,
+        );
+      });
+    }
+
+    if (salesState is SalesAwaitingAuthorization &&
+        salesState.pendingReason == PendingSaleReason.underReview &&
+        !_reviewHandoffStarted) {
+      _reviewHandoffStarted = true;
+      final operation = _operationFromReview(salesState);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
         Navigator.pushReplacementNamed(
           context,
           AppRoutes.saleStatus,
@@ -148,8 +208,11 @@ class SaleProcessingScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // Mensaje de advertencia
-              const Text(
-                'Procesando Transacción...',
+              Text(
+                salesState is SalesAwaitingAuthorization &&
+                        salesState.pollingStopped
+                    ? 'Consulta pausada'
+                    : 'Procesando Transacción...',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -157,9 +220,11 @@ class SaleProcessingScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Estamos autorizando el pago.\n'
-                'Por favor, no cierre la aplicación.',
+              Text(
+                salesState is SalesAwaitingAuthorization
+                    ? salesState.message
+                    : 'Estamos autorizando el pago.\n'
+                          'Por favor, no cierre la aplicación.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.5),
               ),

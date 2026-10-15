@@ -477,15 +477,44 @@ class PsdkBridge(private val appContext: Context) :
      * Example: `B6063007014007403D3012F8` → `;6063007014007403=3012F8?`
      */
     private fun bytesAsBcdAscii(bytes: ByteArray?): String {
-        if (bytes == null || bytes.isEmpty()) return ""
+        if (bytes == null || bytes.isEmpty()) {
+            Log.i(TAG, "track2 bcd length=0 separatorD=false separatorIndex=-1")
+            return ""
+        }
+        var separatorIndex = -1
+        var nibbleIndex = 0
         val sb = StringBuilder()
         for (b in bytes) {
             val hi = (b.toInt() shr 4) and 0x0F
             val lo = b.toInt() and 0x0F
+            if (separatorIndex < 0 && hi == 0xD) separatorIndex = nibbleIndex
+            nibbleIndex += 1
+            if (separatorIndex < 0 && lo == 0xD) separatorIndex = nibbleIndex
+            nibbleIndex += 1
             sb.append(bcdNibbleToChar(hi))
             sb.append(bcdNibbleToChar(lo))
         }
+        // Largo, posición del primer nibble D y clase de los 6 nibbles
+        // finales (dígito o centinela). No incluye PAN ni pista.
+        Log.i(
+            TAG,
+            "track2 bcd length=${bytes.size} separatorD=${separatorIndex >= 0} " +
+                "separatorIndex=$separatorIndex tail=${tailNibbleClasses(bytes)}",
+        )
         return sb.toString()
+    }
+
+    /** Clase de los últimos 6 nibbles: `d` dígito, `s` centinela. Sin valores. */
+    private fun tailNibbleClasses(bytes: ByteArray): String {
+        val classes = StringBuilder()
+        val total = bytes.size * 2
+        val start = (total - 6).coerceAtLeast(0)
+        for (index in start until total) {
+            val b = bytes[index / 2].toInt()
+            val nibble = if (index % 2 == 0) (b shr 4) and 0x0F else b and 0x0F
+            classes.append(if (nibble in 0..9) 'd' else 's')
+        }
+        return classes.toString()
     }
 
     private fun bcdNibbleToChar(nibble: Int): Char {

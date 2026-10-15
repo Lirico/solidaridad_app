@@ -35,6 +35,7 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
     if (_formKey.currentState!.validate()) {
       final cubit = context.read<SalesCubit>();
       final state = cubit.state;
+      final expiry = _expiryController.text.replaceAll('/', '');
 
       cubit.showReview(
         productCode: state.productCode,
@@ -42,8 +43,9 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
         amount: state.amount,
         cardNumber: _cardNumberController.text,
         cvv: _cvvController.text,
-        expirationDate: _expiryController.text.replaceAll('/', ''),
-        entryMode: '012',
+        expirationDate: expiry.length == 4
+            ? '${expiry.substring(2)}${expiry.substring(0, 2)}'
+            : expiry,
       );
 
       Navigator.pushNamed(context, AppRoutes.saleReview);

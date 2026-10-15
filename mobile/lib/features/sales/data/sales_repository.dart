@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
 import '../domain/sale_model.dart';
@@ -10,6 +11,23 @@ import '../domain/sale_model.dart';
 class SessionExpiredException implements Exception {
   const SessionExpiredException();
 }
+
+/// Fallo al cargar catálogo o historial. [message] es el texto para el operador.
+class DataLoadException implements Exception {
+  final String message;
+
+  const DataLoadException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+const _loadTimeoutMessage = 'Tiempo de espera agotado. Verifique su conexión.';
+const _loadNetworkMessage =
+    'No se pudo conectar con el servidor. Verifique su red.';
+const _loadHttpMessage = 'Error de comunicación con el servidor. Reintente.';
+const _loadRejectedMessage = 'No se pudieron cargar los datos. Reintente.';
+const _loadUnexpectedMessage = 'Ocurrió un error inesperado. Reintente.';
 
 /// Generates a pseudo-unique idempotency key.
 ///
@@ -44,8 +62,7 @@ class SalesRepository {
     : _httpClient = httpClient ?? http.Client(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
-  Future<List<ProductInfo>> fetchProducts({required String token}) async {
-    final url = Uri.parse('$_baseUrl/products');
+  Future<http.Response> _authorizedGet(Uri url, String token) async {
     try {
       final response = await _httpClient
           .get(
@@ -60,32 +77,40 @@ class SalesRepository {
       if (response.statusCode == 401) {
         throw const SessionExpiredException();
       }
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-        return data
-            .map((item) => ProductInfo.fromJson(item as Map<String, dynamic>))
-            .toList();
-      }
-      return _defaultProducts();
+      return response;
     } on SessionExpiredException {
       rethrow;
+    } on TimeoutException {
+      throw const DataLoadException(_loadTimeoutMessage);
+    } on SocketException {
+      throw const DataLoadException(_loadNetworkMessage);
+    } on HttpException {
+      throw const DataLoadException(_loadHttpMessage);
+    } on http.ClientException {
+      throw const DataLoadException(_loadNetworkMessage);
     } catch (_) {
-      return _defaultProducts();
+      throw const DataLoadException(_loadUnexpectedMessage);
     }
   }
 
-  List<ProductInfo> _defaultProducts() {
-    return const [
-      ProductInfo(code: 'GARRAFA_10', label: 'Garrafa 10 kg'),
-      ProductInfo(code: 'GARRAFA_15', label: 'Garrafa 15 kg'),
-      ProductInfo(code: 'GARRAFA_30', label: 'Garrafa 30 kg'),
-      ProductInfo(code: 'TUBO_45', label: 'Tubo 45 kg'),
-      ProductInfo(
-        code: 'GRANEL',
-        label: 'Granel',
-        unit: ProductUnit.metrosCubicos,
-      ),
-    ];
+  Future<List<ProductInfo>> fetchProducts({required String token}) async {
+    final url = Uri.parse('$_baseUrl/products');
+    try {
+      final response = await _authorizedGet(url, token);
+      if (response.statusCode != 200) {
+        throw const DataLoadException(_loadRejectedMessage);
+      }
+      final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+      return data
+          .map((item) => ProductInfo.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on SessionExpiredException {
+      rethrow;
+    } on DataLoadException {
+      rethrow;
+    } catch (_) {
+      throw const DataLoadException(_loadUnexpectedMessage);
+    }
   }
 
   Future<VoidResult> voidTransaction({
@@ -173,34 +198,46 @@ class SalesRepository {
   }) async {
     final url = Uri.parse('$_baseUrl/transactions?limit=$limit&offset=$offset');
     try {
-      final response = await _httpClient
-          .get(
-            url,
-            headers: {
-              HttpHeaders.contentTypeHeader: 'application/json',
-              HttpHeaders.authorizationHeader: 'Bearer $token',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 401) {
-        throw const SessionExpiredException();
+      final response = await _authorizedGet(url, token);
+      if (response.statusCode != 200) {
+        throw const DataLoadException(_loadRejectedMessage);
       }
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> body =
-            jsonDecode(response.body) as Map<String, dynamic>;
-        final List<dynamic> items = body['items'] as List<dynamic>? ?? [];
-        return items
-            .map(
-              (item) => OperationModel.fromJson(item as Map<String, dynamic>),
-            )
-            .toList();
-      }
-      return [];
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+      final List<dynamic> items = body['items'] as List<dynamic>? ?? [];
+      return items
+          .map((item) => OperationModel.fromJson(item as Map<String, dynamic>))
+          .toList();
     } on SessionExpiredException {
       rethrow;
+    } on DataLoadException {
+      rethrow;
     } catch (_) {
-      return [];
+      throw const DataLoadException(_loadUnexpectedMessage);
+    }
+  }
+
+  /// Consulta una autorización ya creada. Nunca envía otro `POST /transactions`,
+  /// por lo que es segura para continuar una venta tras perder la respuesta
+  /// inicial o reiniciar la aplicación.
+  Future<SaleResponse> getSaleStatus({
+    required String token,
+    required String transactionNumber,
+  }) async {
+    final url = Uri.parse('$_baseUrl/transactions/$transactionNumber');
+    try {
+      final response = await _authorizedGet(url, token);
+      if (response.statusCode != 200 && response.statusCode != 202) {
+        throw const DataLoadException(_loadRejectedMessage);
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return _saleResponseFromJson(data);
+    } on SessionExpiredException {
+      rethrow;
+    } on DataLoadException {
+      rethrow;
+    } on FormatException {
+      throw const DataLoadException(_loadUnexpectedMessage);
     }
   }
 
@@ -210,8 +247,6 @@ class SalesRepository {
     required String cardNumber,
     required String cvv,
     required String expirationDate,
-    String entryMode = '012',
-    String? track2,
     required String token,
     required String idempotencyKey,
   }) async {
@@ -222,13 +257,9 @@ class SalesRepository {
       'amount': amount,
       'card_number': cardNumber.replaceAll(' ', ''),
       'cvv': cvv,
-      'entry_mode': entryMode,
     };
     if (expirationDate.isNotEmpty) {
       bodyPayload['expiration_date'] = expirationDate;
-    }
-    if (track2 != null && track2.isNotEmpty) {
-      bodyPayload['track2'] = track2;
     }
 
     try {
@@ -255,20 +286,17 @@ class SalesRepository {
       }
 
       final Map<String, dynamic> responseData = jsonDecode(response.body);
+      final String saleMessage =
+          (responseData['user_message'] ?? responseData['message'] ?? '')
+              .toString();
+      debugPrint(
+        'sale response status=${response.statusCode} message=$saleMessage',
+      );
 
       if (response.statusCode == 200 ||
           response.statusCode == 201 ||
           response.statusCode == 202) {
-        final String status = (responseData['status'] as String? ?? '')
-            .toUpperCase();
-
-        return SaleResponse(
-          isApproved: status == 'APPROVED',
-          isUnknown: status == 'UNKNOWN',
-          operationNumber: responseData['transaction_number'] ?? 'OP-UNKNOWN',
-          message: responseData['user_message'] ?? 'Operación procesada',
-          errorCode: '00',
-        );
+        return _saleResponseFromJson(responseData);
       } else {
         return SaleResponse(
           isApproved: false,
@@ -285,9 +313,9 @@ class SalesRepository {
         isApproved: false,
         operationNumber: '',
         message:
-            'No pudimos confirmar el cobro. Consulte la operación antes de volver a cobrar.',
+            'Tiempo de espera agotado con el procesador de pagos. Reintente.',
         errorCode: '99',
-        isUnknown: true,
+        connectionError: true,
       );
     } on SocketException {
       return const SaleResponse(
@@ -314,5 +342,47 @@ class SalesRepository {
         errorCode: 'UNKNOWN',
       );
     }
+  }
+
+  SaleResponse _saleResponseFromJson(Map<String, dynamic> data) {
+    final rawStatus = (data['status'] as String? ?? '').toUpperCase();
+    final SaleAuthorizationStatus authorizationStatus;
+    switch (rawStatus) {
+      case 'APPROVED':
+        authorizationStatus = SaleAuthorizationStatus.approved;
+      case 'DECLINED':
+        authorizationStatus = SaleAuthorizationStatus.declined;
+      case 'PENDING':
+        authorizationStatus = SaleAuthorizationStatus.pending;
+      case 'FAILED':
+      case 'NOT_SENT':
+      case 'INDETERMINATE':
+      default:
+        authorizationStatus = SaleAuthorizationStatus.failed;
+    }
+
+    final rawReason = (data['reason'] as String? ?? '').toUpperCase();
+    final PendingSaleReason? pendingReason;
+    switch (rawReason) {
+      case 'PROCESSING':
+        pendingReason = PendingSaleReason.processing;
+      case 'UNDER_REVIEW':
+        pendingReason = PendingSaleReason.underReview;
+      default:
+        pendingReason = null;
+    }
+
+    return SaleResponse(
+      isApproved: authorizationStatus == SaleAuthorizationStatus.approved,
+      operationNumber: data['transaction_number'] as String? ?? '',
+      message: apiUserMessage(data, 'Operación procesada'),
+      errorCode: authorizationStatus == SaleAuthorizationStatus.approved
+          ? '00'
+          : rawStatus,
+      authorizationStatus: authorizationStatus,
+      pendingReason: pendingReason,
+      pollAfterSeconds: data['poll_after_seconds'] as int?,
+      mayStartNewSale: data['may_start_new_sale'] as bool? ?? true,
+    );
   }
 }

@@ -14,12 +14,7 @@ import '../cubit/batch_close_cubit.dart';
 import '../cubit/batch_close_state.dart';
 import '../widgets/batch_close_content.dart';
 
-/// Cierre de Lote: resumen informativo de las ventas aprobadas del día.
-///
-/// El resumen se arma con las ventas aprobadas del día desde
-/// `GET /v1/transactions`. **No cierra nada**: el cierre contra el procesador
-/// todavía no tiene contrato, así que el botón CERRAR LOTE queda inerte y el
-/// Nº de lote es provisorio. Ver `docs/gaps.md` (G-P2-10).
+/// Cierre de Lote: corte administrativo del lote actual de la terminal.
 class BatchCloseScreen extends StatefulWidget {
   const BatchCloseScreen({super.key});
 
@@ -28,6 +23,7 @@ class BatchCloseScreen extends StatefulWidget {
 }
 
 class _BatchCloseScreenState extends State<BatchCloseScreen> {
+  String? _closeIdempotencyKey;
   @override
   void initState() {
     super.initState();
@@ -43,13 +39,38 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
     }
   }
 
-  /// Callback inerte del botón CERRAR LOTE.
-  ///
-  /// El botón se ve habilitado (como en el mockup) pero no hace nada: todavía
-  /// no existe el contrato de cierre contra el procesador, así que no hay
-  /// confirmación, ni corte, ni pantalla de resultado. Ver `docs/gaps.md`
-  /// (G-P2-10).
-  void _onCloseBatchPending() {}
+  Future<void> _onCloseBatch() async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) return;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cerrar lote'),
+        content: const Text(
+          'Las ventas de este lote quedarán cerradas y ya no podrán anularse desde la terminal.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('CANCELAR'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('CONFIRMAR'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    _closeIdempotencyKey ??=
+        'batch-close-${DateTime.now().microsecondsSinceEpoch}';
+    await context.read<BatchCloseCubit>().closeCurrentBatch(
+      token: authState.user!.token,
+      idempotencyKey: _closeIdempotencyKey!,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +92,22 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
                 (route) => false,
               );
             }
+            if (state is BatchCloseClosed) {
+              _closeIdempotencyKey = null;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Lote cerrado: ${state.operations.length} operaciones incluidas.',
+                  ),
+                ),
+              );
+              _loadCurrentBatch();
+            }
+            if (state is BatchCloseCloseFailed) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message)),
+              );
+            }
           },
           child: BlocBuilder<BatchCloseCubit, BatchCloseState>(
             builder: (context, state) {
@@ -87,6 +124,8 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
 
               final BatchSummary? summary = switch (state) {
                 BatchCloseLoaded(:final summary) => summary,
+                BatchCloseClosing(:final summary) => summary,
+                BatchCloseCloseFailed(:final summary) => summary,
                 _ => null,
               };
 
@@ -94,7 +133,8 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
 
               return BatchCloseContent(
                 summary: summary,
-                onCloseBatch: _onCloseBatchPending,
+                onCloseBatch: _onCloseBatch,
+                isClosing: state is BatchCloseClosing,
               );
             },
           ),

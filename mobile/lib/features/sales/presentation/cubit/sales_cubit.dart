@@ -6,8 +6,20 @@ import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
   final SalesRepository salesRepository;
+  final Future<void> Function(Duration) _wait;
+  final DateTime Function() _now;
+  final Duration pollingTimeout;
+  bool _polling = false;
+  bool _pollingCancelled = false;
 
-  SalesCubit({required this.salesRepository}) : super(const SalesLoading());
+  SalesCubit({
+    required this.salesRepository,
+    Future<void> Function(Duration)? wait,
+    DateTime Function()? now,
+    this.pollingTimeout = const Duration(minutes: 2),
+  }) : _wait = wait ?? Future<void>.delayed,
+       _now = now ?? DateTime.now,
+       super(const SalesLoading());
 
   Future<void> loadHistory({
     required String token,
@@ -24,8 +36,14 @@ class SalesCubit extends Cubit<SalesState> {
       emit(SalesInitialWithHistory(history: items));
     } on SessionExpiredException {
       emit(const SalesSessionExpired());
+    } on DataLoadException catch (error) {
+      emit(SalesHistoryLoadFailed(message: error.message));
     } catch (_) {
-      emit(SalesInitialWithHistory(history: const []));
+      emit(
+        const SalesHistoryLoadFailed(
+          message: 'Ocurrió un error inesperado. Reintente.',
+        ),
+      );
     }
   }
 
@@ -54,8 +72,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String cardNumber,
     required String cvv,
     required String expirationDate,
-    String entryMode = '012',
-    String? track2,
   }) {
     emit(
       SalesReviewing(
@@ -65,8 +81,6 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: cardNumber,
         cvv: cvv,
         expirationDate: expirationDate,
-        entryMode: entryMode,
-        track2: track2,
         history: state.history,
         idempotencyKey: generateIdempotencyKey(),
       ),
@@ -76,15 +90,8 @@ class SalesCubit extends Cubit<SalesState> {
   /// Prepara la pantalla de revisión a partir de una lectura de banda
   /// magnética (MSR), sin pasar por el ingreso manual.
   ///
-  /// La banda magnética NO contiene CVV: se envía vacío. El vencimiento viene
-  /// en formato YYMM (ej. "3012") y la API espera MMYY (ej. "1230"), por eso
-  /// se usa [MsrCardData.expiryMmYy].
-  ///
-  /// La lectura fue por banda magnética: entry_mode "022". Se envía el PAN
-  /// (DE2) + vencimiento (DE14) en lugar del track2 (DE35), porque el track2
-  /// que devuelve esta terminal trae un PAN que no coincide con el registrado
-  /// (ej. "4606300701400740" en vez de "6063007014007403"). El autorizador usa
-  /// el PAN explícito cuando viene presente.
+  /// La banda magnética no contiene CVV. La lectura completa los mismos datos
+  /// que el ingreso manual y el vencimiento ya está en formato YYMM.
   void showReviewFromMsr(MsrCardData data) {
     emit(
       SalesReviewing(
@@ -93,9 +100,7 @@ class SalesCubit extends Cubit<SalesState> {
         amount: state.amount,
         cardNumber: data.pan,
         cvv: '',
-        expirationDate: data.expiryMmYy,
-        entryMode: '022',
-        track2: null,
+        expirationDate: data.expiryYyMm,
         history: state.history,
         idempotencyKey: generateIdempotencyKey(),
       ),
@@ -103,7 +108,9 @@ class SalesCubit extends Cubit<SalesState> {
   }
 
   Future<void> sendIsoMessage({required String token}) async {
-    if (state is SalesProcessing) return;
+    if (state is SalesProcessing || state is SalesAwaitingAuthorization) {
+      return;
+    }
 
     final currentProductCode = state.productCode;
     final currentProductLabel = state.productLabel;
@@ -111,8 +118,6 @@ class SalesCubit extends Cubit<SalesState> {
     final currentCardNumber = state.cardNumber;
     final currentCvv = state.cvv;
     final currentExpirationDate = state.expirationDate;
-    final currentEntryMode = state.entryMode;
-    final currentTrack2 = state.track2;
     final currentIdempotencyKey = state.idempotencyKey;
 
     final currentHistory = List<OperationModel>.from(state.history);
@@ -125,8 +130,6 @@ class SalesCubit extends Cubit<SalesState> {
         cardNumber: currentCardNumber,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
-        entryMode: currentEntryMode,
-        track2: currentTrack2,
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
       ),
@@ -138,8 +141,6 @@ class SalesCubit extends Cubit<SalesState> {
       cardNumber: currentCardNumber,
       cvv: currentCvv,
       expirationDate: currentExpirationDate,
-      entryMode: currentEntryMode,
-      track2: currentTrack2,
       token: token,
       idempotencyKey: currentIdempotencyKey,
     );
@@ -149,46 +150,252 @@ class SalesCubit extends Cubit<SalesState> {
       return;
     }
 
-    final String hiddenCard = currentCardNumber.replaceAll(' ', '').length >= 4
-        ? '•••• ${currentCardNumber.replaceAll(' ', '').substring(currentCardNumber.replaceAll(' ', '').length - 4)}'
-        : '•••• 4321';
-
-    final PaymentResult paymentResult = response.isUnknown
-        ? PaymentResult.unknown
-        : response.connectionError
-        ? PaymentResult.connectionError
-        : response.isApproved
-        ? PaymentResult.approved
-        : PaymentResult.declined;
-
-    final newOperation = OperationModel(
-      id: response.operationNumber.isNotEmpty
-          ? response.operationNumber
-          : 'OP-ERR',
-      productCode: currentProductCode,
-      productLabel: currentProductLabel,
-      amount: currentAmount,
-      cardNumber: hiddenCard,
-      result: paymentResult,
-      date: DateTime.now(),
-    );
-
-    currentHistory.insert(0, newOperation);
-
-    emit(
-      SalesCompleted(
+    if (response.isPending) {
+      _emitPendingResponse(
+        response: response,
         productCode: currentProductCode,
         productLabel: currentProductLabel,
         amount: currentAmount,
         cardNumber: currentCardNumber,
         cvv: currentCvv,
         expirationDate: currentExpirationDate,
-        entryMode: currentEntryMode,
-        track2: currentTrack2,
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
+      );
+      await pollPendingSale(token: token);
+      return;
+    }
+
+    _emitCompletedResponse(
+      response: response,
+      productCode: currentProductCode,
+      productLabel: currentProductLabel,
+      amount: currentAmount,
+      cardNumber: currentCardNumber,
+      cvv: currentCvv,
+      expirationDate: currentExpirationDate,
+      history: currentHistory,
+      idempotencyKey: currentIdempotencyKey,
+    );
+  }
+
+  /// Reanuda una venta observada como pendiente en el historial. Solo consulta
+  /// su número de operación: no conserva ni vuelve a transmitir PAN, CVV o la
+  /// clave de idempotencia original.
+  Future<void> resumePendingSale({
+    required String token,
+    required OperationModel operation,
+  }) async {
+    if (!operation.isPending ||
+        _polling ||
+        state is SalesAwaitingAuthorization) {
+      return;
+    }
+    _emitPendingResponse(
+      response: SaleResponse(
+        isApproved: false,
+        operationNumber: operation.id,
+        message: operation.userMessage ?? 'Operación en curso.',
+        errorCode: 'PENDING',
+        authorizationStatus: SaleAuthorizationStatus.pending,
+        pendingReason: operation.pendingReason,
+        pollAfterSeconds: operation.pollAfterSeconds ?? 2,
+        mayStartNewSale: operation.mayStartNewSale,
+      ),
+      productCode: operation.productCode,
+      productLabel: operation.productLabel,
+      amount: operation.amount,
+      cardNumber: operation.cardNumber,
+      cvv: '',
+      expirationDate: '',
+      history: state.history,
+      idempotencyKey: '',
+    );
+    await pollPendingSale(token: token);
+  }
+
+  /// Polls exactly at the interval supplied by the API. Transient failures do
+  /// not change a pending authorization into a decline and never trigger POST.
+  Future<void> pollPendingSale({required String token}) async {
+    if (_polling || state is! SalesAwaitingAuthorization) return;
+    _polling = true;
+    _pollingCancelled = false;
+    final startedAt = _now();
+
+    try {
+      while (!_pollingCancelled && !isClosed) {
+        final current = state;
+        if (current is! SalesAwaitingAuthorization) return;
+        if (current.pendingReason == PendingSaleReason.underReview ||
+            current.pollAfterSeconds == null) {
+          return;
+        }
+        if (_now().difference(startedAt) >= pollingTimeout) {
+          emit(
+            _stoppedPolling(
+              current,
+              'La operación sigue en curso. Consulte el historial para continuar.',
+            ),
+          );
+          return;
+        }
+
+        await _wait(Duration(seconds: current.pollAfterSeconds!));
+        if (_pollingCancelled || isClosed) return;
+
+        SaleResponse response;
+        try {
+          response = await salesRepository.getSaleStatus(
+            token: token,
+            transactionNumber: current.operationNumber,
+          );
+        } on SessionExpiredException {
+          emit(const SalesSessionExpired());
+          return;
+        } on DataLoadException {
+          // Conservamos la operación pendiente y volvemos a consultar en el
+          // próximo intervalo indicado por la API.
+          continue;
+        }
+
+        if (response.isPending) {
+          _emitPendingResponse(
+            response: response,
+            productCode: current.productCode,
+            productLabel: current.productLabel,
+            amount: current.amount,
+            cardNumber: current.cardNumber,
+            cvv: current.cvv,
+            expirationDate: current.expirationDate,
+            history: current.history,
+            idempotencyKey: current.idempotencyKey,
+          );
+          continue;
+        }
+
+        _emitCompletedResponse(
+          response: response,
+          productCode: current.productCode,
+          productLabel: current.productLabel,
+          amount: current.amount,
+          cardNumber: current.cardNumber,
+          cvv: current.cvv,
+          expirationDate: current.expirationDate,
+          history: current.history,
+          idempotencyKey: current.idempotencyKey,
+        );
+        return;
+      }
+    } finally {
+      _polling = false;
+    }
+  }
+
+  void cancelPendingSalePolling() {
+    _pollingCancelled = true;
+    final current = state;
+    if (current is SalesAwaitingAuthorization && !current.pollingStopped) {
+      emit(
+        _stoppedPolling(
+          current,
+          'Consulta pausada. Puede retomarla desde el historial.',
+        ),
+      );
+    }
+  }
+
+  SalesAwaitingAuthorization _stoppedPolling(
+    SalesAwaitingAuthorization current,
+    String message,
+  ) {
+    return SalesAwaitingAuthorization(
+      productCode: current.productCode,
+      productLabel: current.productLabel,
+      amount: current.amount,
+      cardNumber: current.cardNumber,
+      cvv: current.cvv,
+      expirationDate: current.expirationDate,
+      history: current.history,
+      idempotencyKey: current.idempotencyKey,
+      operationNumber: current.operationNumber,
+      pendingReason: current.pendingReason,
+      pollAfterSeconds: current.pollAfterSeconds,
+      mayStartNewSale: current.mayStartNewSale,
+      message: message,
+      pollingStopped: true,
+    );
+  }
+
+  void _emitPendingResponse({
+    required SaleResponse response,
+    required String productCode,
+    required String productLabel,
+    required double amount,
+    required String cardNumber,
+    required String cvv,
+    required String expirationDate,
+    required List<OperationModel> history,
+    required String idempotencyKey,
+  }) {
+    emit(
+      SalesAwaitingAuthorization(
+        productCode: productCode,
+        productLabel: productLabel,
+        amount: amount,
+        cardNumber: cardNumber,
+        cvv: cvv,
+        expirationDate: expirationDate,
+        history: _upsertOperation(
+          history,
+          _operationFromResponse(
+            response: response,
+            productCode: productCode,
+            productLabel: productLabel,
+            amount: amount,
+            cardNumber: cardNumber,
+          ),
+        ),
+        idempotencyKey: idempotencyKey,
+        operationNumber: response.operationNumber,
+        pendingReason: response.pendingReason,
+        pollAfterSeconds: response.pollAfterSeconds,
+        mayStartNewSale: response.mayStartNewSale,
+        message: response.message,
+      ),
+    );
+  }
+
+  void _emitCompletedResponse({
+    required SaleResponse response,
+    required String productCode,
+    required String productLabel,
+    required double amount,
+    required String cardNumber,
+    required String cvv,
+    required String expirationDate,
+    required List<OperationModel> history,
+    required String idempotencyKey,
+  }) {
+    final paymentResult = _paymentResultFromResponse(response);
+    final operation = _operationFromResponse(
+      response: response,
+      productCode: productCode,
+      productLabel: productLabel,
+      amount: amount,
+      cardNumber: cardNumber,
+    );
+    emit(
+      SalesCompleted(
+        productCode: productCode,
+        productLabel: productLabel,
+        amount: amount,
+        cardNumber: cardNumber,
+        cvv: cvv,
+        expirationDate: expirationDate,
+        history: _upsertOperation(history, operation),
+        idempotencyKey: idempotencyKey,
         result: paymentResult,
-        operationNumber: paymentResult == PaymentResult.approved
+        operationNumber: response.operationNumber.isNotEmpty
             ? response.operationNumber
             : null,
         errorMessage: paymentResult != PaymentResult.approved
@@ -201,8 +408,83 @@ class SalesCubit extends Cubit<SalesState> {
     );
   }
 
+  OperationModel _operationFromResponse({
+    required SaleResponse response,
+    required String productCode,
+    required String productLabel,
+    required double amount,
+    required String cardNumber,
+  }) {
+    final normalizedCard = cardNumber.replaceAll(' ', '');
+    final hiddenCard = normalizedCard.length >= 4
+        ? '•••• ${normalizedCard.substring(normalizedCard.length - 4)}'
+        : '•••• 4321';
+    return OperationModel(
+      id: response.operationNumber.isNotEmpty
+          ? response.operationNumber
+          : 'OP-ERR',
+      productCode: productCode,
+      productLabel: productLabel,
+      amount: amount,
+      cardNumber: hiddenCard,
+      result: _paymentResultFromResponse(response),
+      authorizationStatus: response.authorizationStatus,
+      pendingReason: response.pendingReason,
+      pollAfterSeconds: response.pollAfterSeconds,
+      mayStartNewSale: response.mayStartNewSale,
+      date: _now(),
+      userMessage: response.message,
+    );
+  }
+
+  PaymentResult _paymentResultFromResponse(SaleResponse response) {
+    if (response.connectionError) return PaymentResult.connectionError;
+    switch (response.authorizationStatus) {
+      case SaleAuthorizationStatus.approved:
+        return PaymentResult.approved;
+      case SaleAuthorizationStatus.declined:
+        return PaymentResult.declined;
+      case SaleAuthorizationStatus.pending:
+        return response.pendingReason == PendingSaleReason.underReview
+            ? PaymentResult.underReview
+            : PaymentResult.pending;
+      case SaleAuthorizationStatus.failed:
+        return PaymentResult.failed;
+    }
+  }
+
+  List<OperationModel> _upsertOperation(
+    List<OperationModel> history,
+    OperationModel operation,
+  ) {
+    final updated = List<OperationModel>.from(history);
+    final index = updated.indexWhere((item) => item.id == operation.id);
+    if (index >= 0) {
+      updated[index] = operation;
+    } else {
+      updated.insert(0, operation);
+    }
+    return updated;
+  }
+
   void resetSale() {
     emit(SalesInitial());
+  }
+
+  /// Cierra el handoff visible de una operación bajo revisión sin descartarla.
+  /// La operación se conserva para una consulta manual posterior y la próxima
+  /// venta vuelve a generar su propia clave en [showReview].
+  bool startNewSaleAfterReview() {
+    final current = state;
+    if (current is! SalesAwaitingAuthorization ||
+        current.pendingReason != PendingSaleReason.underReview ||
+        !current.mayStartNewSale) {
+      return false;
+    }
+
+    _pollingCancelled = true;
+    emit(SalesInitialWithHistory(history: current.history));
+    return true;
   }
 
   /// Anula una venta aprobada llamando a la API y actualiza la operación
@@ -265,5 +547,11 @@ class SalesCubit extends Cubit<SalesState> {
   /// Appends more history items (used for pagination / load-more).
   void appendHistory(List<OperationModel> items) {
     emit(SalesInitialWithHistory(history: [...state.history, ...items]));
+  }
+
+  @override
+  Future<void> close() {
+    _pollingCancelled = true;
+    return super.close();
   }
 }

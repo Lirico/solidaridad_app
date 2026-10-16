@@ -1,12 +1,14 @@
 SHELL := /bin/bash
 
 DEV_STARTUP_TIMEOUT ?= 90
+API_BASE_URL ?= http://127.0.0.1:8000
+INTEGRATION_GATEWAY_CONTROL_URL ?= http://127.0.0.1:8011
 
 .PHONY: help env setup dev up down \
 	catalog-install catalog-check \
-	api-up api-down api-run api-dev api-install api-migrate api-seed api-check \
+	api-up api-down api-run api-dev api-install api-migrate api-seed api-check api-integ-test api-integ-test-processor integ-test integ-test-processor \
 	gateway-install gateway-run gateway-check \
-	processor-up processor-down processor-logs processor-reset processor-seed-refresh
+	processor-up processor-down processor-logs processor-reset processor-seed-refresh processor-integration-reset
 
 help:
 	@echo "Solidaridad monorepo"
@@ -26,6 +28,9 @@ help:
 	@echo "  make api-dev            db-up + migrate + run"
 	@echo "  make api-install        uv sync"
 	@echo "  make api-check          lint + typecheck + tests"
+	@echo "  make api-integ-test     Run black-box API integration tests"
+	@echo "  make integ-test         Alias for api-integ-test"
+	@echo "  make integ-test-processor  Reset local processor, load E2E cards and test API"
 	@echo ""
 	@echo "  make gateway-install    uv sync (payment-gateway)"
 	@echo "  make gateway-run        Run gateway (uvicorn :8001)"
@@ -35,6 +40,7 @@ help:
 	@echo "  make processor-down     Stop processor stack"
 	@echo "  make processor-logs     Follow processor logs"
 	@echo "  make processor-reset    Wipe processor DB volume and recreate"
+	@echo "  make processor-integration-reset  Wipe local DB and load known E2E cards"
 	@echo "  make processor-seed-refresh  Re-dump seed from desa"
 
 env:
@@ -135,6 +141,17 @@ api-seed:
 api-check:
 	$(MAKE) -C api check
 
+api-integ-test:
+	$(MAKE) -C api integ-test API_BASE_URL="$(API_BASE_URL)" INTEGRATION_GATEWAY_CONTROL_URL="$(INTEGRATION_GATEWAY_CONTROL_URL)"
+
+integ-test: api-integ-test
+
+# Requires an API already configured with the local TCP payment gateway.
+api-integ-test-processor: processor-integration-reset
+	$(MAKE) -C api integ-test-processor API_BASE_URL="$(API_BASE_URL)"
+
+integ-test-processor: api-integ-test-processor
+
 gateway-install:
 	$(MAKE) -C payment-gateway install
 
@@ -155,6 +172,9 @@ processor-logs:
 
 processor-reset:
 	$(MAKE) -C payment_processor reset
+
+processor-integration-reset:
+	$(MAKE) -C payment_processor integration-reset
 
 processor-seed-refresh:
 	$(MAKE) -C payment_processor seed-refresh

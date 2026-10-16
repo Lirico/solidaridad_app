@@ -1,4 +1,4 @@
-.PHONY: up down logs build reset seed-refresh recarga help
+.PHONY: up down logs build reset seed-refresh recarga integration-fixtures integration-reset help
 
 COMPOSE := docker compose --env-file .env
 
@@ -11,6 +11,7 @@ help:
 	@echo "  make reset          Wipe mysql volume and recreate (schema+seed+demo)"
 	@echo "  make seed-refresh   Re-dump schema/seed from desa (needs VPN + .env DESA_*)"
 	@echo "  make recarga        Recargar saldo alto en tarjetas de demo (DB ya levantada)"
+	@echo "  make integration-reset  Recreate local DB and load known E2E card fixtures"
 
 up:
 	$(COMPOSE) up -d --build --wait
@@ -33,3 +34,19 @@ seed-refresh:
 
 recarga:
 	docker exec -i solidaridad-processor-mysql sh -c "MYSQL_PWD=localdev mysql -ukigadmin2 kigsolidario2" < utils/demo/recarga.sql
+
+integration-fixtures:
+	docker exec -i solidaridad-processor-mysql sh -c "MYSQL_PWD=localdev mysql -ukigadmin2 kigsolidario2" < utils/demo/integration_fixtures.sql
+
+# Destructive only for the processor's local Docker volume. Never use it with
+# a shared or production database. The C service has a legacy 23:00 hour path
+# that does not process normal sales, so select a zone outside that hour before
+# starting its container.
+integration-reset:
+	@set -eu; \
+	processor_tz="Etc/UTC"; \
+	if [ "$$(date -u +%H)" = "23" ]; then processor_tz="Etc/GMT+12"; fi; \
+	echo "Starting processor integration fixtures with AUTH_TIMEZONE=$$processor_tz"; \
+	AUTH_TIMEZONE="$$processor_tz" $(COMPOSE) down -v; \
+	AUTH_TIMEZONE="$$processor_tz" $(COMPOSE) up -d --build --wait
+	$(MAKE) integration-fixtures

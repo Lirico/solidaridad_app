@@ -6,6 +6,30 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-15
 
+> ✅ **Cobertura de integración HTTP (2026-10-15):** se agregó el gate
+> `make -C api integ-test`, parametrizable con `API_BASE_URL` y
+> `INTEGRATION_GATEWAY_CONTROL_URL`. Ejecuta solicitudes contra una API ya
+> levantada, PostgreSQL migrado y un gateway HTTP controlado, cubriendo auth,
+> catálogo, ventas, idempotencia/concurrencia, PENDING, anulación, cierre de
+> lote y saldo. No sustituye la matriz determinista de workers ni prueba contra
+> un ambiente productivo. Evidencia:
+> `api/tests/integration/test_api_http_integration.py` y
+> `api/tests/integration/gateway_stub.py`.
+> Durante su primera ejecución contra PostgreSQL real se detectó y corrigió la
+> constraint que impedía persistir un evento `GATEWAY_RESULT` con outcome de
+> autorización. La migración `20261015_0012` permite dicho outcome sin número
+> de intento, que sigue siendo obligatorio únicamente para
+> `AUTHORIZATION_ATTEMPT`.
+
+> ✅ **Fixtures E2E del procesador local (2026-10-15):**
+> `make integ-test-processor` recrea explícitamente el volumen MySQL local del
+> procesador, carga tarjetas versionadas con saldo, sin saldo, sin producto y
+> ausente, y ejecuta el recorrido API → gateway TCP → autorizador C. Los
+> escenarios de fallas de red continúan en el gateway HTTP programable, porque
+> no son deterministas contra el autorizador. Evidencia:
+> `payment_processor/utils/demo/integration_fixtures.sql` y
+> `api/tests/integration/test_local_processor_http_integration.py`.
+
 > ✅ **Último cambio (2026-10-15, RA-17):** la matriz determinista completa
 > prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
 > timeout y reclamo concurrente entre workers. El rollout por canary, rollback

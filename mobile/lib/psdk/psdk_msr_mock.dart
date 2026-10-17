@@ -78,4 +78,35 @@ class PsdkMsrMock {
           'to wire API without hardware.',
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // Device info (getDeviceInfo) mock — same shape as the Kotlin bridge.
+  // ---------------------------------------------------------------------------
+
+  /// Serial de laboratorio: claramente falso, no confundir con producción.
+  static const labSerialNumber = 'V660P-LAB-0001';
+
+  /// Logical device id de laboratorio: claramente falso.
+  static const labLogicalDeviceId = 'LAB-LOGICAL-0001';
+
+  /// Payload idéntico en forma al `getDeviceInfo` nativo (mapa de
+  /// `PsdkBridge.kt`) para builds de lab sin hardware.
+  static Map<String, dynamic> deviceInfoSuccess() {
+    return {
+      'ok': true,
+      'serialNumber': labSerialNumber,
+      'model': 'V660P',
+      'connectionType': 'TCP/IP',
+      'address': '',
+      'macAddress': '',
+      'paymentAppName': 'Solidaridad Demo',
+      'paymentAppVersion': '1.0',
+      'paymentProtocol': 'VX',
+      'friendlyName': 'V660P Demo',
+      'logicalDeviceId': labLogicalDeviceId,
+      'state': 'READY',
+      'sdiReady': true,
+      'mocked': true,
+    };
+  }
 }

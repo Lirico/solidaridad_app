@@ -6,6 +6,7 @@ import 'package:solidaridad_app/core/theme/app_colors.dart';
 import 'package:solidaridad_app/core/widgets/app_bottom_nav_bar.dart';
 import 'package:solidaridad_app/core/widgets/app_header.dart';
 import 'package:solidaridad_app/core/widgets/app_sheet_panel.dart';
+import 'package:solidaridad_app/core/terminal/terminal_id_store.dart';
 import 'package:solidaridad_app/features/auth/data/auth_repository.dart';
 import 'package:solidaridad_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:solidaridad_app/features/auth/presentation/screens/change_password_screen.dart';
@@ -28,8 +29,12 @@ class _FixedSalesCubit extends SalesCubit {
 /// Monta el template real de las pantallas interactivas (AppBar compacto +
 /// panel blanco a sangre completa + barra inferior) al tamaño del device usado
 /// en QA (720x1440 px a densidad 2 → 360x720 dp).
-Future<void> pumpAtTerminalSize(WidgetTester tester, Widget child) async {
-  tester.view.physicalSize = const Size(720, 1440);
+Future<void> pumpAtTerminalSize(
+  WidgetTester tester,
+  Widget child, {
+  Size physicalSize = const Size(720, 1440),
+}) async {
+  tester.view.physicalSize = physicalSize;
   tester.view.devicePixelRatio = 2.0;
   addTearDown(tester.view.reset);
 
@@ -202,22 +207,37 @@ void main() {
     expect(find.text('CONFIRMAR CAMBIO'), findsOneWidget);
   });
 
-  testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x720', (
+  testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x672', (
     tester,
   ) async {
+    final terminalIdStore = MemoryTerminalIdStore();
+    await terminalIdStore.save('05000001');
+
     await pumpAtTerminalSize(
       tester,
-      MultiBlocProvider(
-        providers: [
-          BlocProvider<AuthCubit>.value(
-            value: AuthCubit(authRepository: AuthRepository()),
-          ),
-        ],
-        child: const LoginScreen(),
+      physicalSize: const Size(720, 1344),
+      RepositoryProvider<TerminalIdStore>.value(
+        value: terminalIdStore,
+        child: MultiBlocProvider(
+          providers: [
+            BlocProvider<AuthCubit>.value(
+              value: AuthCubit(authRepository: AuthRepository()),
+            ),
+          ],
+          child: const LoginScreen(),
+        ),
       ),
     );
 
+    await tester.pump();
+
     expect(tester.takeException(), isNull);
     expect(find.text('Ingresar a su Cuenta'), findsOneWidget);
+    expect(find.text('Terminal 05000001'), findsOneWidget);
+    expect(find.text('CAMBIAR'), findsOneWidget);
+
+    final ingresar = tester.getRect(find.text('INGRESAR'));
+    expect(ingresar.top, greaterThanOrEqualTo(0));
+    expect(ingresar.bottom, lessThanOrEqualTo(672));
   });
 }

@@ -133,17 +133,17 @@ void main() {
     expect(find.text('Procesando Transacción...'), findsOneWidget);
   });
 
-  testWidgets('Resultado del Cobro no desborda en 360x720', (tester) async {
+  testWidgets('Resultado de la Descarga no desborda en 360x720', (tester) async {
     await pumpAtTerminalSize(
       tester,
       _terminalScaffold(
-        title: 'Resultado del Cobro',
+        title: 'Resultado de la Descarga',
         card: SaleStatusContent(
           result: PaymentResult.approved,
           statusColor: const Color(0xFF2ECC71),
           statusIcon: Icons.check_circle_outline,
           statusTitle: '¡Transacción Aprobada!',
-          statusSubtitle: 'El pago fue autorizado correctamente.',
+          statusSubtitle: 'La descarga fue autorizada correctamente.',
           operation: _operation(),
           onFinalize: () {},
         ),

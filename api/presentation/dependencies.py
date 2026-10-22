@@ -17,6 +17,7 @@ from application.payments.check_balance import CheckBalance
 from application.payments.close_batch import CloseBatch
 from application.payments.create_transaction import CreateTransaction
 from application.payments.get_transaction_status import GetTransactionStatus
+from application.payments.get_void_operation import GetVoidOperation
 from application.payments.list_transactions import ListTransactions
 from application.payments.void_transaction import VoidTransaction
 from config import Settings, get_settings
@@ -29,6 +30,7 @@ from persistence.repositories.payment_processing_config_repository import (
 from persistence.repositories.processor_job_repository import ProcessorJobRepository
 from persistence.repositories.transaction_repository import TransactionRepository
 from persistence.repositories.user_repository import UserRepository
+from persistence.repositories.void_operation_repository import VoidOperationRepository
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -113,6 +115,15 @@ def get_transaction_status(
     )
 
 
+def get_void_operation(
+    db: Annotated[Session, Depends(get_db)],
+) -> GetVoidOperation:
+    return GetVoidOperation(
+        transactions=TransactionRepository(db),
+        void_operations=VoidOperationRepository(db),
+    )
+
+
 def get_close_batch(
     db: Annotated[Session, Depends(get_db)],
 ) -> CloseBatch:
@@ -143,6 +154,7 @@ def get_void_transaction(
     return VoidTransaction(
         session=db,
         transactions=TransactionRepository(db),
+        void_operations=VoidOperationRepository(db),
         gateway=gateway,
     )
 

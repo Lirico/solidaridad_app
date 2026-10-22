@@ -61,6 +61,7 @@ from persistence.repositories.transaction_repository import (
 
 class CreateTransactionHttpStatus(IntEnum):
     CREATED = 201
+    OK = 200
     ACCEPTED = 202
 
 
@@ -242,7 +243,7 @@ class CreateTransaction:
         except Exception:
             self._session.rollback()
             raise
-        return self._result(final)
+        return self._result(final, created=True)
 
     def _authorize_with_safe_retries(
         self,
@@ -298,11 +299,11 @@ class CreateTransaction:
             processor_response_code=existing.processor_response_code,
         )
         self._session.commit()
-        if existing.status == TransactionStatus.PENDING:
-            return self._result(existing)
         return self._result(existing)
 
-    def _result(self, transaction: Transaction) -> CreateTransactionResult:
+    def _result(
+        self, transaction: Transaction, *, created: bool = False
+    ) -> CreateTransactionResult:
         reverse_job = self._jobs.get_by_transaction(
             transaction_id=transaction.id,
             operation_type=ProcessorOperationType.REVERSE,
@@ -312,7 +313,11 @@ class CreateTransaction:
             http_status=(
                 CreateTransactionHttpStatus.ACCEPTED
                 if transaction.status == TransactionStatus.PENDING
-                else CreateTransactionHttpStatus.CREATED
+                else (
+                    CreateTransactionHttpStatus.CREATED
+                    if created
+                    else CreateTransactionHttpStatus.OK
+                )
             ),
             public_status=project_public_transaction_status(transaction, reverse_job),
         )

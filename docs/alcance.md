@@ -96,7 +96,8 @@ las pantallas interactivas incluyen:
   persistido y devuelve el listado que integrará la impresión futura. Después del
   corte esas operaciones ya no aparecen en el historial actual ni se pueden
   anular desde la terminal. El botón pide confirmación y rechaza el cierre si hay
-  pagos `PENDING` o `UNKNOWN`, para no imprimir un resumen que pueda cambiar. El
+  pagos o anulaciones en recuperación (`PENDING` / `UNDER_REVIEW`), para no
+  imprimir un resumen que pueda cambiar. El
   total se expresa en **kg**: la API no publica importe/precio por producto. El
   ticket impreso y el peso por producto desde backend quedan pendientes (ver
   `docs/gaps.md`, G-P2-10).
@@ -136,8 +137,18 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).
 - Endpoint de anulación de venta aprobada:
-  `POST /v1/transactions/{transaction_number}/void`, con reingreso de tarjeta
-  (sin persistir PAN) e `Idempotency-Key`.
+  `POST /v1/transactions/{transaction_number}/void`, con reingreso de tarjeta e
+  `Idempotency-Key`. Ante un resultado ambiguo, la intención de anular se
+  persiste y se recupera como una operación separada de la venta; la terminal
+  consulta su estado en `GET /v1/transactions/{transaction_number}/void` en
+  vez de reenviar el `0200`. El resultado ambiguo se proyecta públicamente como
+  `FAILED` con `reason=UNDER_REVIEW`; el estado interno `UNDER_REVIEW` bloquea
+  solo una nueva anulación de ese cupón y el cierre de lote hasta su resolución
+  administrativa. Las demás ventas siguen siendo independientes. En los
+  contratos de operación, `202` se reserva para el estado público `PENDING`.
+  Una anulación terminal, incluido `FAILED`, responde `200`; una venta terminal
+  recién creada responde `201` y su replay idempotente `200`. `5xx` queda para
+  errores inesperados de la API.
 - Validación de datos mínimos: producto/especie, importe/cantidad, datos de
   tarjeta requeridos según modo de entrada, terminal origen.
 - Persistencia de la transacción, delegación al gateway, normalización de
@@ -164,6 +175,10 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - El reverso técnico `0400` se genera únicamente para un `0200` previamente
   enviado. `0410/DE39=00` se considera confirmación operativa del reverso; una
   fila `0400` sin original no afecta saldo, reportes ni cierre.
+- La caracterización VA-00 comprobó que el `0400/020000` del legacy vigente
+  acusa `0410/00` pero no neutraliza una anulación. Una anulación ambigua queda
+  en revisión operativa durable; no se reenvía desde la app ni se intenta su
+  reverso automático hasta una corrección legacy aprobada y revalidada.
 
 ### 2.4 Procesador existente (on-premises)
 

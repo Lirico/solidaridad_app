@@ -18,7 +18,6 @@ class CreateTransactionRequest(BaseModel):
     expiration_date: str | None = Field(default=None, max_length=4)
 
 
-
 class VoidTransactionRequest(BaseModel):
     card_number: str = Field(min_length=13, max_length=19)
     cvv: str | None = Field(default=None, min_length=3, max_length=4)
@@ -29,6 +28,15 @@ class TransactionResponse(BaseModel):
     transaction_number: str
     status: str
     user_message: str
+    created_at: datetime
+
+
+class VoidOperationResponse(BaseModel):
+    transaction_number: str
+    status: str
+    reason: str | None
+    user_message: str
+    may_start_new_void: bool
     created_at: datetime
 
 

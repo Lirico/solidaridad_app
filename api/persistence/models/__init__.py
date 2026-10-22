@@ -7,6 +7,7 @@ from persistence.models.recovery_alert import RecoveryAlert
 from persistence.models.transaction import Transaction, TransactionNumberCounter
 from persistence.models.transaction_status_event import TransactionStatusEvent
 from persistence.models.user import User
+from persistence.models.void_operation import VoidOperation, VoidOperationAlert
 
 __all__ = [
     "Base",
@@ -19,4 +20,6 @@ __all__ = [
     "TransactionNumberCounter",
     "TransactionStatusEvent",
     "User",
+    "VoidOperation",
+    "VoidOperationAlert",
 ]

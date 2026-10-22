@@ -74,14 +74,14 @@ void main() {
     expect(result.message, 'Venta rechazada por la entidad emisora.');
   });
 
-  test('un 201 UNKNOWN no se trata como rechazo ni como error de red', () async {
+  test('un 200 UNKNOWN no se trata como rechazo ni como error de red', () async {
     stubPost(
       jsonMapResponse({
         'status': 'UNKNOWN',
         'transaction_number': 'OP-9',
         'user_message':
             'No pudimos confirmar el pago. No vuelva a intentarlo; consulte la operación.',
-      }, statusCode: 201),
+      }),
     );
 
     final result = await register();

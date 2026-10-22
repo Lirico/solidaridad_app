@@ -485,7 +485,7 @@ silencioso y consumir `unit` del catálogo para los textos de cantidad.
 | `DECLINED` `51` fondos insuficientes | 201 | "Transacción Rechazada / 51 (Fondos insuficientes)" | "Fondos insuficientes" | VE-05 |
 | `DECLINED` `54` vencida / `65` frecuencia / `05` / `96`… | 201 | **"51 (Fondos insuficientes)"** (código incorrecto) | el motivo real del DE39 | VE-04 · VE-05 · VE-09 |
 | `FAILED` (gateway 503, no conectó) | 201 | "Transacción Rechazada / 51 (Fondos insuficientes)" | "No se pudo procesar el pago. Intente nuevamente." | VE-04 · VE-05 |
-| `UNKNOWN` (timeout / 502 / ISO ilegible) | 201 | "Transacción Rechazada / 51 (Fondos insuficientes)" | "No pudimos confirmar el cobro" + VER OPERACIÓN | VE-04 |
+| `UNKNOWN` (timeout / 502 / ISO ilegible) | 202 | "Transacción Rechazada / 51 (Fondos insuficientes)" | "No pudimos confirmar el cobro" + VER OPERACIÓN | VE-04 |
 | Timeout del cliente a los 45 s (mayor que los 35 s del backend) | — | espera el resultado de la API; si igual corta: pendiente de confirmación, sin invitar a reintentar | igual | VE-02 |
 | Validación 400 (`Monto inválido`, `Modo banda (022)…`) | 400 | "Venta rechazada por la entidad emisora." | el `message` de la API | VE-01 · VE-06 |
 | 409 `Idempotency-Key ya usada con otro request` | 409 | "Venta rechazada por la entidad emisora." | el `message` de la API | VE-06 |

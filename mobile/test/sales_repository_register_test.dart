@@ -63,13 +63,13 @@ void main() {
     expect(result.operationNumber, 'OP-9');
   });
 
-  test('un 201 con estado final no queda en curso', () async {
+  test('un 200 con estado final no queda en curso', () async {
     stubPost(
       jsonMapResponse({
         'status': 'APPROVED',
         'transaction_number': 'OP-1',
         'user_message': 'Aprobado',
-      }, statusCode: 201),
+      }),
     );
 
     final approved = await register();
@@ -81,7 +81,7 @@ void main() {
         'status': 'DECLINED',
         'transaction_number': 'OP-2',
         'user_message': 'Fondos insuficientes',
-      }, statusCode: 201),
+      }),
     );
 
     final declined = await register();

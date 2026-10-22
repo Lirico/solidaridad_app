@@ -158,6 +158,7 @@ class VoidResult {
   final bool isVoided;
   final bool isDeclined;
   final bool isUnknown;
+  final bool isUnderReview;
   final bool connectionError;
   final bool sessionExpired;
   final String message;
@@ -166,6 +167,7 @@ class VoidResult {
     required this.isVoided,
     required this.isDeclined,
     required this.isUnknown,
+    this.isUnderReview = false,
     required this.connectionError,
     required this.sessionExpired,
     required this.message,
@@ -175,6 +177,7 @@ class VoidResult {
     : isVoided = true,
       isDeclined = false,
       isUnknown = false,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = false;
 
@@ -182,6 +185,7 @@ class VoidResult {
     : isVoided = false,
       isDeclined = true,
       isUnknown = false,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = false;
 
@@ -189,6 +193,7 @@ class VoidResult {
     : isVoided = false,
       isDeclined = false,
       isUnknown = true,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = false;
 
@@ -197,6 +202,7 @@ class VoidResult {
   }) : isVoided = false,
        isDeclined = false,
        isUnknown = false,
+       isUnderReview = false,
        connectionError = true,
        sessionExpired = false;
 
@@ -204,9 +210,19 @@ class VoidResult {
     : isVoided = false,
       isDeclined = false,
       isUnknown = false,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = true,
       message = 'Su sesión ha expirado. Vuelva a iniciar sesión.';
+
+  const VoidResult.underReview({
+    this.message = 'La anulación está en verificación con casa central.',
+  }) : isVoided = false,
+       isDeclined = false,
+       isUnknown = false,
+       isUnderReview = true,
+       connectionError = false,
+       sessionExpired = false;
 }
 
 class SaleResponse {

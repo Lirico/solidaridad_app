@@ -103,7 +103,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = const Color(0xFF2ECC71);
         statusIcon = Icons.check_circle_outline;
         statusTitle = '¡Transacción Aprobada!';
-        statusSubtitle = 'El pago fue autorizado correctamente.';
+        statusSubtitle = 'La descarga fue autorizada correctamente.';
       case PaymentResult.declined:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
@@ -119,7 +119,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.manage_search;
         statusTitle = 'Verificación requerida';
         statusSubtitle =
-            'Verifique la operación con casa central. El cobro podría haberse procesado.';
+            'Verifique la operación con casa central. La descarga podría haberse procesado.';
       case PaymentResult.failed:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
@@ -141,7 +141,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
       appBar: const AppHeader(
-        title: 'Resultado del Cobro',
+        title: 'Resultado de la Descarga',
         actions: [UserMenuButton(), SizedBox(width: 8)],
       ),
       // Sin flecha atrás: la salida es FINALIZAR / VENTA / ⋯.

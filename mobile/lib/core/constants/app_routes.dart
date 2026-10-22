@@ -1,6 +1,7 @@
 class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
+  static const String terminalId = '/terminal_id';
   static const String saleForm = '/sales_form';
   static const String saleReview = '/sale_review';
   static const String saleProcessing = '/sale_processing';

@@ -4,14 +4,19 @@ import '../../../../core/theme/app_spacing.dart';
 
 class AuthCard extends StatelessWidget {
   final Widget child;
+  final EdgeInsetsGeometry padding;
 
-  const AuthCard({super.key, required this.child});
+  const AuthCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(AppSpacing.xl),
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: padding,
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(16),

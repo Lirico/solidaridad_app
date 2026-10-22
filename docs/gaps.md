@@ -4,7 +4,31 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-15
+Última revisión: 2026-10-22
+
+> ✅ **Cobertura de integración HTTP (2026-10-15):** se agregó el gate
+> `make -C api integ-test`, parametrizable con `API_BASE_URL` y
+> `INTEGRATION_GATEWAY_CONTROL_URL`. Ejecuta solicitudes contra una API ya
+> levantada, PostgreSQL migrado y un gateway HTTP controlado, cubriendo auth,
+> catálogo, ventas, idempotencia/concurrencia, PENDING, anulación, cierre de
+> lote y saldo. No sustituye la matriz determinista de workers ni prueba contra
+> un ambiente productivo. Evidencia:
+> `api/tests/integration/test_api_http_integration.py` y
+> `api/tests/integration/gateway_stub.py`.
+> Durante su primera ejecución contra PostgreSQL real se detectó y corrigió la
+> constraint que impedía persistir un evento `GATEWAY_RESULT` con outcome de
+> autorización. La migración `20261015_0012` permite dicho outcome sin número
+> de intento, que sigue siendo obligatorio únicamente para
+> `AUTHORIZATION_ATTEMPT`.
+
+> ✅ **Fixtures E2E del procesador local (2026-10-15):**
+> `make integ-test-processor` recrea explícitamente el volumen MySQL local del
+> procesador, carga tarjetas versionadas con saldo, sin saldo, sin producto y
+> ausente, y ejecuta el recorrido API → gateway TCP → autorizador C. Los
+> escenarios de fallas de red continúan en el gateway HTTP programable, porque
+> no son deterministas contra el autorizador. Evidencia:
+> `payment_processor/utils/demo/integration_fixtures.sql` y
+> `api/tests/integration/test_local_processor_http_integration.py`.
 
 > ✅ **Último cambio (2026-10-15, RA-17):** la matriz determinista completa
 > prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
@@ -71,6 +95,16 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > históricas permanecen no recuperables, con datos de recuperación nulos. Ver
 > G-P1-09 y G-P1-15.
 
+> ✅ **Último cambio (2026-10-06, errores de formulario en vivo):** los
+> mensajes rojos de los inputs ya no quedan fijos después del primer envío.
+> Los formularios de login, registro, cambio de contraseña, nueva operación,
+> ingreso manual de venta, ingreso manual de saldo y anulación usan
+> `AutovalidateMode.onUserInteraction`. Al corregir un campo se revalida el
+> formulario: el error desaparece si el dato ya es válido y se actualiza si
+> sigue siendo inválido, también en validaciones cruzadas como confirmar
+> contraseña. El error puede aparecer mientras se escribe, antes de enviar.
+> Test en `mobile/test/login_form_validation_test.dart`.
+
 > ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
 > lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
 > (`YYMM`) en Flutter. API y gateway ya no definen ni propagan `entry_mode` ni
@@ -133,6 +167,18 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > decimal se rechaza en el formulario. El mapa de DE39 de la API y del gateway
 > incluye el código `13` (monto inválido) y los códigos `12`, `17`, `19`, `25`,
 > `30`, `89` y `95`. Ver G-P2-07.
+
+> ✅ **Último cambio (2026-09-24, VE-05 motivo en la pantalla de resultado):** el
+> rechazo y el fallo técnico ya no muestran el texto fijo ni el código 51. El
+> subtítulo y la fila de respuesta usan `userMessage` cuando el servidor lo
+> envió. Ver G-P1-11.
+
+> ✅ **Último cambio (2026-09-24, VE-06 mensajes de error de la API):** la app
+> leía solo `user_message`. Los 400/409 de venta y anulación responden
+> `message`, y ese texto se perdía detrás de «Venta rechazada por la entidad
+> emisora» / «Anulación rechazada por la entidad emisora». `apiUserMessage`
+> usa `user_message` y, si no viene, `message`. Ver G-P1-12.
+
 > ⚠️ **Historial sustituido (2026-10-05):** la solución provisional basada en
 > `entry_mode` quedó retirada. El contrato vigente es PAN + vencimiento `YYMM`,
 > sin Track 2, y se describe al inicio de este documento y en G-P1-06.
@@ -570,6 +616,8 @@ Verifone (banda + térmica).
 | G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias y ejecución contra `authkig` + MySQL locales. **Decisión 2026-10-13:** el `0400` solo se genera para un `0200` previamente enviado y `0410/00` se acepta como confirmación; un `0400` sin original no interviene en el cálculo de saldo, reportes ni cierre. **RA-01:** se agregaron `ReverseCommand`, `ReversalResult`, `IsoProcessor.reverse`, mock, transporte TCP de un solo intento y `build_reversal_request` separado de la anulación. **RA-02:** `POST /v1/reverse` ejecuta un intento y distingue `NOT_SENT` de `INDETERMINATE`. **RA-03 (2026-10-13):** `transactions` persiste datos y outcome de recuperación antes del efecto externo; filas históricas quedan fuera de recuperación automática. **RA-04 (2026-10-13):** migración `20261013_0009`, modelos y repositorios agregan `processor_jobs` y `payment_processing_config`, fila `default`, constraints y validación de transiciones, sin ejecutar aún un worker. **RA-05 (2026-10-13):** la API tipa autorización como `APPROVED`/`DECLINED`/`NOT_SENT`/`INDETERMINATE`, incorpora el puerto y cliente HTTP de `/v1/reverse`, clasifica fallos de transporte/HTTP y conserva contratos separados para balance y anulación. **RA-06 (2026-10-14):** la API toma un snapshot de política, reintenta el mismo `0200` solo tras `NOT_SENT`, conserva STAN, ticket e `Idempotency-Key`, aplica backoff/jitter dentro del presupuesto síncrono y publica `FAILED` únicamente al agotar resultados no enviados. Cada intento queda registrado sin PAN, vencimiento ni clave de idempotencia. **RA-07 (2026-10-14):** un resultado `INDETERMINATE` mantiene la venta en `PENDING` y, antes de responder `202`, persiste atómicamente el resultado, un único job `REVERSE/READY` con STAN de reverso y evento de auditoría. No se llama a `reverse()` durante el request. Un watchdog explícito bloquea pendientes envejecidas sin job y las encola conservadoramente. **RA-08 (2026-10-14):** `GET /v1/transactions/{transaction_number}` queda aislado a la terminal autenticada y proyecta `READY`/`PROCESSING`/`RETRY` como `PENDING / PROCESSING` (polling de 2 s, sin nueva venta) y `MANUAL_REVIEW` como `PENDING / UNDER_REVIEW` (sin polling, nueva venta permitida), sin exponer detalles del job. El `POST` y su replay devuelven la misma proyección; `VOIDED` conserva su contrato de anulación independiente. Evidencia: pruebas de contratos públicos, aislamiento y OpenAPI. **RA-09 (2026-10-14):** `ReversalJobWorker.run_once()` reclama a lo sumo un `REVERSE` vencido con `FOR UPDATE SKIP LOCKED`, confirma el claim antes de red y lo protege con `claim_token`; reconstruye el `0400` desde Postgres, reintenta solo `NOT_SENT` con backoff, confirma `FAILED` tras `REVERSED_CONFIRMED` y pasa rechazo, agotamiento, ambigüedad o datos faltantes a `MANUAL_REVIEW`. **RA-10 (2026-10-14):** el monitor mueve un `PROCESSING` vencido a `MANUAL_REVIEW` y abre una alerta durable única. **RA-11 (2026-10-14):** cada proceso FastAPI puede activar un thread de recuperación con sesión y cliente por vuelta; lifecycle, shutdown con gracia, monitoreo de jobs abandonados y readiness observable quedan cubiertos. La activación queda explícitamente deshabilitada por defecto. **RA-12 (2026-10-14):** casa central consulta temporalmente por SQL de solo lectura, sin rol ni endpoints de API; la resolución auditada y el reintento manual quedan diferidos. **Pendiente:** guardia de cierre (RA-13) y herramienta administrativa de resolución. Última revisión: 2026-10-14. |
 | G-P1-15 | PAN de recuperación persistido en texto plano amplía deuda PCI | open | **RA-03 (2026-10-13):** aceptación de riesgo ya definida en `plan-reversos-automaticos.md`. El PAN y vencimiento se guardan para recuperación durable, pero se excluyen de respuestas, eventos, errores y `repr`; CVV nunca se persiste. Pendiente: cifrado/tokenización a nivel aplicación, política de retención/borrado, controles y auditoría de acceso a DB/backups. |
 | G-P1-16 | Métricas y alertas automáticas de recuperación | open | **RA-16 (2026-10-15):** se difiere la exposición de métricas por estado, antigüedad, intentos y tiempo de resolución. Mientras tanto, operación usa `GET /health/ready`, alertas durables `recovery_alerts` y eventos estructurados sin datos sensibles; ver `docs/runbook-recuperacion-pagos.md`. |
+| G-P1-11 | Resultado de venta con texto y código fijos | done | **2026-09-24 (VE-05):** el rechazo, el fallo técnico y el error de conexión muestran `userMessage` en el subtítulo. La fila de un rechazo usa ese texto, o «Rechazada» si no hay mensaje; ya no pinta `51 (Fondos insuficientes)`. **2026-10-15:** un `status: UNKNOWN` queda en `PaymentResult.failed` y un `PENDING` sigue en curso. El timeout del cliente permanece como error de conexión para reintentar con la misma clave. |
+| G-P1-12 | Errores 400/409 de la API no llegan al operador | done | **2026-09-24 (VE-06):** `apiUserMessage` lee `user_message` y, si no viene, `message`, en la venta y en la anulación. Si el servidor no manda texto, se mantiene el fallback genérico. Test: `mobile/test/sales_repository_messages_test.dart`. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `AUTHORIZATION_ATTEMPT`, `GATEWAY_RESULT`, `REVERSAL_ENQUEUED`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migraciones `20260807_0006` y `20261014_0010`; esta última agrega número y outcome de cada intento de autorización sin PAN, vencimiento ni `Idempotency-Key`. **RA-07 (2026-10-14):** el resultado ambiguo y el enqueue del job de reverso quedan auditados antes de responder. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). Última revisión: 2026-10-14. |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |
 | G-P1-14 | Consulta de saldo parcial presentada como completa | done | **2026-10-06:** antes la API llamaba los cinco productos en serie y devolvía `APPROVED` con las filas que alcanzaban a responder. Ahora las despacha concurrentemente, espera los resultados terminales del gateway/cliente ISO y devuelve `FAILED` sin saldos si cualquiera tuvo un fallo técnico terminal (`FAILED`, `UNKNOWN` o excepción). El código `06` no es fallo técnico: conserva la fila en `0.00`. Tests en `api/tests/test_check_balance.py`. |
@@ -679,6 +727,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Aviso al fallar la carga de productos o historial | `DataLoadException` en lugar del catálogo fijo o del historial vacío. Aviso con REINTENTAR en el formulario y en el historial; la paginación no borra lo ya cargado. Cantidad con la unidad del catálogo. Ver G-P1-07. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
+| Errores de formulario que se actualizan al escribir | Los `Form` de login, registro, cambio de contraseña, venta, ingreso manual (venta y saldo) y anulación usan `AutovalidateMode.onUserInteraction`. El mensaje rojo se recalcula al corregir el campo, sin volver a enviar. Test en `mobile/test/login_form_validation_test.dart`. |
 | UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo navega al flujo de saldo, Cerrar Lote deshabilitado + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 

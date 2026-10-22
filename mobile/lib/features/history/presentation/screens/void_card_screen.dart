@@ -104,6 +104,7 @@ class _VoidCardScreenState extends State<VoidCardScreen> {
       body: AppSheetPanel(
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
             child: Column(

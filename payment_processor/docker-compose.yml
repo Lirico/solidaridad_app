@@ -43,6 +43,11 @@ services:
       dockerfile: Dockerfile
     container_name: solidaridad-processor-auth
     restart: unless-stopped
+    environment:
+      # El autorizador legacy bloquea ventas entre 23:00 y 23:29 según la hora
+      # del proceso. UTC deja el entorno local reproducible independientemente
+      # de la zona horaria de la estación de desarrollo.
+      TZ: ${AUTH_TIMEZONE:-Etc/UTC}
     depends_on:
       mysql:
         condition: service_healthy

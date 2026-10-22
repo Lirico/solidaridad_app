@@ -74,3 +74,37 @@ API pública del sistema. Endpoints accesibles desde la app mobile y herramienta
 | Módulo | Total | Pass | Fail | Blocked | N/A | Pendiente |
 |--------|-------|------|------|---------|-----|-----------|
 | API | 43 | 41 | 1 | 0 | 3 | 1 |
+
+---
+
+## Suite de integración HTTP automatizada
+
+> **Actualización 2026-10-15:** los casos de esta sección se ejecutan con
+> `make -C api integ-test`. A diferencia de los tests de controlador, el
+> cliente pega por HTTP a una API levantada y usa PostgreSQL migrado; el gateway
+> es un proceso HTTP de prueba, programable por escenario. `API_BASE_URL` e
+> `INTEGRATION_GATEWAY_CONTROL_URL` permiten seleccionar ambos endpoints.
+
+| Grupo | Casos cubiertos |
+|-------|-----------------|
+| Infraestructura | ping, liveness, CORS, JSON inválido y forma homogénea de error |
+| Auth | registro, credenciales indistinguibles, login, cambio de contraseña, límites de campos y Bearer ausente |
+| Catálogo e historial | catálogo autenticado, listado, detalle y aislamiento por terminal |
+| Venta | aprobación, rechazo, 503/reintento, 502/PENDING, validaciones, conflicto y replay de idempotencia, concurrencia y ausencia de CVV en el gateway |
+| Anulación y lote | PAN no coincidente, rechazo/aprobación, replay, cierre, lote vacío y bloqueo de anulación tras el corte |
+| Saldo | cinco consultas, respuesta completa y fallo técnico atómico sin saldos parciales |
+
+Los escenarios del worker de recuperación que requieren dos procesos y
+reclamos concurrentes siguen cubiertos de forma determinista en
+`api/tests/test_recovery_end_to_end.py`; el gate HTTP valida el contrato
+terminal `PENDING` con el worker desactivado.
+
+### Procesador local con fixtures SQL
+
+`make integ-test-processor` resetea el volumen Docker local de MySQL del
+procesador y carga `payment_processor/utils/demo/integration_fixtures.sql`
+antes de correr `api/tests/integration/test_local_processor_http_integration.py`.
+El gate verifica por HTTP que una tarjeta con saldo sea aprobada, y que las
+tarjetas sin saldo, sin producto y ausente sean rechazadas. Las tarjetas y sus
+resultados esperados están versionados en `payment_processor/README.md`; los
+casos de red permanecen en la suite de gateway controlado.

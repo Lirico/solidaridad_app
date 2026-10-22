@@ -92,6 +92,11 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     }
 
     final PaymentResult result = operation.result;
+    final serverMessage = operation.userMessage?.trim();
+    String withServerMessage(String fallback) =>
+        (serverMessage != null && serverMessage.isNotEmpty)
+        ? serverMessage
+        : fallback;
 
     final Color statusColor;
     final IconData statusIcon;
@@ -103,12 +108,14 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = const Color(0xFF2ECC71);
         statusIcon = Icons.check_circle_outline;
         statusTitle = '¡Transacción Aprobada!';
-        statusSubtitle = 'El pago fue autorizado correctamente.';
+        statusSubtitle = 'La descarga fue autorizada correctamente.';
       case PaymentResult.declined:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
         statusTitle = 'Transacción Rechazada';
-        statusSubtitle = 'La terminal reportó un error en la autorización.';
+        statusSubtitle = withServerMessage(
+          'La terminal reportó un error en la autorización.',
+        );
       case PaymentResult.pending:
         statusColor = Colors.orange;
         statusIcon = Icons.hourglass_top;
@@ -119,18 +126,21 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusIcon = Icons.manage_search;
         statusTitle = 'Verificación requerida';
         statusSubtitle =
-            'Verifique la operación con casa central. El cobro podría haberse procesado.';
+            'Verifique la operación con casa central. La descarga podría haberse procesado.';
       case PaymentResult.failed:
         statusColor = const Color(0xFFE74C3C);
         statusIcon = Icons.error_outline;
         statusTitle = 'Error de Autorización';
-        statusSubtitle = 'No fue posible completar la autorización.';
+        statusSubtitle = withServerMessage(
+          'No fue posible completar la autorización.',
+        );
       case PaymentResult.connectionError:
         statusColor = const Color(0xFFFF8C00);
         statusIcon = Icons.wifi_off_outlined;
         statusTitle = 'Error de Conexión';
-        statusSubtitle =
-            'No se pudo contactar con el procesador. Verifique su conectividad y reintente.';
+        statusSubtitle = withServerMessage(
+          'No se pudo contactar con el procesador. Verifique su conectividad y reintente.',
+        );
       case PaymentResult.voided:
         statusColor = Colors.grey;
         statusIcon = Icons.undo;
@@ -141,7 +151,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
       appBar: const AppHeader(
-        title: 'Resultado del Cobro',
+        title: 'Resultado de la Descarga',
         actions: [UserMenuButton(), SizedBox(width: 8)],
       ),
       // Sin flecha atrás: la salida es FINALIZAR / VENTA / ⋯.

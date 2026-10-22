@@ -6,6 +6,30 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-10-15
 
+> ✅ **Cobertura de integración HTTP (2026-10-15):** se agregó el gate
+> `make -C api integ-test`, parametrizable con `API_BASE_URL` y
+> `INTEGRATION_GATEWAY_CONTROL_URL`. Ejecuta solicitudes contra una API ya
+> levantada, PostgreSQL migrado y un gateway HTTP controlado, cubriendo auth,
+> catálogo, ventas, idempotencia/concurrencia, PENDING, anulación, cierre de
+> lote y saldo. No sustituye la matriz determinista de workers ni prueba contra
+> un ambiente productivo. Evidencia:
+> `api/tests/integration/test_api_http_integration.py` y
+> `api/tests/integration/gateway_stub.py`.
+> Durante su primera ejecución contra PostgreSQL real se detectó y corrigió la
+> constraint que impedía persistir un evento `GATEWAY_RESULT` con outcome de
+> autorización. La migración `20261015_0012` permite dicho outcome sin número
+> de intento, que sigue siendo obligatorio únicamente para
+> `AUTHORIZATION_ATTEMPT`.
+
+> ✅ **Fixtures E2E del procesador local (2026-10-15):**
+> `make integ-test-processor` recrea explícitamente el volumen MySQL local del
+> procesador, carga tarjetas versionadas con saldo, sin saldo, sin producto y
+> ausente, y ejecuta el recorrido API → gateway TCP → autorizador C. Los
+> escenarios de fallas de red continúan en el gateway HTTP programable, porque
+> no son deterministas contra el autorizador. Evidencia:
+> `payment_processor/utils/demo/integration_fixtures.sql` y
+> `api/tests/integration/test_local_processor_http_integration.py`.
+
 > ✅ **Último cambio (2026-10-15, RA-17):** la matriz determinista completa
 > prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
 > timeout y reclamo concurrente entre workers. El rollout por canary, rollback
@@ -70,6 +94,16 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > vencimiento quedan fuera de respuestas, eventos y `repr`. Las filas
 > históricas permanecen no recuperables, con datos de recuperación nulos. Ver
 > G-P1-09 y G-P1-15.
+
+> ✅ **Último cambio (2026-10-06, errores de formulario en vivo):** los
+> mensajes rojos de los inputs ya no quedan fijos después del primer envío.
+> Los formularios de login, registro, cambio de contraseña, nueva operación,
+> ingreso manual de venta, ingreso manual de saldo y anulación usan
+> `AutovalidateMode.onUserInteraction`. Al corregir un campo se revalida el
+> formulario: el error desaparece si el dato ya es válido y se actualiza si
+> sigue siendo inválido, también en validaciones cruzadas como confirmar
+> contraseña. El error puede aparecer mientras se escribe, antes de enviar.
+> Test en `mobile/test/login_form_validation_test.dart`.
 
 > ✅ **Último cambio (2026-10-05, restauración del contrato legacy):** la
 > lectura de banda vuelve a ser solo una forma de completar PAN y vencimiento
@@ -693,6 +727,7 @@ Para no reabrir gaps resueltos, mantener aquí lo cerrado con evidencia breve.
 | Manejo de tokens expirados (401) en mobile | `SalesRepository`/`AuthRepository` detectan 401 y propagan `SessionExpiredException`/`sessionExpired=true`; cubits emiten `SalesSessionExpired`/`AuthSessionExpired`; pantallas hacen logout y redirigen a login. Ver G-P0-17. |
 | Aviso al fallar la carga de productos o historial | `DataLoadException` en lugar del catálogo fijo o del historial vacío. Aviso con REINTENTAR en el formulario y en el historial; la paginación no borra lo ya cargado. Cantidad con la unidad del catálogo. Ver G-P1-07. |
 | Status history append-only (persistencia) | Tabla `transaction_status_events`; eventos en create/gateway/void e `IDEMPOTENT_HIT` en replay. Sin API. Ver G-P1-10. |
+| Errores de formulario que se actualizan al escribir | Los `Form` de login, registro, cambio de contraseña, venta, ingreso manual (venta y saldo) y anulación usan `AutovalidateMode.onUserInteraction`. El mensaje rojo se recalcula al corregir el campo, sin volver a enviar. Test en `mobile/test/login_form_validation_test.dart`. |
 | UX: botones atrás/cancelar y copy en español | Navegación inferior fija (`AppBottomNavBar`) con ← atrás \| VENTA (→ selección de producto/cantidad) \| ⋯ "más" (desplegable blanco: Consultar saldo navega al flujo de saldo, Cerrar Lote deshabilitado + Historial de ventas; Cambiar Contraseña en el menú del ícono de usuario) en todas las screens interactivas; logo `logo.png` en la cabecera (excepto Splash/Iniciando/Login, donde no hay ícono de usuario o no corresponde); las flechas se ocultan en Procesando/Resultados (salida por FINALIZAR/VENTA); cancelar en espera de tarjeta hace `maybePop` (dispara `cancelReadMsr`+`tearDown` en `dispose`); Tarjeta → waiting; QR aviso próximamente; mensajes sin jerga EN (Timeout/AWS/API/`e.toString()`). |
 
 

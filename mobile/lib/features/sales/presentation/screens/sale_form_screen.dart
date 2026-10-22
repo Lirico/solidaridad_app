@@ -137,6 +137,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
       body: AppSheetPanel(
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
             child: Column(

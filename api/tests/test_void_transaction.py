@@ -87,6 +87,9 @@ def test_void_approves() -> None:
     assert req.original_ticket == "00000001"
     assert req.void_ticket == req.stan
     transactions.apply_void_result.assert_called_once()
+    assert transactions.apply_void_result.call_args.kwargs["user_message"] == (
+        "Anulación aprobada"
+    )
 
 
 def test_void_already_voided_is_idempotent() -> None:

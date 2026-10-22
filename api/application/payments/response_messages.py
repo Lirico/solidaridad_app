@@ -1,25 +1,44 @@
-"""Map processor response codes to stable Spanish user messages."""
+"""Map processor response codes to the client's response catalog."""
 
+MSG_APPROVED = "APROBADA"
+
+# Descripción del catálogo de respuestas del cliente. Los códigos que ese
+# catálogo no lista quedan en el texto genérico de rechazo.
 _MESSAGES: dict[str, str] = {
-    "00": "Pago aprobado",
-    "05": "Transacción no autorizada",
-    "12": "Transacción inválida",
-    "13": "Monto inválido",
-    "14": "Tarjeta inválida",
-    "17": "Cupón duplicado",
-    "19": "Error al registrar la operación",
-    "25": "Operación no encontrada",
-    "30": "Error de formato",
-    "51": "Fondos insuficientes",
-    "54": "Tarjeta vencida",
-    "55": "CVV inválido",
-    "57": "Transacción no permitida",
-    "61": "Excede el límite",
-    "65": "Excede frecuencia de uso",
-    "89": "Terminal desconocida",
-    "91": "Emisor no disponible",
-    "95": "Diferencia de cierre",
-    "96": "Error del sistema",
+    "00": MSG_APPROVED,
+    "03": "COMERCIO DESCONOCIDO / SUSPENDIDO",
+    "04": "TITULAR EN BOLETIN",
+    "05": "TRANSACCION DENEGADA",
+    "06": "TIPO DE TRANSACCION DESCONOCIDO",
+    "07": "RETENGA Y LLAME",
+    "13": "MONTO INVALIDO",
+    "14": "TITULAR DESCONOCIDO / SUSPENDIDO",
+    "15": "NRO DOCUMENTO DESCONOCIDO",
+    "16": "ERROR EN FECHA DESDE",
+    "17": "CUPON DUPLICADO",
+    "18": "ERROR EN DIGITO VERIFICADOR",
+    "19": "ERROR EN GRABACION",
+    "21": "CUOTAS EXCEDE TOPE DEL COMERCIO",
+    "23": "ERROR EN CANTIDAD DE CUOTAS",
+    "25": "ANULACION DESCONOCIDA",
+    "30": "ERROR EN FORMATO",
+    "31": "PLAN 1, ERROR FECHAS PROMOCION",
+    "38": "COMERCIO SUSPENDIDO",
+    "40": "FALTA BOLETIN",
+    "41": "RETENGA Y LLAME",
+    "48": "CUOTAS EXCEDE TOPE COMERCIO",
+    "49": "ERROR EN FECHA DE VENCIMIENTO",
+    "53": "COMERCIO FIDELIDAD DESCONOCIDO",
+    "54": "TARJETA VENCIDA",
+    "61": "FALTA / EXCEDE LIMITE",
+    "65": "EXCEDE LIMITE PROPIO",
+    "76": "NO ENCONTRO REGISTRO AL ANULAR",
+    "77": "ERROR PLAN CUOTAS",
+    "78": "ANULACION DESCONOCIDA",
+    "80": "NO TIENE MOVIMIENTOS AL CERRAR CAJERO",
+    "89": "TERMINAL DESCONOCIDA",
+    "91": "EMISOR FUERA DE LINEA",
+    "95": "CIERRE CON DIFERENCIA",
 }
 
 MSG_PENDING = "Operación en curso, reintente en unos segundos"
@@ -46,7 +65,7 @@ MSG_BALANCE_FAILED = "No se pudo consultar el saldo. Intente nuevamente."
 
 def message_for_code(response_code: str | None, *, approved: bool) -> str:
     if approved:
-        return _MESSAGES.get(response_code or "00", "Pago aprobado")
+        return _MESSAGES.get(response_code or "00", MSG_APPROVED)
     if response_code is None:
         return MSG_DECLINED_DEFAULT
     return _MESSAGES.get(response_code, MSG_DECLINED_DEFAULT)

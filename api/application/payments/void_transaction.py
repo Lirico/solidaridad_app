@@ -13,6 +13,7 @@ from application.payments.ports import (
     VoidResult,
 )
 from application.payments.response_messages import (
+    MSG_APPROVED,
     MSG_VOID_DECLINED,
     MSG_VOID_FAILED,
     MSG_VOID_UNKNOWN,
@@ -160,7 +161,7 @@ class VoidTransaction:
         if result.outcome == GatewayOutcome.APPROVED:
             status = TransactionStatus.VOIDED
             message = message_for_code(result.response_code, approved=True)
-            if message == "Pago aprobado":
+            if message == MSG_APPROVED:
                 message = MSG_VOIDED
             final = self._transactions.apply_void_result(
                 transaction_id=transaction_id,

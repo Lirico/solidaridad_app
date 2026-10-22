@@ -2,18 +2,18 @@ from application.payments.response_messages import message_for_code
 
 
 def test_approved_default() -> None:
-    assert message_for_code(None, approved=True) == "APROBADA"
+    assert message_for_code(None, approved=True) == "Aprobada"
 
 
 def test_declined_known_code() -> None:
     assert (
         message_for_code("14", approved=False)
-        == "TITULAR DESCONOCIDO / SUSPENDIDO"
+        == "Titular desconocido / suspendido"
     )
-    assert message_for_code("13", approved=False) == "MONTO INVALIDO"
-    assert message_for_code("65", approved=False) == "EXCEDE LIMITE PROPIO"
-    assert message_for_code("77", approved=False) == "ERROR PLAN CUOTAS"
-    assert message_for_code("89", approved=False) == "TERMINAL DESCONOCIDA"
+    assert message_for_code("13", approved=False) == "Monto inválido"
+    assert message_for_code("65", approved=False) == "Excede límite propio"
+    assert message_for_code("77", approved=False) == "Error plan cuotas"
+    assert message_for_code("89", approved=False) == "Terminal desconocida"
 
 
 def test_declined_unknown_code() -> None:

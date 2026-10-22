@@ -86,7 +86,13 @@ class SaleStatusContent extends StatelessWidget {
               const Divider(height: 12),
               _buildTicketRow('Tarjeta', operation?.cardNumber ?? '---'),
               const Divider(height: 12),
-              _buildTicketRow('Código de respuesta', _responseCode(result)),
+              _buildTicketRow(
+                'Código de respuesta',
+                _responseCode(result),
+                wrapValue:
+                    result == PaymentResult.declined ||
+                    result == PaymentResult.failed,
+              ),
             ],
           ),
         ),
@@ -211,16 +217,19 @@ class SaleStatusContent extends StatelessWidget {
   }
 
   String _responseCode(PaymentResult result) {
+    final message = operation?.userMessage?.trim();
     switch (result) {
       case PaymentResult.approved:
         return '00 (Aprobado)';
       case PaymentResult.declined:
-        return '51 (Fondos insuficientes)';
+        if (message != null && message.isNotEmpty) return message;
+        return 'Rechazada';
       case PaymentResult.pending:
         return 'PENDIENTE';
       case PaymentResult.underReview:
         return 'VERIFICACIÓN REQUERIDA';
       case PaymentResult.failed:
+        if (message != null && message.isNotEmpty) return message;
         return 'ERROR DE AUTORIZACIÓN';
       case PaymentResult.connectionError:
         return '99 (Tiempo agotado)';
@@ -229,7 +238,12 @@ class SaleStatusContent extends StatelessWidget {
     }
   }
 
-  Widget _buildTicketRow(String label, String value) {
+  Widget _buildTicketRow(String label, String value, {bool wrapValue = false}) {
+    const valueStyle = TextStyle(
+      fontSize: 13,
+      color: Colors.black87,
+      fontWeight: FontWeight.bold,
+    );
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -250,19 +264,13 @@ class SaleStatusContent extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Flexible(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerRight,
-            child: Text(
-              value,
-              maxLines: 1,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          child: wrapValue
+              ? Text(value, textAlign: TextAlign.right, style: valueStyle)
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(value, maxLines: 1, style: valueStyle),
+                ),
         ),
       ],
     );

@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-15
+Última revisión: 2026-10-22
 
 > ✅ **Cobertura de integración HTTP (2026-10-15):** se agregó el gate
 > `make -C api integ-test`, parametrizable con `API_BASE_URL` y

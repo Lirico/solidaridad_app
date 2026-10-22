@@ -1,19 +1,26 @@
 # Contrato observado del reverso legacy (`0400`)
 
-> RA-00 · Evidencia obtenida el 2026-10-12 contra el stack Docker local y el
+> RA-00 / VA-00 · Evidencia obtenida el 2026-10-22 contra el stack Docker local y el
 > binario legacy sin modificaciones.
 
 ## Conclusión operativa
 
-El procesador devuelve `0410/DE39=00` tanto cuando encuentra la venta original
-como cuando no existe. Esto no produce un saldo negativo: el cálculo de consumo
-solo incluye filas `0200`, y reportes y cierre excluyen `0400`.
+Para una **venta** (`DE3=000000`), el procesador devuelve `0410/DE39=00` tanto
+cuando encuentra la original como cuando no existe. Esto no produce un saldo
+negativo: el cálculo de consumo solo incluye filas `0200`, y reportes y cierre
+excluyen `0400`.
+
+Esa conclusión no se puede generalizar a una **anulación** (`DE3=020000`). La
+sonda integrada de venta → anulación → reverso de anulación obtuvo también
+`0410/00`, pero la fila `0200/020000` siguió activa: la anulación no fue
+compensada. El acuse ISO confirma recepción, no el efecto económico.
 
 El contrato operativo acordado establece que:
 
 - el `0400` solo se genera para un `0200` previamente enviado;
-- `0410/00` se clasifica como `REVERSED_CONFIRMED`;
-- un reverso de una original inexistente es económicamente neutro;
+- `0410/00` se clasifica como `REVERSED_CONFIRMED` solo para el vector de venta
+  (`DE3=000000`) caracterizado;
+- un reverso de venta cuya original no existe es económicamente neutro;
 - una respuesta inválida o un fallo ambiguo de transporte permanece
   `INDETERMINATE`.
 
@@ -48,6 +55,12 @@ vencimiento, importe, STAN, terminal, ticket, producto, PAN, lote y código de
 proceso. Sin embargo, que la búsqueda no encuentre filas no es un error:
 `reverso()` inserta igualmente una fila `0400` y devuelve éxito.
 
+Para el vector Verifone de anulación, `anula_cupon()` persiste el `0200/020000`
+sin vencimiento (`NULL`), aunque la trama recibida contiene `DE14=1228`.
+`valida_cupon_reverso()` luego exige ese vencimiento para encontrar la original.
+Por ello el `0400/020000` no la encuentra, inserta otra fila `0400/020000` y
+responde éxito. Es un defecto legacy reproducible; este cambio no modifica C.
+
 ## Matriz reproducida
 
 | Escenario | DE39 | Estado de DB después | Clasificación operativa |
@@ -57,6 +70,7 @@ proceso. Sin embargo, que la búsqueda no encuentre filas no es un error:
 | Mismo reverso repetido | `00` | pasa de 2 a 3 filas `0400`, sin impacto adicional | `REVERSED_CONFIRMED` |
 | Reverso antes de registrar la venta | `00` | 1 fila `0400` | fuera del flujo admitido |
 | Venta después del reverso anticipado | `00` | 1 fila `0400` + 1 fila `0200` activa | fuera del flujo admitido |
+| Anulación existente y luego `0400/020000` | `00` | persiste el `0200/020000` con vencimiento `NULL` y agrega un `0400/020000` | `ACKNOWLEDGED_NOT_COMPENSATED` |
 
 La repetición es idempotente respecto del código HTTP/ISO aparente, pero no en
 persistencia: cada repetición agrega otra fila. Tampoco existe un tombstone que
@@ -65,12 +79,13 @@ impida una venta tardía.
 ## Evidencia ejecutable
 
 - `tests/fixtures/legacy_reversal_contract.json` contiene las tramas binarias
-  sintéticas y los conteos observados; no contiene datos de producción.
+  sintéticas, incluidos el vector de anulación y su reverso fallido; no contiene
+  datos de producción.
 - `tests/test_legacy_reversal_contract.py` verifica los MTI, bitmaps, códigos y
   la clasificación operativa aceptada.
-- `tests/manual/record_legacy_reversal_contract.py` reproduce los cuatro casos
+- `tests/manual/record_legacy_reversal_contract.py` reproduce los escenarios
   contra `authkig` + MySQL locales. Solo limpia los STAN/tickets reservados
-  `890001`–`890003` de la tarjeta sintética del seed.
+  `890001`–`890005` de la tarjeta sintética del seed.
 
 Reproducción manual:
 
@@ -85,5 +100,8 @@ make check
 ## Decisión de integración
 
 No se modifica el C legacy. El gateway interpreta `0410/00` como reverso
-confirmado y no reintenta internamente. La orquestación superior conserva
-`INDETERMINATE` cuando no obtiene una respuesta ISO válida.
+confirmado **solamente para el vector de venta caracterizado**
+(`DE3=000000`). No debe exponer ni emitir un reverso de anulación: para
+`DE3=020000`, `0410/00` quedó probado como acuse sin compensación. La
+orquestación superior conserva `INDETERMINATE` cuando no obtiene una respuesta
+ISO válida y deriva las anulaciones ambiguas a revisión durable.

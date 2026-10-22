@@ -1,5 +1,6 @@
 """Transactions HTTP controller."""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
@@ -12,6 +13,7 @@ from application.payments.create_transaction import (
     CreateTransactionHttpStatus,
 )
 from application.payments.get_transaction_status import GetTransactionStatus
+from application.payments.get_void_operation import GetVoidOperation
 from application.payments.list_transactions import ListTransactions
 from application.payments.public_transaction_status import (
     project_public_transaction_status,
@@ -31,14 +33,17 @@ from domain.exceptions import (
     TransactionNotFound,
     TransactionNotVoidable,
     UnsupportedProduct,
+    VoidOperationNotFound,
 )
 from domain.money import AMOUNT_EXPONENT
+from domain.void_operation import VoidOperation, VoidOperationStatus
 from presentation.dependencies import (
     CurrentUser,
     get_close_batch,
     get_create_transaction,
     get_current_user,
     get_list_transactions,
+    get_void_operation,
     get_void_transaction,
 )
 from presentation.dependencies import (
@@ -51,10 +56,51 @@ from presentation.schemas.transactions import (
     TransactionItemResponse,
     TransactionListResponse,
     TransactionResponse,
+    VoidOperationResponse,
     VoidTransactionRequest,
 )
 
 router = APIRouter()
+
+
+def _void_response(
+    transaction_number: str,
+    operation: VoidOperation | None,
+    *,
+    fallback_status: str,
+    fallback_message: str,
+    created_at: datetime,
+) -> VoidOperationResponse:
+    if operation is None:
+        return VoidOperationResponse(
+            transaction_number=transaction_number,
+            status=fallback_status,
+            reason=None,
+            user_message=fallback_message,
+            may_start_new_void=False,
+            created_at=created_at,
+        )
+    under_review = operation.status == VoidOperationStatus.UNDER_REVIEW
+    public_status = "FAILED" if under_review else operation.status.value
+    reason = (
+        "UNDER_REVIEW"
+        if under_review
+        else "NOT_SENT"
+        if operation.status == VoidOperationStatus.FAILED
+        else None
+    )
+    return VoidOperationResponse(
+        transaction_number=transaction_number,
+        # UNDER_REVIEW is an internal, durable workflow state. The terminal
+        # contract deliberately keeps the same three final result categories
+        # as sales: VOIDED, DECLINED and FAILED.
+        status=public_status,
+        reason=reason,
+        user_message=operation.user_message,
+        may_start_new_void=operation.status
+        in {VoidOperationStatus.DECLINED, VoidOperationStatus.FAILED},
+        created_at=operation.created_at,
+    )
 
 
 @router.get(
@@ -235,6 +281,11 @@ def create_transaction(
             status_code=status.HTTP_202_ACCEPTED,
             content=payload.model_dump(mode="json"),
         )
+    if result.http_status == CreateTransactionHttpStatus.OK:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=payload.model_dump(mode="json"),
+        )
     return payload
 
 
@@ -295,8 +346,7 @@ def close_batch(
 
 @router.post(
     "/{transaction_number}/void",
-    status_code=status.HTTP_200_OK,
-    response_model=TransactionResponse,
+    response_model=VoidOperationResponse,
     responses={
         status.HTTP_400_BAD_REQUEST: {
             "description": "Validation / domain error",
@@ -315,7 +365,7 @@ def void_transaction(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     use_case: Annotated[VoidTransaction, Depends(get_void_transaction)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> TransactionResponse | JSONResponse:
+) -> VoidOperationResponse | JSONResponse:
     try:
         result = use_case.execute(
             terminal_id=current_user.installation_id,
@@ -341,9 +391,45 @@ def void_transaction(
             content={"message": str(exc)},
         )
 
-    return TransactionResponse(
-        transaction_number=result.transaction.transaction_number,
-        status=result.transaction.status.value,
-        user_message=result.user_message,
+    payload = _void_response(
+        result.transaction.transaction_number,
+        result.void_operation,
+        fallback_status=result.transaction.status.value,
+        fallback_message=result.user_message,
+        created_at=result.transaction.created_at,
+    )
+    return payload
+
+
+@router.get(
+    "/{transaction_number}/void",
+    response_model=VoidOperationResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Missing/invalid token"},
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Transaction or void operation not found for terminal"
+        },
+    },
+)
+def get_void_operation_status(
+    transaction_number: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[GetVoidOperation, Depends(get_void_operation)],
+) -> VoidOperationResponse | JSONResponse:
+    try:
+        result = use_case.execute(
+            terminal_id=current_user.installation_id,
+            transaction_number=transaction_number,
+        )
+    except (TransactionNotFound, VoidOperationNotFound) as exc:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": str(exc)},
+        )
+    return _void_response(
+        result.transaction.transaction_number,
+        result.void_operation,
+        fallback_status=result.transaction.status.value,
+        fallback_message=result.transaction.user_message or "",
         created_at=result.transaction.created_at,
     )

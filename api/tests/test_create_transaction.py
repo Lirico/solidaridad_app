@@ -292,7 +292,7 @@ def test_pending_replay_uses_the_current_manual_review_projection() -> None:
     assert result.public_status.may_start_new_sale is True
 
 
-def test_replay_approved_returns_201_without_gateway() -> None:
+def test_replay_approved_returns_200_without_gateway() -> None:
     from application.payments.create_transaction import _fingerprint
 
     fp = _fingerprint(
@@ -312,7 +312,7 @@ def test_replay_approved_returns_201_without_gateway() -> None:
         card_number="4111111111111111",
         cvv="123",
     )
-    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    assert result.http_status == CreateTransactionHttpStatus.OK
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_not_called()
     transactions.record_idempotent_hit.assert_called_once_with(
@@ -725,6 +725,7 @@ def test_integrity_error_replays_existing() -> None:
         cvv="123",
     )
     assert result.transaction.status == TransactionStatus.APPROVED
+    assert result.http_status == CreateTransactionHttpStatus.OK
     gateway.authorize.assert_not_called()
 
 

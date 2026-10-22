@@ -129,6 +129,13 @@ class TransactionBatchClosed(DomainError):
         super().__init__(message)
 
 
+class VoidOperationNotFound(DomainError):
+    """Raised when a transaction has no recorded void operation."""
+
+    def __init__(self, message: str = "No hay una anulación para consultar") -> None:
+        super().__init__(message)
+
+
 class BatchIsEmpty(DomainError):
     """Raised when there is no current terminal activity to close."""
 

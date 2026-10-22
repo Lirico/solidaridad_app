@@ -1,10 +1,13 @@
 # Plan de reversos automáticos y recuperación durable
 
-> Estado: contrato ISO validado. Por decisión de producto, el reverso solo se
-> emite para un `0200` previamente enviado y `0410/DE39=00` confirma que el
-> procesador aceptó la neutralización.
+> Estado: recuperación de **ventas** implementada. La extensión a anulaciones
+> está diseñada, pero la caracterización VA-00 demostró que un `0400/020000`
+> no compensa de forma segura una anulación en el legacy vigente; ver
+> [`diseno-recuperacion-anulaciones.md`](diseno-recuperacion-anulaciones.md).
+> Por decisión de producto, el reverso solo se emite para un `0200` previamente
+> enviado y `0410/DE39=00` confirma que el procesador aceptó la neutralización.
 >
-> Última revisión: 2026-10-13.
+> Última revisión: 2026-10-22.
 
 ## 1. Objetivo
 
@@ -21,6 +24,12 @@ La propiedad buscada es:
 
 El mecanismo de compensación es el reverso ISO8583 `0400` que ya reconoce el
 procesador legacy.
+
+La implementación actual aplica este objetivo a la autorización de una venta.
+Una anulación también es un `0200`, pero tiene semántica de negocio distinta:
+su incertidumbre no debe convertir la venta ya aprobada en `UNKNOWN` ni
+habilitar un segundo envío desde la terminal. Su extensión se especifica por
+separado para no prometer una equivalencia ISO todavía no verificada.
 
 ## 2. Decisiones de diseño
 
@@ -59,6 +68,10 @@ procesador legacy.
 12. Una operación `PENDING` no bloquea toda la terminal ni impide una nueva
     venta con otra clave de idempotencia. La API solo impide reenviar la misma
     operación.
+13. Una anulación ambigua tendrá su propia operación durable. No reutiliza ni
+    altera el estado de recuperación de la venta original. VA-00 dejó probado
+    que el legacy vigente no admite su compensación por `0400/020000`: queda en
+    revisión manual y no se reenvía el `0200` ni se emite un `0400`.
 
 ## 3. Clasificación de resultados
 

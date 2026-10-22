@@ -1,10 +1,10 @@
-"""Record the RA-00 legacy 0400 contract against the local processor.
+"""Record the legacy 0400 contract against the local processor.
 
 Run from ``payment-gateway`` with the local processor already running::
 
     PYTHONPATH=. uv run python tests/manual/record_legacy_reversal_contract.py
 
-The script only uses reserved STAN/ticket values 890001-890003 and deletes
+The script only uses reserved STAN/ticket values 890001-890005 and deletes
 rows with those exact identifiers before recording the scenarios.
 """
 
@@ -15,8 +15,11 @@ from datetime import datetime
 from typing import Any
 
 from config.settings import Settings
-from domain.authorization import AuthorizeCommand
-from infrastructure.iso.message_builder import build_purchase_request
+from domain.authorization import AuthorizeCommand, VoidCommand
+from infrastructure.iso.message_builder import (
+    build_purchase_request,
+    build_void_request,
+)
 from infrastructure.iso.packer import IsoMessage, pack_iso, unpack_iso
 
 _CARD_NUMBER = "6063007014007403"  # Synthetic card from the local demo seed.
@@ -24,7 +27,7 @@ _EXPIRATION = "1228"
 _TERMINAL_ID = "05000001"
 _PRODUCT_CODE = "993"
 _AMOUNT_MINOR = 10_000
-_RESERVED_IDS = ("890001", "890002", "890003")
+_RESERVED_IDS = ("890001", "890002", "890003", "890004", "890005")
 _FIXED_MOMENT = datetime(2026, 10, 12, 12, 0, 0)
 
 
@@ -48,8 +51,54 @@ def _purchase(identifier: str, settings: Settings) -> IsoMessage:
     )
 
 
+def _void_command(*, original_ticket: str, identifier: str) -> VoidCommand:
+    return VoidCommand(
+        product_code=_PRODUCT_CODE,
+        amount_minor=_AMOUNT_MINOR,
+        card_number=_CARD_NUMBER,
+        terminal_id=_TERMINAL_ID,
+        stan=identifier,
+        original_ticket=original_ticket,
+        void_ticket=identifier,
+        expiration_date=_EXPIRATION,
+    )
+
+
+def _void(
+    *,
+    original_ticket: str,
+    identifier: str,
+    settings: Settings,
+) -> IsoMessage:
+    return build_void_request(
+        _void_command(original_ticket=original_ticket, identifier=identifier),
+        settings,
+        now=_FIXED_MOMENT,
+    )
+
+
 def _reversal(identifier: str, settings: Settings) -> IsoMessage:
     message = _purchase(identifier, settings)
+    message.mtype = "0400"
+    return message
+
+
+def _void_reversal(
+    *,
+    original_ticket: str,
+    identifier: str,
+    settings: Settings,
+) -> IsoMessage:
+    """Reuse the exact identifiers and processing code of a void 0200.
+
+    This is a contract probe only.  Production has no such builder until the
+    processor demonstrates that this frame safely compensates an anulación.
+    """
+    message = _void(
+        original_ticket=original_ticket,
+        identifier=identifier,
+        settings=settings,
+    )
     message.mtype = "0400"
     return message
 
@@ -132,6 +181,31 @@ def _row_counts(identifier: str) -> dict[str, int]:
     }
 
 
+def _rows(identifier: str) -> list[dict[str, str]]:
+    output = _mysql(
+        "SELECT tipo_mensaje, procode, anula_comprobante, "
+        "COALESCE(vencimiento, 'NULL') FROM sgas_cup "
+        f"WHERE nro_tarjeta = '{_CARD_NUMBER}' "
+        f"AND numero_comprobante = '{identifier}' "
+        f"AND terminalid = '{_TERMINAL_ID}' "
+        "ORDER BY id"
+    )
+    if not output:
+        return []
+    return [
+        {
+            "message_type": message_type,
+            "processing_code": processing_code,
+            "voids_ticket": voids_ticket,
+            "expiration": expiration,
+        }
+        for line in output.splitlines()
+        for message_type, processing_code, voids_ticket, expiration in [
+            line.split("\t")
+        ]
+    ]
+
+
 def _capture(
     name: str,
     message: IsoMessage,
@@ -180,6 +254,35 @@ def main() -> None:
         _capture("sale_after_early_reversal", _purchase("890003", settings), settings)
     )
     captures[-1]["database_rows_after"] = _row_counts("890003")
+
+    captures.append(
+        _capture("sale_before_void", _purchase("890004", settings), settings)
+    )
+    captures.append(
+        _capture(
+            "existing_void",
+            _void(
+                original_ticket="890004",
+                identifier="890005",
+                settings=settings,
+            ),
+            settings,
+        )
+    )
+    captures[-1]["database_rows_after"] = _rows("890005")
+    captures.append(
+        _capture(
+            "reversal_existing_void",
+            _void_reversal(
+                original_ticket="890004",
+                identifier="890005",
+                settings=settings,
+            ),
+            settings,
+        )
+    )
+    captures[-1]["sale_rows_after"] = _rows("890004")
+    captures[-1]["void_rows_after"] = _rows("890005")
 
     print(json.dumps({"captures": captures}, indent=2, sort_keys=True))
 

@@ -37,6 +37,10 @@ MSG_VOID_DECLINED = "Anulación rechazada"
 MSG_VOID_UNKNOWN = (
     "No pudimos confirmar la anulación. Consulte el estado de la operación."
 )
+MSG_VOID_UNDER_REVIEW = (
+    "No pudimos confirmar la anulación. No vuelva a intentarlo; verifíquela "
+    "con casa central."
+)
 MSG_VOID_FAILED = "No se pudo anular. Intente nuevamente."
 
 MSG_BALANCE_OK = "Consulta de saldo exitosa"

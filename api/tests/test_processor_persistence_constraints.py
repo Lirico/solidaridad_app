@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from persistence.models.payment_processing_config import PaymentProcessingConfig
 from persistence.models.processor_job import ProcessorJob
 from persistence.models.recovery_alert import RecoveryAlert
+from persistence.models.void_operation import VoidOperation, VoidOperationAlert
 
 
 def _config_values() -> dict[str, object]:
@@ -130,4 +131,44 @@ def test_database_keeps_one_open_alert_per_job_and_cause() -> None:
         with pytest.raises(IntegrityError):
             connection.execute(
                 insert(RecoveryAlert).values(**alert | {"id": 3, "state": "CLOSED"})
+            )
+
+
+def test_database_rejects_invalid_void_operation_and_duplicate_alert() -> None:
+    engine = create_engine("sqlite://")
+    VoidOperation.__table__.create(engine)
+    VoidOperationAlert.__table__.create(engine)
+    now = datetime.now(UTC)
+    operation = {
+        "id": 1,
+        "transaction_id": 10,
+        "idempotency_key": "void-1",
+        "request_fingerprint": "a" * 64,
+        "stan": "123456",
+        "void_ticket": "123456",
+        "original_ticket": "00000001",
+        "outcome": "INDETERMINATE",
+        "status": "UNDER_REVIEW",
+        "processor_response_code": None,
+        "user_message": "Verificar",
+        "created_at": now,
+        "updated_at": now,
+    }
+    alert = {
+        "id": 1,
+        "void_operation_id": 1,
+        "cause": "VOID_INDETERMINATE",
+        "state": "OPEN",
+        "opened_at": now,
+        "created_at": now,
+    }
+
+    with engine.begin() as connection:
+        connection.execute(insert(VoidOperation).values(**operation))
+        connection.execute(insert(VoidOperationAlert).values(**alert))
+        with pytest.raises(IntegrityError):
+            connection.execute(insert(VoidOperationAlert).values(**alert | {"id": 2}))
+        with pytest.raises(IntegrityError):
+            connection.execute(
+                insert(VoidOperation).values(**operation | {"id": 2, "status": "BAD"})
             )

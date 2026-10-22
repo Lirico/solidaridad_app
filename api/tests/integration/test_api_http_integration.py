@@ -197,7 +197,7 @@ def test_sale_approved_replay_and_public_history(
     assert {"reason", "poll_after_seconds"}.issubset(created)
 
     replay = _sale(api, operator.headers, sale_payload, key)
-    assert replay.status_code == 201
+    assert replay.status_code == 200
     assert replay.json()["transaction_number"] == created["transaction_number"]
     assert len(gateway_requests(gateway, "authorize")) == 1
 
@@ -366,7 +366,7 @@ def test_same_idempotency_key_is_safe_under_concurrent_requests(
                 lambda _: _sale(api, operator.headers, sale_payload, key), range(2)
             )
         )
-    assert {response.status_code for response in responses} <= {201, 202}
+    assert {response.status_code for response in responses} <= {200, 201, 202}
     assert len(gateway_requests(gateway, "authorize")) == 1
 
 

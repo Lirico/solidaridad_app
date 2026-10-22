@@ -13,6 +13,10 @@ from application.payments.get_transaction_status import (
     GetTransactionStatus,
     GetTransactionStatusResult,
 )
+from application.payments.get_void_operation import (
+    GetVoidOperation,
+    GetVoidOperationResult,
+)
 from application.payments.list_transactions import (
     ListTransactions,
     ListTransactionsResult,
@@ -33,10 +37,16 @@ from domain.exceptions import (
     IdempotencyConflict,
     InvalidCardNumber,
     TransactionNotFound,
+    VoidOperationNotFound,
 )
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
+from domain.void_operation import (
+    VoidOperation,
+    VoidOperationOutcome,
+    VoidOperationStatus,
+)
 from main import app
 from presentation.dependencies import (
     CurrentUser,
@@ -45,6 +55,7 @@ from presentation.dependencies import (
     get_current_user,
     get_list_transactions,
     get_transaction_status,
+    get_void_operation,
     get_void_transaction,
 )
 
@@ -75,6 +86,26 @@ def _tx(**overrides: object) -> Transaction:
     )
     base.update(overrides)
     return Transaction(**base)  # type: ignore[arg-type]
+
+
+def _void_operation(**overrides: object) -> VoidOperation:
+    base = dict(
+        id=2,
+        transaction_id=1,
+        idempotency_key="void-1",
+        request_fingerprint="fp",
+        stan="123456",
+        void_ticket="123456",
+        original_ticket="00000001",
+        outcome=VoidOperationOutcome.APPROVED,
+        status=VoidOperationStatus.VOIDED,
+        processor_response_code="00",
+        user_message="Anulación aprobada",
+        created_at=datetime(2026, 7, 16, 19, 1, tzinfo=UTC),
+        updated_at=datetime(2026, 7, 16, 19, 1, tzinfo=UTC),
+    )
+    base.update(overrides)
+    return VoidOperation(**base)  # type: ignore[arg-type]
 
 
 def _override(use_case: MagicMock) -> None:
@@ -196,6 +227,25 @@ def test_create_transaction_202_pending() -> None:
     assert response.json()["may_start_new_sale"] is False
 
 
+def test_create_transaction_replay_returns_200() -> None:
+    use_case = MagicMock(spec=CreateTransaction)
+    use_case.execute.return_value = CreateTransactionResult(
+        transaction=_tx(),
+        http_status=CreateTransactionHttpStatus.OK,
+    )
+    _override(use_case)
+    try:
+        response = client.post(
+            "/v1/transactions",
+            json=_payload(),
+            headers={"Idempotency-Key": "k1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 200
+
+
 def test_create_transaction_requires_auth() -> None:
     response = client.post("/v1/transactions", json=_payload())
     assert response.status_code == 401
@@ -237,7 +287,6 @@ def test_create_transaction_accepts_empty_cvv() -> None:
     use_case.execute.assert_called_once()
     kwargs = use_case.execute.call_args.kwargs
     assert kwargs["cvv"] == ""
-
 
 
 def test_create_transaction_domain_400() -> None:
@@ -508,6 +557,7 @@ def test_void_transaction_200() -> None:
             status=TransactionStatus.VOIDED,
             user_message="Anulación aprobada",
         ),
+        void_operation=_void_operation(),
         http_status=VoidTransactionHttpStatus.OK,
         user_message="Anulación aprobada",
     )
@@ -531,6 +581,85 @@ def test_void_transaction_200() -> None:
     assert data["status"] == "VOIDED"
     assert data["user_message"] == "Anulación aprobada"
     use_case.execute.assert_called_once()
+
+
+def test_void_transaction_200_under_review() -> None:
+    use_case = MagicMock(spec=VoidTransaction)
+    operation = _void_operation(
+        outcome=VoidOperationOutcome.INDETERMINATE,
+        status=VoidOperationStatus.UNDER_REVIEW,
+        processor_response_code=None,
+        user_message="Verifique con casa central",
+    )
+    use_case.execute.return_value = VoidTransactionResult(
+        transaction=_tx(),
+        void_operation=operation,
+        http_status=VoidTransactionHttpStatus.OK,
+        user_message=operation.user_message,
+    )
+    app.dependency_overrides[get_void_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.post(
+            "/v1/transactions/OP-260716-00000001/void",
+            json={"card_number": "4111111111111111"},
+            headers={"Idempotency-Key": "void-1"},
+        )
+    finally:
+        _clear()
+    assert response.status_code == 200
+    assert response.json()["status"] == "FAILED"
+    assert response.json()["reason"] == "UNDER_REVIEW"
+    assert response.json()["may_start_new_void"] is False
+
+
+def test_get_void_operation_is_terminal_scoped() -> None:
+    use_case = MagicMock(spec=GetVoidOperation)
+    operation = _void_operation(
+        outcome=VoidOperationOutcome.INDETERMINATE,
+        status=VoidOperationStatus.UNDER_REVIEW,
+    )
+    use_case.execute.return_value = GetVoidOperationResult(
+        transaction=_tx(),
+        void_operation=operation,
+    )
+    app.dependency_overrides[get_void_operation] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.get("/v1/transactions/OP-260716-00000001/void")
+    finally:
+        _clear()
+    assert response.status_code == 200
+    assert response.json()["status"] == "FAILED"
+    assert response.json()["reason"] == "UNDER_REVIEW"
+    use_case.execute.assert_called_once_with(
+        terminal_id="inst-1",
+        transaction_number="OP-260716-00000001",
+    )
+
+
+def test_get_void_operation_404() -> None:
+    use_case = MagicMock(spec=GetVoidOperation)
+    use_case.execute.side_effect = VoidOperationNotFound()
+    app.dependency_overrides[get_void_operation] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.get("/v1/transactions/OP-260716-00000001/void")
+    finally:
+        _clear()
+    assert response.status_code == 404
 
 
 def test_void_transaction_404() -> None:

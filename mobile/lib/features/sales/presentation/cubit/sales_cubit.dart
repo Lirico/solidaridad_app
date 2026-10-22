@@ -515,13 +515,15 @@ class SalesCubit extends Cubit<SalesState> {
 
     // La API deja la venta original en APPROVED cuando la anulación es
     // rechazada o falla: solo reflejamos en el historial los casos que
-    // cambian el estado real (VOIDED) o quedan ambiguos (UNKNOWN).
-    if (!result.isVoided && !result.isUnknown) {
+    // cambian el estado real (VOIDED) o requieren verificación (UNDER_REVIEW).
+    if (!result.isVoided && !result.isUnderReview && !result.isUnknown) {
       return result;
     }
 
     final PaymentResult mappedResult = result.isVoided
         ? PaymentResult.voided
+        : result.isUnderReview
+        ? PaymentResult.underReview
         : PaymentResult.connectionError;
 
     final updatedHistory = state.history.map((op) {

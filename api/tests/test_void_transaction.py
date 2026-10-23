@@ -142,6 +142,9 @@ def test_void_approves_and_persists_identifiers_before_gateway() -> None:
     request = gateway.void.call_args.args[0]
     assert request.stan == request.void_ticket == "123456"
     transactions.apply_void_result.assert_called_once()
+    assert transactions.apply_void_result.call_args.kwargs["user_message"] == (
+        "Anulación aprobada"
+    )
 
 
 def test_ambiguous_void_keeps_sale_approved_and_opens_review_alert() -> None:

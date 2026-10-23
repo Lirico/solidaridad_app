@@ -100,7 +100,7 @@ def test_check_balance_card_invalid_returns_declined() -> None:
     uc = CheckBalance(_installation_repo(), _gateway(outcomes))
     result = uc.execute(installation_id="05000001", card_number="4111111111111111")
     assert result.status == "DECLINED"
-    assert result.user_message == "Tarjeta inválida"
+    assert result.user_message == "Titular desconocido / suspendido"
     assert result.balances == []
 
 

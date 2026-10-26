@@ -57,6 +57,7 @@ class _Transactions:
         self.rows: dict[int, Transaction] = {}
         self._idempotency: dict[tuple[int, str], int] = {}
         self._next_id = 1
+        self.jobs = None
 
     def get_by_idempotency(
         self, *, user_id: int, idempotency_key: str
@@ -140,6 +141,31 @@ class _Transactions:
             ),
             None,
         )
+
+    def list_stale_pending_without_reverse_job(
+        self, *, created_before: datetime
+    ) -> list[Transaction]:
+        selected: list[Transaction] = []
+        for row in self.rows.values():
+            if row.status is not TransactionStatus.PENDING:
+                continue
+            if row.authorization_outcome is not AuthorizationOutcome.PENDING:
+                continue
+            if row.created_at > created_before:
+                continue
+            if row.stan is None or row.processor_ticket is None:
+                continue
+            if (
+                self.jobs is not None
+                and self.jobs.get_by_transaction(
+                    transaction_id=row.id,
+                    operation_type=ProcessorOperationType.REVERSE,
+                )
+                is not None
+            ):
+                continue
+            selected.append(row)
+        return selected
 
 
 class _Jobs:
@@ -354,6 +380,7 @@ class _Harness:
         self.session = _Session()
         self.transactions = _Transactions()
         self.jobs = _Jobs()
+        self.transactions.jobs = self.jobs
         self.alerts = _Alerts()
         self.configs = _Configs()
         self.gateway = _ProcessorMock(

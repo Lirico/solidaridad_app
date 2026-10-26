@@ -116,6 +116,18 @@ void main() {
     );
     expect(cubit.state.idempotencyKey, key);
 
+    verify(
+      () => repository.registerSale(
+        product: 'GARRAFA_10',
+        amount: '4.0',
+        cardNumber: '6063007014007403',
+        cvv: '878',
+        expirationDate: '1228',
+        token: 'tok',
+        idempotencyKey: key,
+      ),
+    ).called(2);
+
     await cubit.sendIsoMessage(token: 'tok');
 
     verify(

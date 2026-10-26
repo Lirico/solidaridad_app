@@ -7,6 +7,9 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
+from application.payments.enqueue_stale_pending_reversals import (
+    EnqueueStalePendingReversals,
+)
 from application.payments.ports import (
     PaymentGateway,
     ReversalOutcome,
@@ -63,6 +66,9 @@ class ReversalJobWorker:
 
     def run_once(self) -> bool:
         """Process one job, returning whether this worker claimed any work."""
+        if self._should_stop():
+            return False
+        self._enqueue_stale_pending()
         claimed = self._claim()
         if claimed is None:
             return False
@@ -135,6 +141,17 @@ class ReversalJobWorker:
             finalized_at=finalized_at,
         )
         return True
+
+    def _enqueue_stale_pending(self) -> None:
+        """Queue one reverse for each PENDING sale older than the wait."""
+        config = self._configs.get_default()
+        EnqueueStalePendingReversals(
+            session=self._session,
+            transactions=self._transactions,
+            jobs=self._jobs,
+            stale_after=timedelta(seconds=config.processing_timeout_seconds),
+            now=self._now,
+        ).execute()
 
     def _claim(self) -> ProcessorJob | None:
         if self._should_stop():

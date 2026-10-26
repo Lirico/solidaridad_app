@@ -21,6 +21,7 @@ class SaleProcessingScreen extends StatefulWidget {
 class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
   SalesCubit? _salesCubit;
   bool _reviewHandoffStarted = false;
+  bool _unconfirmedHandoffStarted = false;
 
   @override
   void didChangeDependencies() {
@@ -87,6 +88,35 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
           date: DateTime.now(),
           userMessage: salesState.errorMessage,
         );
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.saleStatus,
+          arguments: operation,
+        );
+      });
+    }
+
+    if (salesState is SalesAwaitingAuthorization &&
+        salesState.pollingStopped &&
+        salesState.pendingReason != PendingSaleReason.underReview &&
+        !_unconfirmedHandoffStarted) {
+      _unconfirmedHandoffStarted = true;
+      final operation = OperationModel(
+        id: salesState.operationNumber,
+        productCode: salesState.productCode,
+        productLabel: salesState.productLabel,
+        amount: salesState.amount,
+        cardNumber: _maskCardNumber(salesState.cardNumber),
+        result: PaymentResult.pending,
+        authorizationStatus: SaleAuthorizationStatus.pending,
+        pendingReason: salesState.pendingReason,
+        pollAfterSeconds: salesState.pollAfterSeconds,
+        mayStartNewSale: salesState.mayStartNewSale,
+        date: DateTime.now(),
+        userMessage: salesState.message,
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
         Navigator.pushReplacementNamed(
           context,
           AppRoutes.saleStatus,
@@ -208,11 +238,8 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
               const SizedBox(height: 16),
 
               // Mensaje de advertencia
-              Text(
-                salesState is SalesAwaitingAuthorization &&
-                        salesState.pollingStopped
-                    ? 'Consulta pausada'
-                    : 'Procesando Transacción...',
+              const Text(
+                'Procesando Transacción...',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -226,7 +253,17 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
                     : 'Estamos autorizando el pago.\n'
                           'Por favor, no cierre la aplicación.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.5),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () =>
+                    context.read<SalesCubit>().leaveUnconfirmedSale(),
+                child: const Text('Dejar de esperar'),
               ),
             ],
           ),

@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import UUID
@@ -122,6 +122,7 @@ def _build(
     jobs.claim_next_due_reverse.return_value = claimed or _job()
     jobs.finalize_claim.return_value = True
     transactions.get_by_id.return_value = transaction or _transaction()
+    transactions.list_stale_pending_without_reverse_job.return_value = []
     configs.get_default.return_value = _config()
     gateway.reverse.return_value = ReverseResult(outcome=outcome, response_code="00")
     worker = ReversalJobWorker(
@@ -274,6 +275,40 @@ def test_late_gateway_result_with_an_old_claim_token_changes_nothing() -> None:
 
     transactions.update_result.assert_not_called()
     session.rollback.assert_called_once()
+
+
+def test_run_once_enqueues_one_stale_pending_before_claim() -> None:
+    worker, _, transactions, jobs, _, gateway = _build()
+    pending = _transaction()
+    listed = 0
+
+    def list_stale(**kwargs: object) -> list[Transaction]:
+        nonlocal listed
+        listed += 1
+        assert kwargs["created_before"] == NOW - timedelta(seconds=60)
+        return [pending] if listed == 1 else []
+
+    order: list[str] = []
+
+    def claim(**kwargs: object) -> None:
+        order.append("claim")
+        return None
+
+    def create_reverse(**kwargs: object) -> None:
+        order.append("enqueue")
+
+    transactions.list_stale_pending_without_reverse_job.side_effect = list_stale
+    jobs.claim_next_due_reverse.side_effect = claim
+    jobs.create_reverse.side_effect = create_reverse
+
+    assert worker.run_once() is False
+    assert order == ["enqueue", "claim"]
+    jobs.create_reverse.assert_called_once()
+
+    jobs.create_reverse.reset_mock()
+    assert worker.run_once() is False
+    jobs.create_reverse.assert_not_called()
+    gateway.reverse.assert_not_called()
 
 
 def test_run_once_returns_false_without_due_work() -> None:

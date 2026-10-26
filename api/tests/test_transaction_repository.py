@@ -216,10 +216,11 @@ def test_close_batch_blocks_each_open_recovery_job_state(
     ("status", "outcome"),
     [
         (TransactionStatus.PENDING, AuthorizationOutcome.PENDING),
-        (TransactionStatus.APPROVED, AuthorizationOutcome.INDETERMINATE),
+        (TransactionStatus.PENDING, AuthorizationOutcome.INDETERMINATE),
+        (TransactionStatus.UNKNOWN, AuthorizationOutcome.INDETERMINATE),
     ],
 )
-def test_close_batch_blocks_pending_or_indeterminate_transactions(
+def test_close_batch_blocks_pending_or_unknown_transactions(
     status: TransactionStatus,
     outcome: AuthorizationOutcome,
 ) -> None:
@@ -235,6 +236,42 @@ def test_close_batch_blocks_pending_or_indeterminate_transactions(
     assert result == "in_flight"
     assert session.scalar.call_count == 1
     assert session.add.call_count == 0
+
+
+def test_close_batch_allows_failed_sale_after_confirmed_reversal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = _current_batch_row(
+        status=TransactionStatus.FAILED,
+        authorization_outcome=AuthorizationOutcome.INDETERMINATE,
+    )
+    session = _batch_close_session(row, open_recovery_job=None)
+
+    def assign_close_id() -> None:
+        if session.add.called:
+            session.add.call_args.args[0].id = 23
+
+    session.flush.side_effect = assign_close_id
+    expected_close = MagicMock()
+    expected_transaction = MagicMock()
+    monkeypatch.setattr(
+        "persistence.repositories.transaction_repository._to_batch_close",
+        lambda _: expected_close,
+    )
+    monkeypatch.setattr(
+        "persistence.repositories.transaction_repository._to_domain",
+        lambda _: expected_transaction,
+    )
+
+    result = TransactionRepository(session).close_current_batch(
+        terminal_id="05000001",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+    )
+
+    assert result == (expected_close, [expected_transaction])
+    assert row.batch_close_id is not None
+    session.add.assert_called_once()
 
 
 def test_close_batch_allows_confirmed_transaction_without_open_recovery(

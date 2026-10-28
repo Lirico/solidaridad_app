@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 import '../../../psdk/psdk_bridge.dart';
 import '../../../psdk/psdk_card_reader.dart';
 import '../domain/receipt_formatter.dart';
@@ -32,32 +34,79 @@ class ReceiptPrinter {
 
   /// Imprime el ticket de [operation] en la térmica.
   ///
+  /// Reintenta solo el arranque, hasta [initAttempts] veces, con
+  /// [initRetryDelay] entre intentos. Cada espera de `sdiReady` dura como
+  /// máximo [readyTimeoutSec]. Si [PsdkCardReader.ensureReady] no ve el
+  /// manager, o si [PsdkBridge.printHtml] responde `PSDK_NOT_READY` antes de
+  /// llamar a la térmica, apaga el SDK y vuelve a crearlo. Un código de
+  /// `printHTML` ya ejecutado no se reintenta.
+  ///
   /// Devuelve [PrintResult.success] si la impresión fue OK, o un
   /// [PrintResult.failure] con el motivo en caso contrario.
-  Future<PrintResult> printTicket(OperationModel operation) async {
-    try {
-      // 1. Asegurar que el SDK esté inicializado y listo (sdiReady).
-      final bool ready = await _reader.ensureReady(initializeIfNeeded: true);
-      if (!ready) {
+  Future<PrintResult> printTicket(
+    OperationModel operation, {
+    int initAttempts = 3,
+    Duration initRetryDelay = const Duration(milliseconds: 400),
+    int readyTimeoutSec = 8,
+  }) async {
+    final int attempts = initAttempts < 1 ? 1 : initAttempts;
+    final String html = ReceiptFormatter.toHtml(operation);
+
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      final bool willRetry = attempt < attempts - 1;
+      try {
+        final bool ready = await _reader.ensureReady(
+          initializeIfNeeded: true,
+          timeoutSec: readyTimeoutSec,
+        );
+        if (!ready) {
+          await _releaseForRetry();
+          if (willRetry) {
+            await Future<void>.delayed(initRetryDelay);
+            continue;
+          }
+          return const PrintResult.failure(
+            'No se pudo inicializar la impresora. Reintente.',
+          );
+        }
+
+        final Map<String, dynamic> result = await _psdk.printHtml(html);
+        if (result['ok'] == true) {
+          return const PrintResult.success();
+        }
+        final String code = result['result'] as String? ?? 'UNKNOWN';
+        return PrintResult.failure('La impresora no imprimió (código $code).');
+      } on PlatformException catch (error) {
+        if (error.code != 'PSDK_NOT_READY') {
+          return const PrintResult.failure(
+            'Error al imprimir el ticket. Reintente.',
+          );
+        }
+        await _releaseForRetry();
+        if (willRetry) {
+          await Future<void>.delayed(initRetryDelay);
+          continue;
+        }
         return const PrintResult.failure(
           'No se pudo inicializar la impresora. Reintente.',
         );
+      } catch (_) {
+        return const PrintResult.failure(
+          'Error al imprimir el ticket. Reintente.',
+        );
       }
-
-      // 2. Generar el HTML del ticket y enviarlo a la térmica.
-      final String html = ReceiptFormatter.toHtml(operation);
-      final Map<String, dynamic> result = await _psdk.printHtml(html);
-
-      final bool ok = result['ok'] == true;
-      if (ok) {
-        return const PrintResult.success();
-      }
-      final String code = result['result'] as String? ?? 'UNKNOWN';
-      return PrintResult.failure('La impresora no imprimió (código $code).');
-    } catch (_) {
-      return const PrintResult.failure(
-        'Error al imprimir el ticket. Reintente.',
-      );
     }
+
+    return const PrintResult.failure(
+      'No se pudo inicializar la impresora. Reintente.',
+    );
+  }
+
+  /// Apaga el SDK entre arranques fallidos para que el siguiente `initialize`
+  /// cree uno nuevo. Un tearDown fallido no debe tapar el reintento.
+  Future<void> _releaseForRetry() async {
+    try {
+      await _psdk.tearDown();
+    } catch (_) {}
   }
 }

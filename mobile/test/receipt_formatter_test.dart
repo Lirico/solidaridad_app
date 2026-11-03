@@ -43,6 +43,7 @@ void main() {
     () {
       final defaults = _defaults();
       final text = ReceiptFormatter.toPlainText(_operation(), defaults);
+      final html = ReceiptFormatter.toHtml(_operation(), defaults);
 
       expect(text, contains('COMPROBANTE DE VERIFICACIÓN'));
       expect(text, contains('Op: OP-REF-123'));
@@ -50,14 +51,18 @@ void main() {
       expect(text, contains('15:30:05'));
       expect(text, isNot(contains('Fecha:')));
       expect(text, isNot(contains('Hora:')));
-      expect(text, contains(defaults.establishmentName));
+      expect(text, contains(_defaults().establishmentName));
       expect(text, isNot(contains('Comercio:')));
       expect(text, contains('Terminal: ${ReceiptFormatter.terminalId}'));
       expect(text, contains('Importe:'));
       expect(text, contains('6063007*****7403'));
       expect(text, contains('No cobre nuevamente'));
       expect(text, contains('Venta'));
-      expect(text, contains('Gracias'));
+      expect(text, contains('Firma:'));
+      expect(text, contains('.' * 48));
+      expect(html, contains('Firma: ${'.' * 32}'));
+      expect(html, contains('<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>'));
+      expect(text, isNot(contains('Gracias')));
       expect(text, isNot(contains('Tipo:')));
       expect(text, isNot(contains('Cargo original')));
     },

@@ -26,7 +26,7 @@ class ReceiptFormatter {
   static String _statusLabel(PaymentResult result) {
     switch (result) {
       case PaymentResult.approved:
-        return 'APROBADA';
+        return 'Aprobada';
       case PaymentResult.declined:
         return 'RECHAZADA';
       case PaymentResult.pending:
@@ -54,15 +54,6 @@ class ReceiptFormatter {
     final time = _formatTime(op.date);
     final type = operationTypeLabel(op.result);
     final buf = StringBuffer()
-      ..writeln(_statusLabel(op.result));
-    if (op.result == PaymentResult.underReview) {
-      buf
-        ..writeln(
-          'No cobre nuevamente: podría producirse un cobro duplicado.',
-        )
-        ..writeln('Verifique esta referencia con casa central.');
-    }
-    buf
       ..writeln('--------------------------------')
       ..writeln('$date  ${defaults.issuerName}  $time')
       ..writeln(type)
@@ -89,9 +80,12 @@ class ReceiptFormatter {
     if (message.isNotEmpty) {
       buf.writeln('Mensaje: $message');
     }
-    buf
-      ..writeln('--------------------------------')
-      ..writeln('Gracias');
+    buf.writeln(_statusLabel(op.result));
+    if (op.result == PaymentResult.underReview) {
+      buf.writeln('No cobre nuevamente: podría producirse un cobro duplicado.');
+      buf.writeln('Verifique esta referencia con casa central.');
+    }
+    buf.writeln('Firma: ${'.' * 48}');
     return buf.toString();
   }
 
@@ -137,14 +131,14 @@ class ReceiptFormatter {
   td { vertical-align: top; padding: 2px 0; width: 33%; }
   .l { text-align: left; }
   .r { text-align: right; }
-  .detail { text-align: left; padding-top: 8px; }
+  .merchant { margin-top: 22px; }
+  .detail { text-align: left; padding-top: 28px; }
+  .status { margin-top: 32px; margin-bottom: 44px; }
+  .firma { text-align: left; white-space: nowrap; }
   hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
 </style>
 </head>
 <body>
-  <div class="c big">${_esc(_statusLabel(op.result))}</div>
-  $verificationWarning
-  <hr/>
   <table>
     <tr>
       <td class="l">${_esc(_formatDate(op.date))}</td>
@@ -152,15 +146,16 @@ class ReceiptFormatter {
       <td class="r">${_esc(_formatTime(op.date))}</td>
     </tr>
   </table>
-  <div class="c b">${_esc(defaults.establishmentName)}</div>
+  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
   <div class="c">${_esc(defaults.establishmentAddress)}</div>
   <div class="c">${_esc(defaults.establishmentCuit)}</div>
   <div class="detail">
     ${lines.join('\n    ')}
   </div>
-  <hr/>
-  <div class="c">Gracias</div>
-  <br/><br/>
+  <div class="c big status">${_esc(_statusLabel(op.result))}</div>
+  $verificationWarning
+  <div class="firma">Firma: ${'.' * 32}</div>
+  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 </body>
 </html>
 ''';

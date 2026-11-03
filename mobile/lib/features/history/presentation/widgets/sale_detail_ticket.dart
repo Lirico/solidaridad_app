@@ -24,7 +24,7 @@ class SaleDetailTicket extends StatelessWidget {
       case PaymentResult.approved:
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
-        statusTitle = 'VENTA EXITOSA';
+        statusTitle = 'Aprobada';
       case PaymentResult.declined:
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
@@ -79,23 +79,6 @@ class SaleDetailTicket extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Center(
-          child: Column(
-            children: [
-              Icon(statusIcon, color: statusColor, size: 64),
-              const SizedBox(height: 12),
-              Text(
-                statusTitle,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: statusColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -118,7 +101,7 @@ class SaleDetailTicket extends StatelessWidget {
             Text(time, style: const TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 28),
         Center(
           child: Text(
             defaults.establishmentName,
@@ -135,7 +118,7 @@ class SaleDetailTicket extends StatelessWidget {
         Center(
           child: Text(defaults.establishmentCuit, textAlign: TextAlign.center),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 32),
         for (final row in rows)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
@@ -145,16 +128,37 @@ class SaleDetailTicket extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
-        const Divider(height: 40, thickness: 1),
-        const Center(
-          child: Text(
-            'GAS Terminal - Sistema de Distribución',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-              fontStyle: FontStyle.italic,
-            ),
+        const SizedBox(height: 32),
+        Center(
+          child: Column(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                statusTitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: statusColor,
+                ),
+              ),
+            ],
           ),
+        ),
+        const SizedBox(height: 40),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text('Firma: '),
+            Expanded(
+              child: Text(
+                '.' * 80,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+              ),
+            ),
+          ],
         ),
       ],
     );

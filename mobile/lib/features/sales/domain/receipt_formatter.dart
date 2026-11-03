@@ -50,6 +50,9 @@ class ReceiptFormatter {
 
   /// Texto plano para previsualización / log.
   static String toPlainText(OperationModel op, ReceiptDefaults defaults) {
+    final date = _formatDate(op.date);
+    final time = _formatTime(op.date);
+    final type = operationTypeLabel(op.result);
     final buf = StringBuffer()
       ..writeln(_statusLabel(op.result));
     if (op.result == PaymentResult.underReview) {
@@ -60,14 +63,14 @@ class ReceiptFormatter {
         ..writeln('Verifique esta referencia con casa central.');
     }
     buf
-      ..writeln('Emisor: ${defaults.issuerName}')
-      ..writeln('Tipo: ${operationTypeLabel(op.result)}')
-      ..writeln('Comercio: ${defaults.establishmentName}')
-      ..writeln('Domicilio: ${defaults.establishmentAddress}')
-      ..writeln('CUIT: ${defaults.establishmentCuit}')
+      ..writeln('--------------------------------')
+      ..writeln('$date  ${defaults.issuerName}  $time')
+      ..writeln(type)
+      ..writeln(defaults.establishmentName)
+      ..writeln(defaults.establishmentAddress)
+      ..writeln(defaults.establishmentCuit)
+      ..writeln('--------------------------------')
       ..writeln('Cód. establecimiento: ${defaults.establishmentCode}')
-      ..writeln('Fecha: ${_formatDate(op.date)}')
-      ..writeln('Hora: ${_formatTime(op.date)}')
       ..writeln('Cupón: ${defaults.couponNumber}')
       ..writeln('Lote: ${defaults.batchNumber}')
       ..writeln('Terminal: $terminalId')
@@ -95,14 +98,7 @@ class ReceiptFormatter {
   /// HTML compacto para [SdiPrinter.printHTML] (térmica portrait).
   static String toHtml(OperationModel op, ReceiptDefaults defaults) {
     final lines = <String>[
-      _line('Emisor', defaults.issuerName),
-      _line('Tipo', operationTypeLabel(op.result)),
-      _line('Comercio', defaults.establishmentName),
-      _line('Domicilio', defaults.establishmentAddress),
-      _line('CUIT', defaults.establishmentCuit),
       _line('Cód. establecimiento', defaults.establishmentCode),
-      _line('Fecha', _formatDate(op.date)),
-      _line('Hora', _formatTime(op.date)),
       _line('Cupón', defaults.couponNumber),
       _line('Lote', defaults.batchNumber),
       _line('Terminal', terminalId),
@@ -138,9 +134,10 @@ class ReceiptFormatter {
   .b { font-weight: bold; }
   .big { font-size: 22px; font-weight: bold; }
   table { width: 100%; border-collapse: collapse; }
-  td { vertical-align: top; padding: 2px 0; }
-  .l { text-align: left; width: 42%; }
-  .r { text-align: right; word-break: break-all; }
+  td { vertical-align: top; padding: 2px 0; width: 33%; }
+  .l { text-align: left; }
+  .r { text-align: right; }
+  .detail { text-align: left; padding-top: 8px; }
   hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
 </style>
 </head>
@@ -149,8 +146,18 @@ class ReceiptFormatter {
   $verificationWarning
   <hr/>
   <table>
-    ${lines.join('\n    ')}
+    <tr>
+      <td class="l">${_esc(_formatDate(op.date))}</td>
+      <td class="c b">${_esc(defaults.issuerName)}<br/><span>${_esc(operationTypeLabel(op.result))}</span></td>
+      <td class="r">${_esc(_formatTime(op.date))}</td>
+    </tr>
   </table>
+  <div class="c b">${_esc(defaults.establishmentName)}</div>
+  <div class="c">${_esc(defaults.establishmentAddress)}</div>
+  <div class="c">${_esc(defaults.establishmentCuit)}</div>
+  <div class="detail">
+    ${lines.join('\n    ')}
+  </div>
   <hr/>
   <div class="c">Gracias</div>
   <br/><br/>
@@ -161,7 +168,7 @@ class ReceiptFormatter {
 
   static String _line(String label, String value, {bool emphasize = false}) {
     final css = emphasize ? ' class="b"' : '';
-    return '<tr><td class="l">${_esc(label)}</td><td class="r"$css>${_esc(value)}</td></tr>';
+    return '<div$css>${_esc(label)}: ${_esc(value)}</div>';
   }
 
   static String _esc(String value) {

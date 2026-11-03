@@ -46,15 +46,20 @@ void main() {
 
       expect(text, contains('COMPROBANTE DE VERIFICACIÓN'));
       expect(text, contains('Op: OP-REF-123'));
-      expect(text, contains('Fecha: 14/10/2026'));
-      expect(text, contains('Hora: 15:30:05'));
-      expect(text, contains('Comercio: ${defaults.establishmentName}'));
-      expect(text, contains('Tipo: Venta'));
+      expect(text, contains('14/10/2026'));
+      expect(text, contains('15:30:05'));
+      expect(text, isNot(contains('Fecha:')));
+      expect(text, isNot(contains('Hora:')));
+      expect(text, contains(defaults.establishmentName));
+      expect(text, isNot(contains('Comercio:')));
       expect(text, contains('Terminal: ${ReceiptFormatter.terminalId}'));
       expect(text, contains('Importe:'));
       expect(text, contains('6063007*****7403'));
       expect(text, contains('No cobre nuevamente'));
+      expect(text, contains('Venta'));
       expect(text, contains('Gracias'));
+      expect(text, isNot(contains('Tipo:')));
+      expect(text, isNot(contains('Cargo original')));
     },
   );
 
@@ -91,9 +96,10 @@ void main() {
       _defaults(),
     );
 
-    expect(sale, contains('Tipo: Venta'));
+    expect(sale, contains('Venta'));
+    expect(sale, isNot(contains('Tipo:')));
     expect(sale, isNot(contains('Cargo original')));
-    expect(voided, contains('Tipo: Anulación'));
+    expect(voided, contains('Anulación'));
     expect(voided, contains('Cargo original: 00000000'));
   });
 

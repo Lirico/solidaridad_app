@@ -52,34 +52,28 @@ class SaleDetailTicket extends StatelessWidget {
     }
 
     final date =
-        '${operation.date.day}/${operation.date.month}/${operation.date.year}';
+        _two(operation.date.day) +
+        '/${_two(operation.date.month)}/${operation.date.year}';
     final time =
-        '${operation.date.hour.toString().padLeft(2, '0')}:${operation.date.minute.toString().padLeft(2, '0')} hs';
-    final rows = <MapEntry<String, String>>[
-      MapEntry('Emisor:', defaults.issuerName),
-      MapEntry('Tipo:', ReceiptFormatter.operationTypeLabel(operation.result)),
-      MapEntry('Comercio:', defaults.establishmentName),
-      MapEntry('Domicilio:', defaults.establishmentAddress),
-      MapEntry('CUIT:', defaults.establishmentCuit),
-      MapEntry('Cód. establecimiento:', defaults.establishmentCode),
-      MapEntry('Fecha:', date),
-      MapEntry('Hora:', time),
-      MapEntry('Cupón:', defaults.couponNumber),
-      MapEntry('Lote:', defaults.batchNumber),
-      MapEntry('Terminal:', ReceiptFormatter.terminalId),
-      MapEntry('Tarjeta:', ReceiptFormatter.maskPan(operation.cardNumber)),
-      MapEntry('Autorización:', defaults.authorizationCode),
-      MapEntry('ID Operación:', operation.id),
-      MapEntry('Producto:', operation.productLabel),
-      MapEntry('Importe:', formatAmount(operation.amount)),
-      MapEntry('Moneda:', defaults.currency),
-      MapEntry('Cuotas:', defaults.installments),
-      MapEntry('Plan:', defaults.installmentPlan),
+        '${_two(operation.date.hour)}:${_two(operation.date.minute)}:${_two(operation.date.second)}';
+    final rows = <String>[
+      'Cód. establecimiento: ${defaults.establishmentCode}',
+      'Cupón: ${defaults.couponNumber}',
+      'Lote: ${defaults.batchNumber}',
+      'Terminal: ${ReceiptFormatter.terminalId}',
+      'Tarjeta: ${ReceiptFormatter.maskPan(operation.cardNumber)}',
+      'Autorización: ${defaults.authorizationCode}',
+      'Op: ${operation.id}',
+      'Producto: ${operation.productLabel}',
+      'Importe: ${formatAmount(operation.amount)}',
+      'Moneda: ${defaults.currency}',
+      'Cuotas: ${defaults.installments}',
+      'Plan: ${defaults.installmentPlan}',
       if (operation.result == PaymentResult.voided)
-        MapEntry('Cargo original:', defaults.originalChargeNumber),
+        'Cargo original: ${defaults.originalChargeNumber}',
       if (operation.userMessage != null &&
           operation.userMessage!.trim().isNotEmpty)
-        MapEntry('Mensaje:', operation.userMessage!.trim()),
+        'Mensaje: ${operation.userMessage!.trim()}',
     ];
 
     return Column(
@@ -101,8 +95,56 @@ class SaleDetailTicket extends StatelessWidget {
             ],
           ),
         ),
-        const Divider(height: 40, thickness: 1),
-        for (final row in rows) _buildTicketRow(row.key, row.value),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(date, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    defaults.issuerName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    ReceiptFormatter.operationTypeLabel(operation.result),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            Text(time, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: Text(
+            defaults.establishmentName,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        Center(
+          child: Text(
+            defaults.establishmentAddress,
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Center(
+          child: Text(defaults.establishmentCuit, textAlign: TextAlign.center),
+        ),
+        const SizedBox(height: 12),
+        for (final row in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              row,
+              textAlign: TextAlign.left,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
         const Divider(height: 40, thickness: 1),
         const Center(
           child: Text(
@@ -118,28 +160,5 @@ class SaleDetailTicket extends StatelessWidget {
     );
   }
 
-  Widget _buildTicketRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  static String _two(int n) => n.toString().padLeft(2, '0');
 }

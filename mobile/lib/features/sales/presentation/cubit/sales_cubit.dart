@@ -1,7 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/sale_model.dart';
+
 import '../../../../psdk/msr_card_data.dart';
 import '../../data/sales_repository.dart';
+import '../../domain/receipt_formatter.dart';
+import '../../domain/sale_model.dart';
 import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
@@ -416,9 +418,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String cardNumber,
   }) {
     final normalizedCard = cardNumber.replaceAll(' ', '');
-    final hiddenCard = normalizedCard.length >= 4
-        ? '•••• ${normalizedCard.substring(normalizedCard.length - 4)}'
-        : '•••• 4321';
     return OperationModel(
       id: response.operationNumber.isNotEmpty
           ? response.operationNumber
@@ -426,7 +425,7 @@ class SalesCubit extends Cubit<SalesState> {
       productCode: productCode,
       productLabel: productLabel,
       amount: amount,
-      cardNumber: hiddenCard,
+      cardNumber: ReceiptFormatter.maskPan(normalizedCard),
       result: _paymentResultFromResponse(response),
       authorizationStatus: response.authorizationStatus,
       pendingReason: response.pendingReason,

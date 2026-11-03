@@ -1,15 +1,15 @@
 import '../../../core/formatters/amount_formatter.dart';
+import 'receipt_defaults.dart';
 import 'sale_model.dart';
 
 /// Genera el ticket térmico (HTML para `SdiPrinter.printHTML`) a partir de los
-/// datos de una venta aprobada.
+/// datos de una venta y del perfil [ReceiptDefaults].
 ///
 /// Es un port del `ReceiptFormatter` del POC Verifone, adaptado al modelo de
 /// datos real de la app mobile (`OperationModel` / `SalesCompleted`).
 class ReceiptFormatter {
   ReceiptFormatter._();
 
-  static const String merchantName = 'GAS Terminal — Solidaridad';
   static const String terminalId = String.fromEnvironment(
     'INSTALLATION_ID',
     defaultValue: '05000001',
@@ -42,26 +42,49 @@ class ReceiptFormatter {
     }
   }
 
+  /// Compra para una operación. Anulación solo cuando el resultado es un void.
+  static String operationTypeLabel(PaymentResult result) {
+    if (result == PaymentResult.voided) return 'Anulación';
+    return 'Compra';
+  }
+
   /// Texto plano para previsualización / log.
-  static String toPlainText(OperationModel op) {
+  static String toPlainText(OperationModel op, ReceiptDefaults defaults) {
     final buf = StringBuffer()
-      ..writeln('Comercio: $merchantName')
-      ..writeln('Terminal: $terminalId')
-      ..writeln('--------------------------------')
-      ..writeln(_statusLabel(op.result))
-      ..writeln('--------------------------------')
-      ..writeln('Op:     ${op.id}')
-      ..writeln('Fecha:  ${_formatDate(op.date)}')
-      ..writeln('Hora:   ${_formatTime(op.date)}')
-      ..writeln('Prod:   ${op.productLabel}')
-      ..writeln('Monto:  ${formatAmount(op.amount)}')
-      ..writeln('Tarjeta:${_maskedPan(op.cardNumber)}');
-    if (op.userMessage != null && op.userMessage!.trim().isNotEmpty) {
-      buf.writeln('Mensaje:${op.userMessage}');
-    }
+      ..writeln(_statusLabel(op.result));
     if (op.result == PaymentResult.underReview) {
-      buf.writeln('No cobre nuevamente: podría producirse un cobro duplicado.');
-      buf.writeln('Verifique esta referencia con casa central.');
+      buf
+        ..writeln(
+          'No cobre nuevamente: podría producirse un cobro duplicado.',
+        )
+        ..writeln('Verifique esta referencia con casa central.');
+    }
+    buf
+      ..writeln('Emisor: ${defaults.issuerName}')
+      ..writeln('Tipo: ${operationTypeLabel(op.result)}')
+      ..writeln('Comercio: ${defaults.establishmentName}')
+      ..writeln('Domicilio: ${defaults.establishmentAddress}')
+      ..writeln('CUIT: ${defaults.establishmentCuit}')
+      ..writeln('Cód. establecimiento: ${defaults.establishmentCode}')
+      ..writeln('Fecha: ${_formatDate(op.date)}')
+      ..writeln('Hora: ${_formatTime(op.date)}')
+      ..writeln('Cupón: ${defaults.couponNumber}')
+      ..writeln('Lote: ${defaults.batchNumber}')
+      ..writeln('Terminal: $terminalId')
+      ..writeln('Tarjeta: ${maskPan(op.cardNumber)}')
+      ..writeln('Autorización: ${defaults.authorizationCode}')
+      ..writeln('Op: ${op.id}')
+      ..writeln('Producto: ${op.productLabel}')
+      ..writeln('Importe: ${formatAmount(op.amount)}')
+      ..writeln('Moneda: ${defaults.currency}')
+      ..writeln('Cuotas: ${defaults.installments}')
+      ..writeln('Plan: ${defaults.installmentPlan}');
+    if (op.result == PaymentResult.voided) {
+      buf.writeln('Cargo original: ${defaults.originalChargeNumber}');
+    }
+    final message = op.userMessage?.trim() ?? '';
+    if (message.isNotEmpty) {
+      buf.writeln('Mensaje: $message');
     }
     buf
       ..writeln('--------------------------------')
@@ -70,13 +93,37 @@ class ReceiptFormatter {
   }
 
   /// HTML compacto para [SdiPrinter.printHTML] (térmica portrait).
-  static String toHtml(OperationModel op) {
-    final message =
-        (op.userMessage != null && op.userMessage!.trim().isNotEmpty)
-        ? '<div class="c">${_esc(op.userMessage!)}</div>'
-        : '';
+  static String toHtml(OperationModel op, ReceiptDefaults defaults) {
+    final lines = <String>[
+      _line('Emisor', defaults.issuerName),
+      _line('Tipo', operationTypeLabel(op.result)),
+      _line('Comercio', defaults.establishmentName),
+      _line('Domicilio', defaults.establishmentAddress),
+      _line('CUIT', defaults.establishmentCuit),
+      _line('Cód. establecimiento', defaults.establishmentCode),
+      _line('Fecha', _formatDate(op.date)),
+      _line('Hora', _formatTime(op.date)),
+      _line('Cupón', defaults.couponNumber),
+      _line('Lote', defaults.batchNumber),
+      _line('Terminal', terminalId),
+      _line('Tarjeta', maskPan(op.cardNumber)),
+      _line('Autorización', defaults.authorizationCode),
+      _line('Op', op.id),
+      _line('Producto', op.productLabel),
+      _line('Importe', formatAmount(op.amount), emphasize: true),
+      _line('Moneda', defaults.currency),
+      _line('Cuotas', defaults.installments),
+      _line('Plan', defaults.installmentPlan),
+    ];
+    if (op.result == PaymentResult.voided) {
+      lines.add(_line('Cargo original', defaults.originalChargeNumber));
+    }
+    final message = op.userMessage?.trim() ?? '';
+    if (message.isNotEmpty) {
+      lines.add(_line('Mensaje', message));
+    }
     final verificationWarning = op.result == PaymentResult.underReview
-        ? '<div class="warning">No cobre nuevamente: podría producirse un cobro duplicado.<br/>Verifique esta referencia con casa central.</div>'
+        ? '<div class="c">No cobre nuevamente: podría producirse un cobro duplicado.<br/>Verifique esta referencia con casa central.</div>'
         : '';
 
     return '''
@@ -92,33 +139,29 @@ class ReceiptFormatter {
   .big { font-size: 22px; font-weight: bold; }
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 2px 0; }
-  .l { text-align: left; width: 36%; }
+  .l { text-align: left; width: 42%; }
   .r { text-align: right; word-break: break-all; }
   hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
 </style>
 </head>
 <body>
-  <div class="c b">Comercio: ${_esc(merchantName)}</div>
-  <div class="c">Terminal: ${_esc(terminalId)}</div>
-  <hr/>
   <div class="c big">${_esc(_statusLabel(op.result))}</div>
-  $message
+  $verificationWarning
   <hr/>
   <table>
-    <tr><td class="l">Op</td><td class="r">${_esc(op.id)}</td></tr>
-    <tr><td class="l">Fecha</td><td class="r">${_esc(_formatDate(op.date))}</td></tr>
-    <tr><td class="l">Hora</td><td class="r">${_esc(_formatTime(op.date))}</td></tr>
-    <tr><td class="l">Producto</td><td class="r">${_esc(op.productLabel)}</td></tr>
-    <tr><td class="l">Monto</td><td class="r b">${_esc(formatAmount(op.amount))}</td></tr>
-    <tr><td class="l">Tarjeta</td><td class="r">${_esc(_maskedPan(op.cardNumber))}</td></tr>
+    ${lines.join('\n    ')}
   </table>
-  $verificationWarning
   <hr/>
   <div class="c">Gracias</div>
   <br/><br/>
 </body>
 </html>
 ''';
+  }
+
+  static String _line(String label, String value, {bool emphasize = false}) {
+    final css = emphasize ? ' class="b"' : '';
+    return '<tr><td class="l">${_esc(label)}</td><td class="r"$css>${_esc(value)}</td></tr>';
   }
 
   static String _esc(String value) {
@@ -144,10 +187,18 @@ class ReceiptFormatter {
     return buf.toString();
   }
 
-  /// The receipt layer is a final guard: it never prints a full PAN even if a
-  /// caller accidentally constructs an [OperationModel] with one.
-  static String _maskedPan(String value) {
+  /// Últimos 4 visibles, 5 centrales enmascarados y el resto visible.
+  ///
+  /// Un PAN de al menos 9 dígitos queda `prefijo + ***** + últimos 4`. Si ya
+  /// viene enmascarado, o solo quedan los últimos 4 (historial de la API),
+  /// no se reconstruye el número.
+  static String maskPan(String value) {
+    if (value.contains('*')) return value;
     final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length >= 9) {
+      final prefixLength = digits.length - 9;
+      return '${digits.substring(0, prefixLength)}*****${digits.substring(digits.length - 4)}';
+    }
     if (digits.length >= 4) {
       return '•••• ${digits.substring(digits.length - 4)}';
     }

@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../../../core/formatters/amount_formatter.dart';
+import '../../../sales/domain/receipt_defaults.dart';
+import '../../../sales/domain/receipt_formatter.dart';
 import '../../../sales/domain/sale_model.dart';
 
 class SaleDetailTicket extends StatelessWidget {
   final OperationModel operation;
+  final ReceiptDefaults defaults;
 
-  const SaleDetailTicket({super.key, required this.operation});
+  const SaleDetailTicket({
+    super.key,
+    required this.operation,
+    required this.defaults,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +51,37 @@ class SaleDetailTicket extends StatelessWidget {
         statusTitle = 'VENTA ANULADA';
     }
 
+    final date =
+        '${operation.date.day}/${operation.date.month}/${operation.date.year}';
+    final time =
+        '${operation.date.hour.toString().padLeft(2, '0')}:${operation.date.minute.toString().padLeft(2, '0')} hs';
+    final rows = <MapEntry<String, String>>[
+      MapEntry('Emisor:', defaults.issuerName),
+      MapEntry('Tipo:', ReceiptFormatter.operationTypeLabel(operation.result)),
+      MapEntry('Comercio:', defaults.establishmentName),
+      MapEntry('Domicilio:', defaults.establishmentAddress),
+      MapEntry('CUIT:', defaults.establishmentCuit),
+      MapEntry('Cód. establecimiento:', defaults.establishmentCode),
+      MapEntry('Fecha:', date),
+      MapEntry('Hora:', time),
+      MapEntry('Cupón:', defaults.couponNumber),
+      MapEntry('Lote:', defaults.batchNumber),
+      MapEntry('Terminal:', ReceiptFormatter.terminalId),
+      MapEntry('Tarjeta:', ReceiptFormatter.maskPan(operation.cardNumber)),
+      MapEntry('Autorización:', defaults.authorizationCode),
+      MapEntry('ID Operación:', operation.id),
+      MapEntry('Producto:', operation.productLabel),
+      MapEntry('Importe:', formatAmount(operation.amount)),
+      MapEntry('Moneda:', defaults.currency),
+      MapEntry('Cuotas:', defaults.installments),
+      MapEntry('Plan:', defaults.installmentPlan),
+      if (operation.result == PaymentResult.voided)
+        MapEntry('Cargo original:', defaults.originalChargeNumber),
+      if (operation.userMessage != null &&
+          operation.userMessage!.trim().isNotEmpty)
+        MapEntry('Mensaje:', operation.userMessage!.trim()),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -60,33 +98,11 @@ class SaleDetailTicket extends StatelessWidget {
                   color: statusColor,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${operation.productLabel} — ${formatAmount(operation.amount)}',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ],
           ),
         ),
         const Divider(height: 40, thickness: 1),
-        _buildTicketRow('ID Operación:', operation.id),
-        _buildTicketRow(
-          'Fecha:',
-          '${operation.date.day}/${operation.date.month}/${operation.date.year}',
-        ),
-        _buildTicketRow(
-          'Hora:',
-          '${operation.date.hour.toString().padLeft(2, '0')}:${operation.date.minute.toString().padLeft(2, '0')} hs',
-        ),
-        _buildTicketRow('Tarjeta (PAN):', operation.cardNumber),
-        if (operation.userMessage != null &&
-            operation.userMessage!.isNotEmpty) ...[
-          const Divider(height: 24, thickness: 1),
-          _buildTicketRow('Mensaje:', operation.userMessage!),
-        ],
+        for (final row in rows) _buildTicketRow(row.key, row.value),
         const Divider(height: 40, thickness: 1),
         const Center(
           child: Text(
@@ -115,7 +131,13 @@ class SaleDetailTicket extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );

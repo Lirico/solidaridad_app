@@ -5,7 +5,9 @@ import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
+import '../../../sales/data/receipt_defaults_repository.dart';
 import '../../../sales/data/receipt_printer.dart';
+import '../../../sales/domain/receipt_defaults.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../widgets/sale_detail_ticket.dart';
 
@@ -17,8 +19,29 @@ class SaleDetailScreen extends StatefulWidget {
 }
 
 class _SaleDetailScreenState extends State<SaleDetailScreen> {
-  final ReceiptPrinter _printer = ReceiptPrinter();
+  final ReceiptDefaultsRepository _defaultsRepository =
+      ReceiptDefaultsRepository();
+  late final ReceiptPrinter _printer = ReceiptPrinter(
+    defaultsRepository: _defaultsRepository,
+  );
+  ReceiptDefaults? _defaults;
+  bool _defaultsFailed = false;
   bool _printing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _defaultsRepository
+        .load()
+        .then((defaults) {
+          if (!mounted) return;
+          setState(() => _defaults = defaults);
+        })
+        .catchError((Object _) {
+          if (!mounted) return;
+          setState(() => _defaultsFailed = true);
+        });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +82,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFFE9ECEF)),
                   ),
-                  child: SaleDetailTicket(operation: operation),
+                  child: _buildTicket(operation),
                 ),
               ),
             ),
@@ -69,6 +92,17 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildTicket(OperationModel operation) {
+    final defaults = _defaults;
+    if (defaults != null) {
+      return SaleDetailTicket(operation: operation, defaults: defaults);
+    }
+    if (_defaultsFailed) {
+      return const Text('No se pudieron cargar los datos del comprobante.');
+    }
+    return const Center(child: CircularProgressIndicator());
   }
 
   Widget _buildPrintButton(BuildContext context, OperationModel operation) {

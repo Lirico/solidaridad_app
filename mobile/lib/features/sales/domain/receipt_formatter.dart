@@ -42,10 +42,10 @@ class ReceiptFormatter {
     }
   }
 
-  /// Compra para una operación. Anulación solo cuando el resultado es un void.
+  /// Venta para una operación. Anulación solo cuando el resultado es un void.
   static String operationTypeLabel(PaymentResult result) {
     if (result == PaymentResult.voided) return 'Anulación';
-    return 'Compra';
+    return 'Venta';
   }
 
   /// Texto plano para previsualización / log.

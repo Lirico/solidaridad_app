@@ -49,7 +49,7 @@ void main() {
       expect(text, contains('Fecha: 14/10/2026'));
       expect(text, contains('Hora: 15:30:05'));
       expect(text, contains('Comercio: ${defaults.establishmentName}'));
-      expect(text, contains('Tipo: Compra'));
+      expect(text, contains('Tipo: Venta'));
       expect(text, contains('Terminal: ${ReceiptFormatter.terminalId}'));
       expect(text, contains('Importe:'));
       expect(text, contains('6063007*****7403'));
@@ -91,7 +91,7 @@ void main() {
       _defaults(),
     );
 
-    expect(sale, contains('Tipo: Compra'));
+    expect(sale, contains('Tipo: Venta'));
     expect(sale, isNot(contains('Cargo original')));
     expect(voided, contains('Tipo: Anulación'));
     expect(voided, contains('Cargo original: 00000000'));

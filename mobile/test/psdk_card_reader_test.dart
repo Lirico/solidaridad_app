@@ -227,13 +227,22 @@ void main() {
   });
 
   group('PsdkCardReader.ensureReady', () {
-    test('no escucha el stream si getStatus ya reporta listo', () async {
+    test('no escucha el stream si getStatus ya reporta sdiReady', () async {
       when(
         () => bridge.getStatus(),
-      ).thenAnswer((_) async => <String, dynamic>{'initialized': true});
+      ).thenAnswer((_) async => <String, dynamic>{'sdiReady': true});
 
       expect(await reader.ensureReady(), isTrue);
       verifyNever(() => bridge.statusEvents);
+    });
+
+    test('initialized sin sdiReady no alcanza para leer', () async {
+      when(
+        () => bridge.getStatus(),
+      ).thenAnswer((_) async => <String, dynamic>{'initialized': true});
+      when(() => bridge.statusEvents).thenAnswer((_) => const Stream.empty());
+
+      expect(await reader.ensureReady(timeoutSec: 1), isFalse);
     });
 
     test('espera el stream y completa con el evento sdiReady', () async {
@@ -248,6 +257,21 @@ void main() {
       await controller.close();
 
       expect(await future, isTrue);
+    });
+
+    test('un success sin sdiReady no habilita la lectura ni la impresión', () async {
+      when(
+        () => bridge.getStatus(),
+      ).thenAnswer((_) async => <String, dynamic>{});
+      final controller = StreamController<Map<String, dynamic>>.broadcast();
+      when(() => bridge.statusEvents).thenAnswer((_) => controller.stream);
+
+      final future = reader.ensureReady(timeoutSec: 1);
+      controller.add(<String, dynamic>{'success': true, 'sdiReady': false});
+      await pumpEventQueue();
+
+      expect(await future, isFalse);
+      await controller.close();
     });
   });
 

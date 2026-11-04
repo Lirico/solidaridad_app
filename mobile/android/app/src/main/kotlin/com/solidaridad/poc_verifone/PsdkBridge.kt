@@ -63,8 +63,6 @@ class PsdkBridge(private val appContext: Context) :
 
     private val commerceListener = object : CommerceListenerAdapter() {
         override fun handleStatus(status: Status) {
-            val payload = statusToMap(status)
-            lastStatus = payload
             val ok = status.status == StatusCode.SUCCESS
             if (ok) {
                 sdiManager = paymentSdk?.sdiManager
@@ -75,6 +73,10 @@ class PsdkBridge(private val appContext: Context) :
                 initialized = false
                 Log.w(TAG, "PaymentSDK status not SUCCESS: ${status.message} (${status.status})")
             }
+            // El mapa sale después de copiar el manager: sdiReady refleja ese
+            // flag y no un SUCCESS que todavía no tiene hardware.
+            val payload = statusToMap(status)
+            lastStatus = payload
             emit(payload)
         }
     }
@@ -414,7 +416,7 @@ class PsdkBridge(private val appContext: Context) :
             "message" to status.message,
             "sessionId" to status.sessionId,
             "success" to (status.status == StatusCode.SUCCESS),
-            "sdiReady" to (paymentSdk?.sdiManager != null && status.status == StatusCode.SUCCESS),
+            "sdiReady" to (sdiManager != null),
         )
     }
 

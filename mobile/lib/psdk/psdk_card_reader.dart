@@ -78,12 +78,16 @@ class PsdkCardReader {
   /// `Future`, para no encadenar dos `tearDown`.
   Future<void>? _releaseInFlight;
 
-  /// Espera hasta que el PaymentSDK emita el evento `sdiReady` (o `success`).
+  /// Espera hasta que el PaymentSDK emita `sdiReady`.
   ///
   /// `initialize()` es asíncrono: retorna de inmediato con `sdiReady=false` y
-  /// el SDK recién queda listo cuando llega `handleStatus` con SUCCESS. Este
-  /// método escucha [PsdkBridge.statusEvents] hasta que eso ocurra o se agote
-  /// [timeoutSec].
+  /// el SDK recién queda listo cuando llega `handleStatus` con el manager de
+  /// SDI. Este método escucha [PsdkBridge.statusEvents] hasta que eso ocurra
+  /// o se agote [timeoutSec].
+  ///
+  /// `success` solo no alcanza. Un callback puede decir SUCCESS cuando
+  /// `sdiManager` todavía es null, o llegar tarde de un SDK ya apagado. En
+  /// ambos casos `readMsr` y `printHtml` fallan con `PSDK_NOT_READY`.
   ///
   /// Para evitar una race condition (el evento `sdiReady` puede haber llegado
   /// antes de suscribirnos al stream), primero se consulta el estado actual con
@@ -102,8 +106,7 @@ class PsdkCardReader {
     //    haber pasado antes de suscribirnos), no hace falta esperar el stream.
     try {
       final Map<String, dynamic> status = await _psdk.getStatus();
-      final bool alreadyReady =
-          status['sdiReady'] == true || status['initialized'] == true;
+      final bool alreadyReady = status['sdiReady'] == true;
       if (alreadyReady) return true;
     } catch (_) {
       // Si getStatus falla, seguimos y esperamos el stream.
@@ -124,7 +127,7 @@ class PsdkCardReader {
     StreamSubscription<Map<String, dynamic>>? sub;
 
     sub = _psdk.statusEvents.listen((event) {
-      final bool ready = event['sdiReady'] == true || event['success'] == true;
+      final bool ready = event['sdiReady'] == true;
       if (ready && !completer.isCompleted) {
         completer.complete(true);
       }

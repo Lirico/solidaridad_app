@@ -21,7 +21,8 @@ class PrintResult {
 /// Encapsula la inicialización del PaymentSDK (si no está listo) y la llamada
 /// a [PsdkBridge.printHtml]. La espera de `sdiReady` (con el guard de
 /// race-condition) vive en [PsdkCardReader.ensureReady], compartida con las
-/// pantallas de lectura de banda.
+/// pantallas de lectura de banda. Un `success` del SDK sin `sdiReady` no
+/// alcanza: la térmica se usa recién cuando el manager de SDI está listo.
 class ReceiptPrinter {
   ReceiptPrinter({
     PsdkBridge? psdk,

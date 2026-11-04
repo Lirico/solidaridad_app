@@ -17,6 +17,7 @@ import 'package:solidaridad_app/features/sales/presentation/cubit/sales_state.da
 import 'package:solidaridad_app/features/sales/presentation/screens/sale_processing_screen.dart';
 import 'package:solidaridad_app/features/sales/presentation/widgets/sale_review_content.dart';
 import 'package:solidaridad_app/features/sales/presentation/widgets/sale_status_content.dart';
+import 'package:solidaridad_app/features/sales/presentation/widgets/waiting_for_card_content.dart';
 
 /// Cubit de test que permite fijar un estado sin pasar por la red.
 class _FixedSalesCubit extends SalesCubit {
@@ -133,7 +134,9 @@ void main() {
     expect(find.text('Procesando Transacción...'), findsOneWidget);
   });
 
-  testWidgets('Resultado de la Descarga no desborda en 360x720', (tester) async {
+  testWidgets('Resultado de la Descarga no desborda en 360x720', (
+    tester,
+  ) async {
     await pumpAtTerminalSize(
       tester,
       _terminalScaffold(
@@ -200,6 +203,26 @@ void main() {
     expect(header.preferredSize.height, 64);
     expect(tester.takeException(), isNull);
     expect(find.text('CONFIRMAR CAMBIO'), findsOneWidget);
+  });
+
+  testWidgets('Esperando tarjeta no desborda la fila Cambiar en 360x720', (
+    tester,
+  ) async {
+    await pumpAtTerminalSize(
+      tester,
+      Scaffold(
+        backgroundColor: AppColors.primaryOrange,
+        appBar: const AppHeader(title: 'Nueva Operación'),
+        bottomNavigationBar: const AppBottomNavBar(),
+        body: AppSheetPanel(
+          child: WaitingForCardContent(onChangePaymentMode: () {}),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Cambiar'), findsOneWidget);
+    expect(find.text('Acercar, insertar o deslizar'), findsOneWidget);
   });
 
   testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x720', (

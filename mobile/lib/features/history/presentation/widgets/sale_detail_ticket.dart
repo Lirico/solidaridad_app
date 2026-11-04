@@ -103,19 +103,28 @@ class SaleDetailTicket extends StatelessWidget {
   }
 
   Widget _buildTicketRow(String label, String value) {
+    const labelStyle = TextStyle(
+      color: Colors.grey,
+      fontWeight: FontWeight.w600,
+    );
+    const valueStyle = TextStyle(fontWeight: FontWeight.bold);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(label, maxLines: 1, style: labelStyle),
             ),
           ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(value, textAlign: TextAlign.right, style: valueStyle),
+          ),
         ],
       ),
     );

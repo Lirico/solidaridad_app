@@ -10,6 +10,7 @@ import 'package:solidaridad_app/features/auth/data/auth_repository.dart';
 import 'package:solidaridad_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:solidaridad_app/features/auth/presentation/screens/change_password_screen.dart';
 import 'package:solidaridad_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:solidaridad_app/features/history/presentation/widgets/sale_detail_ticket.dart';
 import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_cubit.dart';
@@ -224,6 +225,46 @@ void main() {
     expect(find.text('Cambiar'), findsOneWidget);
     expect(find.text('Acercar, insertar o deslizar'), findsOneWidget);
   });
+
+  testWidgets(
+    'Detalle de comprobante no desborda un mensaje largo en 360x720',
+    (tester) async {
+      await pumpAtTerminalSize(
+        tester,
+        Scaffold(
+          backgroundColor: AppColors.primaryOrange,
+          appBar: const AppHeader(title: 'Detalle de Comprobante'),
+          bottomNavigationBar: const AppBottomNavBar(),
+          body: AppSheetPanel(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: SaleDetailTicket(
+                  operation: OperationModel(
+                    id: 'OP-260716-00000007',
+                    productCode: 'GARRAFA_10',
+                    productLabel: 'Garrafa 10 kg',
+                    amount: 10,
+                    cardNumber: '**** **** **** 3456',
+                    result: PaymentResult.declined,
+                    date: DateTime(2026, 9, 2),
+                    userMessage:
+                        'No fue posible confirmar el resultado. Verifique la '
+                        'operación con casa central ante un posible cobro '
+                        'duplicado.',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('casa central'), findsOneWidget);
+    },
+  );
 
   testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x720', (
     tester,

@@ -53,26 +53,6 @@ class UserRepository:
             tax_id=row.tax_id,
         )
 
-    def create(
-        self,
-        *,
-        merchant_id: int,
-        name: str,
-        email: str,
-        password_hash: str,
-        must_change_password: bool = False,
-    ) -> User:
-        row = UserModel(
-            merchant_id=merchant_id,
-            name=name,
-            email=email,
-            password_hash=password_hash,
-            must_change_password=must_change_password,
-        )
-        self._session.add(row)
-        self._session.flush()
-        return _to_domain(row)
-
     def update_password(
         self,
         user_id: int,

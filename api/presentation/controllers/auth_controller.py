@@ -25,24 +25,9 @@ from presentation.schemas.auth import (
     LoginTokenResponse,
     MerchantResponse,
     MessageResponse,
-    RegisterRequest,
 )
 
 router = APIRouter()
-
-
-@router.post(
-    "/register",
-    status_code=status.HTTP_403_FORBIDDEN,
-    responses={
-        status.HTTP_403_FORBIDDEN: {"description": "Account provisioning is manual"},
-    },
-)
-def register(body: RegisterRequest) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_403_FORBIDDEN,
-        content={"message": "El alta de cuentas se realiza con un comercio asignado"},
-    )
 
 
 @router.post(

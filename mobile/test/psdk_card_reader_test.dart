@@ -163,7 +163,7 @@ void main() {
         final Completer<Map<String, dynamic>> tearDownGate = Completer();
         when(() => bridge.tearDown()).thenAnswer((_) => tearDownGate.future);
 
-        final Future<CardReadResult> future = reader.readCard();
+        final Future<CardReadResult> future = reader.readCard(initAttempts: 1);
         var completed = false;
         future.whenComplete(() => completed = true);
         await pumpEventQueue();
@@ -187,7 +187,7 @@ void main() {
       ).thenAnswer((_) async => <String, dynamic>{});
       when(() => bridge.statusEvents).thenAnswer((_) => const Stream.empty());
 
-      final result = await reader.readCard(readyTimeoutSec: 1);
+      final result = await reader.readCard(readyTimeoutSec: 1, initAttempts: 1);
 
       expect(
         (result as CardReadFailure).reason,
@@ -210,6 +210,7 @@ void main() {
 
         final Future<CardReadResult> future = reader.readCard(
           readyTimeoutSec: 1,
+          initAttempts: 1,
         );
         var completed = false;
         future.whenComplete(() => completed = true);
@@ -222,6 +223,38 @@ void main() {
           ((await future) as CardReadFailure).reason,
           CardReadFailureReason.notReady,
         );
+      },
+    );
+
+    test(
+      'reintenta el arranque y lee una sola vez cuando el segundo intento queda listo',
+      () async {
+        stubInitialize();
+        var statusCalls = 0;
+        when(() => bridge.getStatus()).thenAnswer((_) async {
+          statusCalls += 1;
+          if (statusCalls == 1) return <String, dynamic>{};
+          return <String, dynamic>{'sdiReady': true};
+        });
+        when(
+          () => bridge.statusEvents,
+        ).thenAnswer((_) => const Stream<Map<String, dynamic>>.empty());
+        when(
+          () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
+        ).thenAnswer((_) async => PsdkMsrMock.readMsrSuccess());
+
+        final CardReadResult result = await reader.readCard(
+          readyTimeoutSec: 1,
+          initAttempts: 2,
+          initRetryDelay: Duration.zero,
+        );
+
+        expect(result, isA<CardReadSuccess>());
+        verify(() => bridge.initialize()).called(2);
+        verify(
+          () => bridge.readMsr(timeoutSec: any(named: 'timeoutSec')),
+        ).called(1);
+        verify(() => bridge.tearDown()).called(2);
       },
     );
   });
@@ -248,6 +281,20 @@ void main() {
       await controller.close();
 
       expect(await future, isTrue);
+    });
+
+    test('success sin sdiReady no da por listo el lector', () async {
+      when(
+        () => bridge.getStatus(),
+      ).thenAnswer((_) async => <String, dynamic>{});
+      final controller = StreamController<Map<String, dynamic>>();
+      when(() => bridge.statusEvents).thenAnswer((_) => controller.stream);
+
+      final future = reader.ensureReady(timeoutSec: 1);
+      controller.add(<String, dynamic>{'success': true, 'sdiReady': false});
+
+      expect(await future, isFalse);
+      await controller.close();
     });
   });
 

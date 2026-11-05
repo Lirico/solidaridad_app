@@ -74,11 +74,15 @@ class PsdkCardReader {
   /// posterior (el `dispose` de la pantalla de espera) no hace otro `tearDown`.
   bool _ownsSession = false;
 
+  /// El `dispose` de la pantalla pidió abortar. Corta los reintentos de
+  /// arranque para no volver a crear el SDK después de un [cancel].
+  bool _cancelRequested = false;
+
   /// Liberación en curso. Quien llegue mientras corre se une a este mismo
   /// `Future`, para no encadenar dos `tearDown`.
   Future<void>? _releaseInFlight;
 
-  /// Espera hasta que el PaymentSDK emita el evento `sdiReady` (o `success`).
+  /// Espera hasta que el PaymentSDK emita el evento `sdiReady`.
   ///
   /// `initialize()` es asíncrono: retorna de inmediato con `sdiReady=false` y
   /// el SDK recién queda listo cuando llega `handleStatus` con SUCCESS. Este
@@ -124,7 +128,10 @@ class PsdkCardReader {
     StreamSubscription<Map<String, dynamic>>? sub;
 
     sub = _psdk.statusEvents.listen((event) {
-      final bool ready = event['sdiReady'] == true || event['success'] == true;
+      // `success` solo no alcanza: un callback tardío de un SDK ya apagado
+      // llega con success y sdiReady en false. readMsr fallaría con
+      // PSDK_NOT_READY.
+      final bool ready = event['sdiReady'] == true;
       if (ready && !completer.isCompleted) {
         completer.complete(true);
       }
@@ -143,7 +150,10 @@ class PsdkCardReader {
   /// Inicializa el SDK y espera una lectura de banda.
   ///
   /// [readyTimeoutSec] acota la espera de `sdiReady`; [timeoutSec] acota la
-  /// lectura de banda.
+  /// lectura de banda. El arranque se reintenta hasta [initAttempts] veces
+  /// (con [initRetryDelay] entre intentos) antes de devolver [notReady] o
+  /// [exception]. Un timeout de pasada no se reintenta: el lector ya estaba
+  /// listo.
   ///
   /// Devuelve [CardReadSuccess] con los datos parseados o un [CardReadFailure]
   /// con el motivo y un mensaje listo para mostrar. Nunca lanza: las
@@ -151,22 +161,20 @@ class PsdkCardReader {
   Future<CardReadResult> readCard({
     int timeoutSec = 30,
     int readyTimeoutSec = 20,
+    int initAttempts = 3,
+    Duration initRetryDelay = const Duration(milliseconds: 400),
   }) async {
+    _cancelRequested = false;
     _ownsSession = true;
     try {
-      // 1. Inicializar el PaymentSDK (despierta el lector Verifone).
-      await _psdk.initialize();
+      final CardReadFailure? initFailure = await _bringReaderOnline(
+        readyTimeoutSec: readyTimeoutSec,
+        initAttempts: initAttempts,
+        initRetryDelay: initRetryDelay,
+      );
+      if (initFailure != null) return initFailure;
 
-      // 2. Esperar a que el SDK quede listo (evento sdiReady) antes de leer.
-      final bool ready = await ensureReady(timeoutSec: readyTimeoutSec);
-      if (!ready) {
-        return const CardReadFailure(
-          CardReadFailureReason.notReady,
-          'No se pudo inicializar el lector de tarjetas. Reintente.',
-        );
-      }
-
-      // 3. Esperar la lectura de banda (hasta [timeoutSec] segundos).
+      // Esperar la lectura de banda (hasta [timeoutSec] segundos).
       final result = await _psdk.readMsr(timeoutSec: timeoutSec);
 
       // El bridge nativo setea `ok` solo cuando code == OK, pero en esta
@@ -208,6 +216,74 @@ class PsdkCardReader {
     }
   }
 
+  /// Arranca el lector. Reintenta solo esta fase: un fallo de pasada de
+  /// tarjeta no vuelve a entrar acá.
+  ///
+  /// Devuelve `null` con la sesión todavía abierta cuando el SDK quedó listo.
+  /// Si agota los intentos o [cancel] cortó el ciclo, devuelve el fallo y deja
+  /// la sesión liberada.
+  Future<CardReadFailure?> _bringReaderOnline({
+    required int readyTimeoutSec,
+    required int initAttempts,
+    required Duration initRetryDelay,
+  }) async {
+    const CardReadFailure notReady = CardReadFailure(
+      CardReadFailureReason.notReady,
+      'No se pudo inicializar el lector de tarjetas. Reintente.',
+    );
+    const CardReadFailure initError = CardReadFailure(
+      CardReadFailureReason.exception,
+      'Error al inicializar el lector de tarjetas. Reintente.',
+    );
+
+    CardReadFailure? failure;
+    final int attempts = initAttempts < 1 ? 1 : initAttempts;
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      if (_cancelRequested) {
+        await _release();
+        return failure ?? initError;
+      }
+
+      _ownsSession = true;
+      var ready = false;
+      try {
+        await _psdk.initialize();
+        ready = await ensureReady(timeoutSec: readyTimeoutSec);
+        if (!ready) failure = notReady;
+      } catch (_) {
+        ready = false;
+        failure = initError;
+      }
+
+      if (_cancelRequested) {
+        await _release();
+        return failure ?? initError;
+      }
+      if (ready) return null;
+
+      await _release();
+      if (attempt < attempts - 1) {
+        await _pauseForRetry(initRetryDelay);
+      }
+    }
+    return failure ?? notReady;
+  }
+
+  /// Espera [delay] entre arranques, en pasos cortos, para que [cancel]
+  /// corte el ciclo sin esperar los 400 ms enteros.
+  Future<void> _pauseForRetry(Duration delay) async {
+    if (delay <= Duration.zero || _cancelRequested) return;
+    final DateTime end = DateTime.now().add(delay);
+    while (!_cancelRequested && DateTime.now().isBefore(end)) {
+      final Duration remaining = end.difference(DateTime.now());
+      final Duration step = remaining < const Duration(milliseconds: 50)
+          ? remaining
+          : const Duration(milliseconds: 50);
+      if (step <= Duration.zero) return;
+      await Future<void>.delayed(step);
+    }
+  }
+
   /// Cancela una lectura MSR en curso y apaga el SDK.
   ///
   /// Si la sesión sigue abierta, llama a [PsdkBridge.cancelReadMsr] y **luego**
@@ -215,8 +291,14 @@ class PsdkCardReader {
   /// lectura todavía activa. Si [readCard] ya liberó el hardware, no hace nada:
   /// un `tearDown` extra pisaría la impresión o la lectura siguiente.
   ///
+  /// También corta los reintentos de arranque: no se vuelve a llamar a
+  /// `initialize` después de este pedido.
+  ///
   /// Llamadas concurrentes se unen a la misma liberación.
-  Future<void> cancel() => _release();
+  Future<void> cancel() {
+    _cancelRequested = true;
+    return _release();
+  }
 
   /// Libera la sesión actual una sola vez. Los errores de limpieza no se
   /// propagan: no deben tapar el [CardReadResult] que [readCard] ya resolvió.

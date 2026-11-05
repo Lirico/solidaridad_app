@@ -60,11 +60,23 @@ class PsdkBridge(private val appContext: Context) :
     private var eventSink: EventChannel.EventSink? = null
     private var readCancelled = false
 
+    /** Sube en cada create y en cada tearDown. Un callback con otra generación se descarta. */
+    private var sdkGeneration = 0
+
+    /** Generación del [PaymentSdk.initialize] que todavía puede aceptar [handleStatus]. */
+    private var listenerGeneration = 0
+
+    /** `true` desde `initialize` hasta el primer [handleStatus] de esa generación. */
+    private var initInFlight = false
+
 
     private val commerceListener = object : CommerceListenerAdapter() {
         override fun handleStatus(status: Status) {
-            val payload = statusToMap(status)
-            lastStatus = payload
+            if (sdkGeneration != listenerGeneration) {
+                Log.i(TAG, "Ignoring stale PaymentSDK status (generation mismatch)")
+                return
+            }
+            initInFlight = false
             val ok = status.status == StatusCode.SUCCESS
             if (ok) {
                 sdiManager = paymentSdk?.sdiManager
@@ -75,6 +87,8 @@ class PsdkBridge(private val appContext: Context) :
                 initialized = false
                 Log.w(TAG, "PaymentSDK status not SUCCESS: ${status.message} (${status.status})")
             }
+            val payload = statusToMap(status)
+            lastStatus = payload
             emit(payload)
         }
     }
@@ -115,18 +129,20 @@ class PsdkBridge(private val appContext: Context) :
 
     private fun initialize(result: MethodChannel.Result) {
         try {
-            if (paymentSdk != null) {
-                result.success(
-                    mapOf(
-                        "ok" to initialized,
-                        "alreadyInitialized" to true,
-                        "sdiReady" to (sdiManager != null),
-                        "message" to "SDK already created; waiting for / using last status",
-                    ),
-                )
+            if (sdiManager != null) {
+                result.success(alreadyInitializedPayload())
                 return
             }
+            if (paymentSdk != null && initInFlight) {
+                result.success(alreadyInitializedPayload())
+                return
+            }
+            if (paymentSdk != null) {
+                discardSdk()
+            }
             Log.d(TAG, "Creating PaymentSdk 4.1.0-sdi…")
+            listenerGeneration = ++sdkGeneration
+            initInFlight = true
             paymentSdk = PaymentSdk.create(appContext)
             paymentSdk?.initialize(commerceListener)
             result.success(
@@ -138,14 +154,48 @@ class PsdkBridge(private val appContext: Context) :
                 ),
             )
         } catch (e: Exception) {
+            initInFlight = false
             Log.e(TAG, "initialize failed", e)
             result.error("PSDK_INIT_FAILED", e.message, e.javaClass.name)
         }
     }
 
-    private fun tearDown(result: MethodChannel.Result) {
+    private fun alreadyInitializedPayload(): Map<String, Any?> {
+        return mapOf(
+            "ok" to initialized,
+            "alreadyInitialized" to true,
+            "sdiReady" to (sdiManager != null),
+            "message" to "SDK already created; waiting for / using last status",
+        )
+    }
+
+    /**
+     * Apaga una instancia que quedó creada sin manager. Sube la generación
+     * para que un [handleStatus] de ese SDK no pise el intento siguiente.
+     */
+    private fun discardSdk() {
+        sdkGeneration += 1
+        initInFlight = false
         try {
             paymentSdk?.tearDown()
+        } catch (e: Exception) {
+            Log.e(TAG, "tearDown before recreate failed", e)
+        }
+        paymentSdk = null
+        sdiManager = null
+        initialized = false
+    }
+
+    private fun tearDown(result: MethodChannel.Result) {
+        sdkGeneration += 1
+        initInFlight = false
+        try {
+            paymentSdk?.tearDown()
+            result.success(mapOf("ok" to true))
+        } catch (e: Exception) {
+            Log.e(TAG, "tearDown failed", e)
+            result.error("PSDK_TEARDOWN_FAILED", e.message, e.javaClass.name)
+        } finally {
             paymentSdk = null
             sdiManager = null
             initialized = false
@@ -156,10 +206,6 @@ class PsdkBridge(private val appContext: Context) :
                 "sdiReady" to false,
             )
             emit(lastStatus!!)
-            result.success(mapOf("ok" to true))
-        } catch (e: Exception) {
-            Log.e(TAG, "tearDown failed", e)
-            result.error("PSDK_TEARDOWN_FAILED", e.message, e.javaClass.name)
         }
     }
 

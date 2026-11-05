@@ -48,6 +48,12 @@ impresión de ticket.
 
 - App Android en Flutter, orientada a operación de venta en terminal.
 - Login de usuario y cambio de contraseña.
+- El alta de cuentas es manual con comercio asignado; el registro público queda
+  deshabilitado hasta contar con un mecanismo de asignación controlado.
+- El comercio pertenece obligatoriamente a la cuenta: login entrega sus datos actuales y
+  `GET /v1/me/merchant` permite refrescarlos. Los datos se administran
+  manualmente en la API y no se guardan como instantánea en cada venta. La
+  actualización de la app para consumirlos queda pendiente.
 - Identificador de terminal (`installation_id` / terminal id, 8 caracteres)
   configurado en el dispositivo; el operador no lo inventa por operación.
 - Pantalla inicial simple orientada a la venta.

@@ -2,6 +2,7 @@
 
 from presentation.controllers.auth_controller import router as auth_router
 from presentation.controllers.balance_controller import router as balance_router
+from presentation.controllers.me_controller import router as me_router
 from presentation.controllers.ping_controller import router as ping_router
 from presentation.controllers.products_controller import router as products_router
 from presentation.controllers.transactions_controller import (
@@ -11,6 +12,7 @@ from presentation.controllers.transactions_controller import (
 __all__ = [
     "auth_router",
     "balance_router",
+    "me_router",
     "ping_router",
     "products_router",
     "transactions_router",

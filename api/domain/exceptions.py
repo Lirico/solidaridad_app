@@ -33,6 +33,13 @@ class InvalidCredentials(DomainError):
         super().__init__(message)
 
 
+class MerchantNotConfigured(DomainError):
+    """The account cannot operate until a merchant is assigned."""
+
+    def __init__(self) -> None:
+        super().__init__("La cuenta no tiene un comercio configurado")
+
+
 class InvalidCurrentPassword(DomainError):
     """Raised when change-password current_password does not match."""
 

@@ -2,6 +2,7 @@ import '../../../psdk/psdk_bridge.dart';
 import '../../../psdk/psdk_card_reader.dart';
 import '../domain/receipt_formatter.dart';
 import '../domain/sale_model.dart';
+import 'receipt_defaults_repository.dart';
 
 /// Resultado de una impresión de ticket.
 class PrintResult {
@@ -20,14 +21,20 @@ class PrintResult {
 /// Encapsula la inicialización del PaymentSDK (si no está listo) y la llamada
 /// a [PsdkBridge.printHtml]. La espera de `sdiReady` (con el guard de
 /// race-condition) vive en [PsdkCardReader.ensureReady], compartida con las
-/// pantallas de lectura de banda.
+/// pantallas de lectura de banda. Un `success` del SDK sin `sdiReady` no
+/// alcanza: la térmica se usa recién cuando el manager de SDI está listo.
 class ReceiptPrinter {
-  ReceiptPrinter({PsdkBridge? psdk, PsdkCardReader? reader})
-    : _psdk = psdk ?? PsdkBridge() {
+  ReceiptPrinter({
+    PsdkBridge? psdk,
+    PsdkCardReader? reader,
+    ReceiptDefaultsRepository? defaultsRepository,
+  }) : _psdk = psdk ?? PsdkBridge(),
+       _defaults = defaultsRepository ?? ReceiptDefaultsRepository() {
     _reader = reader ?? PsdkCardReader(psdk: _psdk);
   }
 
   final PsdkBridge _psdk;
+  final ReceiptDefaultsRepository _defaults;
   late final PsdkCardReader _reader;
 
   /// Imprime el ticket de [operation] en la térmica.
@@ -45,7 +52,8 @@ class ReceiptPrinter {
       }
 
       // 2. Generar el HTML del ticket y enviarlo a la térmica.
-      final String html = ReceiptFormatter.toHtml(operation);
+      final defaults = await _defaults.load();
+      final String html = ReceiptFormatter.toHtml(operation, defaults);
       final Map<String, dynamic> result = await _psdk.printHtml(html);
 
       final bool ok = result['ok'] == true;

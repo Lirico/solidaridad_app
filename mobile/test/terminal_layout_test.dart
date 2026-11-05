@@ -12,6 +12,7 @@ import 'package:solidaridad_app/features/auth/presentation/screens/change_passwo
 import 'package:solidaridad_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:solidaridad_app/features/history/presentation/widgets/sale_detail_ticket.dart';
 import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
+import 'package:solidaridad_app/features/sales/domain/receipt_defaults.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_cubit.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_state.dart';
@@ -241,6 +242,20 @@ void main() {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 child: SaleDetailTicket(
+                  defaults: const ReceiptDefaults(
+                    issuerName: 'Solidaridad',
+                    establishmentName: 'Gas Austral',
+                    establishmentAddress: 'Av. San Martín 100, Ushuaia',
+                    establishmentCuit: '30-00000000-0',
+                    establishmentCode: '00000001',
+                    couponNumber: '00000001',
+                    batchNumber: '000001',
+                    authorizationCode: 'MOCK01',
+                    currency: 'ARS',
+                    installments: '1',
+                    installmentPlan: 'Contado',
+                    originalChargeNumber: '00000000',
+                  ),
                   operation: OperationModel(
                     id: 'OP-260716-00000007',
                     productCode: 'GARRAFA_10',

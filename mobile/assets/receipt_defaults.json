@@ -1,0 +1,14 @@
+{
+  "issuer_name": "Solidaridad",
+  "establishment_name": "Gas Austral",
+  "establishment_address": "Av. San Martín 100, Ushuaia",
+  "establishment_cuit": "30-00000000-0",
+  "establishment_code": "00000001",
+  "coupon_number": "00000001",
+  "batch_number": "000001",
+  "authorization_code": "MOCK01",
+  "currency": "ARS",
+  "installments": "1",
+  "installment_plan": "Contado",
+  "original_charge_number": "00000000"
+}

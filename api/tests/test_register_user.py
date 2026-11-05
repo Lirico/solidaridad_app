@@ -54,6 +54,7 @@ def test_register_user_success() -> None:
     use_case, users, installations, tokens = _build_use_case(created=created)
 
     result = use_case.execute(
+        merchant_id=42,
         name=" Ada ",
         email="Ada@Example.com",
         password="password1",
@@ -69,6 +70,7 @@ def test_register_user_success() -> None:
     users.create.assert_called_once()
     create_kwargs = users.create.call_args.kwargs
     assert create_kwargs["name"] == "Ada"
+    assert create_kwargs["merchant_id"] == 42
     assert create_kwargs["email"] == "ada@example.com"
     assert create_kwargs["password_hash"] == "argon2-hash"
     assert create_kwargs["must_change_password"] is True
@@ -88,6 +90,7 @@ def test_register_user_rejects_duplicate_email() -> None:
 
     with pytest.raises(EmailAlreadyExists):
         use_case.execute(
+            merchant_id=42,
             name="Ada",
             email="ada@example.com",
             password="password1",
@@ -103,6 +106,7 @@ def test_register_user_rejects_short_password() -> None:
 
     with pytest.raises(WeakPassword):
         use_case.execute(
+            merchant_id=42,
             name="Ada",
             email="ada@example.com",
             password="short",

@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
-from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
 from application.payments.close_batch import CloseBatch
@@ -54,18 +53,6 @@ def get_token_service(
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> TokenService:
     return TokenService(settings)
-
-
-def get_register_user(
-    db: Annotated[Session, Depends(get_db)],
-    tokens: Annotated[TokenService, Depends(get_token_service)],
-) -> RegisterUser:
-    return RegisterUser(
-        session=db,
-        users=UserRepository(db),
-        installations=InstallationRepository(db),
-        tokens=tokens,
-    )
 
 
 def get_login_user(

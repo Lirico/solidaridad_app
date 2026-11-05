@@ -41,6 +41,7 @@ class RegisterUser:
     def execute(
         self,
         *,
+        merchant_id: int,
         name: str,
         email: str,
         password: str,
@@ -56,6 +57,7 @@ class RegisterUser:
             raise EmailAlreadyExists(normalized_email)
 
         user = self._users.create(
+            merchant_id=merchant_id,
             name=normalized_name,
             email=normalized_email,
             password_hash=self._hasher.hash(password),

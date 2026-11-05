@@ -3,7 +3,9 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from domain.merchant import Merchant
 from domain.user import User
+from persistence.models.merchant import Merchant as MerchantModel
 from persistence.models.user import User as UserModel
 
 
@@ -35,15 +37,33 @@ class UserRepository:
             return None
         return _to_domain(row)
 
+    def get_merchant(self, user_id: int) -> Merchant | None:
+        row = self._session.scalar(
+            select(MerchantModel)
+            .join(UserModel, UserModel.merchant_id == MerchantModel.id)
+            .where(UserModel.id == user_id)
+        )
+        if row is None:
+            return None
+        return Merchant(
+            code=row.code,
+            name=row.name,
+            address=row.address,
+            city=row.city,
+            tax_id=row.tax_id,
+        )
+
     def create(
         self,
         *,
+        merchant_id: int,
         name: str,
         email: str,
         password_hash: str,
         must_change_password: bool = False,
     ) -> User:
         row = UserModel(
+            merchant_id=merchant_id,
             name=name,
             email=email,
             password_hash=password_hash,

@@ -44,12 +44,16 @@ class WaitingForCardContent extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Modo de pago',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              const Expanded(
+                child: Text(
+                  'Modo de pago',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -59,36 +63,41 @@ class WaitingForCardContent extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 40.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.credit_card,
-                      color: AppColors.primaryOrange,
-                      size: 32,
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Tarjeta',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.credit_card,
+                        color: AppColors.primaryOrange,
+                        size: 32,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Tarjeta',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            Text(
+                              'Acercar, insertar o deslizar',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.iconGrey,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Acercar, insertar o deslizar',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.iconGrey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
                 TextButton(
                   onPressed:
@@ -129,12 +138,16 @@ class WaitingForCardContent extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Esperando tarjeta',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              const Expanded(
+                child: Text(
+                  'Esperando tarjeta',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],

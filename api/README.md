@@ -45,6 +45,36 @@ Endpoints:
 
 Instalación/terminal de ejemplo: `05000001`
 
+### Configuración manual del comercio
+
+Un administrador carga `merchants` y asigna
+`users.merchant_id` al comercio correspondiente. `code` debe coincidir con el
+código de comercio del procesador asociado a la terminal; se conserva como
+texto, incluidos los ceros iniciales. La asociación es obligatoria. Durante la
+transición, login y `GET /v1/me/merchant` responden 403 si aún falta. El endpoint
+consulta el comercio de la cuenta autenticada en cada solicitud.
+
+```sql
+INSERT INTO merchants (code, name, address, city, tax_id)
+VALUES ('CODIGO', 'NOMBRE', 'DOMICILIO', 'LOCALIDAD', 'CUIT');
+
+UPDATE users SET merchant_id = (SELECT id FROM merchants WHERE code = 'CODIGO')
+WHERE email = 'cuenta@ejemplo.com';
+```
+
+El registro público responde 403: el alta de cuentas es manual y debe incluir
+`merchant_id` y una contraseña almacenada con el hash compatible con la API.
+El seed local crea un comercio de demostración con datos ficticios y lo asigna
+a las cuentas demo.
+
+Para una base con cuentas existentes, aplicar primero
+`uv run alembic upgrade 20261105_0014`, cargar y asociar comercios, y después
+`make migrate`. La migración `20261105_0015` rechaza cuentas sin asociación;
+no inventa un comercio para ellas. Una base nueva puede migrarse normalmente.
+
+La asociación de terminal a comercio y su validación contra el procesador aún
+no están implementadas; deben verificarse durante la configuración manual.
+
 Re-ejecutar seed es seguro (idempotente):
 
 ```bash

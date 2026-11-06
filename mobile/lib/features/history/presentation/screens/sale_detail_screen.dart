@@ -60,7 +60,8 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     final bool canVoid = operation.result == PaymentResult.approved;
     final bool canPrint =
         operation.result == PaymentResult.approved ||
-        operation.result == PaymentResult.underReview;
+        operation.result == PaymentResult.underReview ||
+        operation.result == PaymentResult.declined;
 
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,

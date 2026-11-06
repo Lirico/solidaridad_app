@@ -7,21 +7,35 @@ import '../../domain/sale_model.dart';
 import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
+  static const String unconfirmedSaleMessage =
+      'La venta sigue sin confirmar. Puede consultarla en el historial.';
+  static const String blockedNewSaleMessage = 'Hay una venta sin confirmar.';
+
   final SalesRepository salesRepository;
   final Future<void> Function(Duration) _wait;
   final DateTime Function() _now;
   final Duration pollingTimeout;
   bool _polling = false;
   bool _pollingCancelled = false;
+  bool _leaveRequested = false;
 
   SalesCubit({
     required this.salesRepository,
     Future<void> Function(Duration)? wait,
     DateTime Function()? now,
-    this.pollingTimeout = const Duration(minutes: 2),
+    this.pollingTimeout = const Duration(seconds: 30),
   }) : _wait = wait ?? Future<void>.delayed,
        _now = now ?? DateTime.now,
        super(const SalesLoading());
+
+  /// Hay un cobro en curso que todavía puede cambiar de resultado.
+  /// Una revisión de oficina no bloquea la venta siguiente.
+  bool get blocksNewSale {
+    final current = state;
+    return current is SalesAwaitingAuthorization &&
+        current.pendingReason != PendingSaleReason.underReview &&
+        !current.mayStartNewSale;
+  }
 
   Future<void> loadHistory({
     required String token,
@@ -57,6 +71,7 @@ class SalesCubit extends Cubit<SalesState> {
     required String productLabel,
     required double amount,
   }) {
+    if (blocksNewSale) return;
     emit(
       SalesProductSelected(
         productCode: productCode,
@@ -75,6 +90,7 @@ class SalesCubit extends Cubit<SalesState> {
     required String cvv,
     required String expirationDate,
   }) {
+    if (blocksNewSale) return;
     emit(
       SalesReviewing(
         productCode: productCode,
@@ -95,6 +111,7 @@ class SalesCubit extends Cubit<SalesState> {
   /// La banda magnética no contiene CVV. La lectura completa los mismos datos
   /// que el ingreso manual y el vencimiento ya está en formato YYMM.
   void showReviewFromMsr(MsrCardData data) {
+    if (blocksNewSale) return;
     emit(
       SalesReviewing(
         productCode: state.productCode,
@@ -113,6 +130,7 @@ class SalesCubit extends Cubit<SalesState> {
     if (state is SalesProcessing || state is SalesAwaitingAuthorization) {
       return;
     }
+    _leaveRequested = false;
 
     final currentProductCode = state.productCode;
     final currentProductLabel = state.productLabel;
@@ -137,15 +155,22 @@ class SalesCubit extends Cubit<SalesState> {
       ),
     );
 
-    final response = await salesRepository.registerSale(
-      product: currentProductCode,
-      amount: currentAmount.toString(),
-      cardNumber: currentCardNumber,
-      cvv: currentCvv,
-      expirationDate: currentExpirationDate,
-      token: token,
-      idempotencyKey: currentIdempotencyKey,
-    );
+    Future<SaleResponse> register() {
+      return salesRepository.registerSale(
+        product: currentProductCode,
+        amount: currentAmount.toString(),
+        cardNumber: currentCardNumber,
+        cvv: currentCvv,
+        expirationDate: currentExpirationDate,
+        token: token,
+        idempotencyKey: currentIdempotencyKey,
+      );
+    }
+
+    var response = await register();
+    if (response.connectionError && !_leaveRequested && !isClosed) {
+      response = await register();
+    }
 
     if (response.sessionExpired) {
       emit(const SalesSessionExpired());
@@ -164,6 +189,10 @@ class SalesCubit extends Cubit<SalesState> {
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
       );
+      if (_leaveRequested || isClosed) {
+        cancelPendingSalePolling();
+        return;
+      }
       await pollPendingSale(token: token);
       return;
     }
@@ -233,12 +262,7 @@ class SalesCubit extends Cubit<SalesState> {
           return;
         }
         if (_now().difference(startedAt) >= pollingTimeout) {
-          emit(
-            _stoppedPolling(
-              current,
-              'La operación sigue en curso. Consulte el historial para continuar.',
-            ),
-          );
+          emit(_stoppedPolling(current, unconfirmedSaleMessage));
           return;
         }
 
@@ -293,17 +317,19 @@ class SalesCubit extends Cubit<SalesState> {
     }
   }
 
-  void cancelPendingSalePolling() {
+  /// Corta la espera visible. No vuelve a enviar la venta ni la da por
+  /// rechazada: el servidor sigue hasta un resultado.
+  void leaveUnconfirmedSale() {
+    _leaveRequested = true;
     _pollingCancelled = true;
     final current = state;
     if (current is SalesAwaitingAuthorization && !current.pollingStopped) {
-      emit(
-        _stoppedPolling(
-          current,
-          'Consulta pausada. Puede retomarla desde el historial.',
-        ),
-      );
+      emit(_stoppedPolling(current, unconfirmedSaleMessage));
     }
+  }
+
+  void cancelPendingSalePolling() {
+    leaveUnconfirmedSale();
   }
 
   SalesAwaitingAuthorization _stoppedPolling(

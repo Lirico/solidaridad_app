@@ -120,7 +120,9 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = Colors.orange;
         statusIcon = Icons.hourglass_top;
         statusTitle = 'Transacción en Proceso';
-        statusSubtitle = 'La autorización sigue en curso.';
+        statusSubtitle = withServerMessage(
+          'La autorización sigue en curso.',
+        );
       case PaymentResult.underReview:
         statusColor = Colors.orange.shade800;
         statusIcon = Icons.manage_search;

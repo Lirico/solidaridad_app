@@ -111,6 +111,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   }
 
   void _onNext() {
+    if (context.read<SalesCubit>().blocksNewSale) return;
     if (_formKey.currentState!.validate()) {
       final units =
           double.tryParse(_unitsController.text.replaceAll(',', '.')) ?? 0;
@@ -127,6 +128,8 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool saleBlocked = context.watch<SalesCubit>().blocksNewSale;
+
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
       appBar: const AppHeader(
@@ -160,7 +163,20 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                 const Divider(height: 32),
                 const SizedBox(height: 8),
 
-                if (_loadingProducts)
+                if (saleBlocked)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      SalesCubit.blockedNewSaleMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  )
+                else if (_loadingProducts)
                   const Center(
                     child: Padding(
                       padding: EdgeInsets.all(16.0),
@@ -229,7 +245,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton(
-                    onPressed: _canContinue ? _onNext : null,
+                    onPressed: saleBlocked || !_canContinue ? null : _onNext,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryOrange,
                       foregroundColor: Colors.white,

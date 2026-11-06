@@ -32,6 +32,9 @@ class BatchCloseSubmitResult {
   final int? batchCloseId;
   final bool sessionExpired;
   final bool connectionError;
+
+  /// El servidor rechazó el cierre (por ejemplo, una venta todavía en curso).
+  final bool rejected;
   final String? errorMessage;
 
   const BatchCloseSubmitResult({
@@ -39,6 +42,7 @@ class BatchCloseSubmitResult {
     this.batchCloseId,
     this.sessionExpired = false,
     this.connectionError = false,
+    this.rejected = false,
     this.errorMessage,
   });
 }
@@ -201,6 +205,14 @@ class BatchCloseRepository {
       }
 
       final Map<String, dynamic>? body = _tryDecodeObject(response.body);
+      if (response.statusCode == 409) {
+        return BatchCloseSubmitResult(
+          rejected: true,
+          errorMessage:
+              (body?['message'] as String?) ??
+              'No se puede cerrar el lote: hay una venta sin confirmar.',
+        );
+      }
       if (response.statusCode != 201) {
         return BatchCloseSubmitResult(
           connectionError: true,

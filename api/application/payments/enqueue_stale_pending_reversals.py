@@ -67,7 +67,8 @@ class EnqueueStalePendingReversals:
                     transaction_id=transaction.id
                 )
                 recovered.append(transaction)
-            self._session.commit()
+            if recovered:
+                self._session.commit()
         except Exception:
             self._session.rollback()
             raise

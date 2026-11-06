@@ -298,6 +298,81 @@ void main() {
     expect(cubit.state, isA<SalesAwaitingAuthorization>());
     final pending = cubit.state as SalesAwaitingAuthorization;
     expect(pending.pollingStopped, isTrue);
-    expect(pending.message, contains('historial'));
+    expect(pending.message, SalesCubit.unconfirmedSaleMessage);
+    expect(cubit.blocksNewSale, isTrue);
+
+    cubit.setProductAndAmount(
+      productCode: 'GARRAFA_15',
+      productLabel: 'Garrafa 15 kg',
+      amount: 1,
+    );
+    expect(cubit.state, same(pending));
+    verify(
+      () => repository.registerSale(
+        product: any(named: 'product'),
+        amount: any(named: 'amount'),
+        cardNumber: any(named: 'cardNumber'),
+        cvv: any(named: 'cvv'),
+        expirationDate: any(named: 'expirationDate'),
+        token: any(named: 'token'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).called(1);
+  });
+
+  test('un envío sin respuesta se reintenta una sola vez', () async {
+    final cubit = makeCubit(wait: (_) async {});
+    addTearDown(cubit.close);
+    openReview(cubit);
+    when(
+      () => repository.registerSale(
+        product: any(named: 'product'),
+        amount: any(named: 'amount'),
+        cardNumber: any(named: 'cardNumber'),
+        cvv: any(named: 'cvv'),
+        expirationDate: any(named: 'expirationDate'),
+        token: any(named: 'token'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).thenAnswer(
+      (_) async => const SaleResponse(
+        isApproved: false,
+        operationNumber: '',
+        message: 'Sin red',
+        errorCode: '99',
+        connectionError: true,
+      ),
+    );
+
+    await cubit.sendIsoMessage(token: 'token');
+
+    expect(cubit.state, isA<SalesCompleted>());
+    expect(
+      (cubit.state as SalesCompleted).result,
+      PaymentResult.connectionError,
+    );
+    verify(
+      () => repository.registerSale(
+        product: any(named: 'product'),
+        amount: any(named: 'amount'),
+        cardNumber: any(named: 'cardNumber'),
+        cvv: any(named: 'cvv'),
+        expirationDate: any(named: 'expirationDate'),
+        token: any(named: 'token'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).called(2);
+    verifyNever(
+      () => repository.getSaleStatus(
+        token: any(named: 'token'),
+        transactionNumber: any(named: 'transactionNumber'),
+      ),
+    );
+  });
+
+  test('la espera visible por defecto es de 30 segundos', () {
+    final cubit = SalesCubit(salesRepository: repository);
+    addTearDown(cubit.close);
+    expect(cubit.pollingTimeout, const Duration(seconds: 30));
   });
 }

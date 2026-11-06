@@ -16,6 +16,7 @@ class AuthorizeCommand:
     amount_minor: int
     card_number: str
     terminal_id: str
+    merchant_code: str
     stan: str
     ticket_number: str
     expiration_date: str | None = None
@@ -27,6 +28,7 @@ class VoidCommand:
     amount_minor: int
     card_number: str
     terminal_id: str
+    merchant_code: str
     stan: str
     original_ticket: str
     void_ticket: str

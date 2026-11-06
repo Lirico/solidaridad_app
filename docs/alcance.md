@@ -48,12 +48,15 @@ impresión de ticket.
 
 - App Android en Flutter, orientada a operación de venta en terminal.
 - Login de usuario y cambio de contraseña.
-- El alta de cuentas es manual con comercio asignado; el registro público queda
-  deshabilitado hasta contar con un mecanismo de asignación controlado.
+- El alta de cuentas es manual en la base de datos, con comercio asignado;
+  no existe registro público.
 - El comercio pertenece obligatoriamente a la cuenta: login entrega sus datos actuales y
   `GET /v1/me/merchant` permite refrescarlos. Los datos se administran
   manualmente en la API y no se guardan como instantánea en cada venta. La
   actualización de la app para consumirlos queda pendiente.
+- La API envía el código de comercio asociado a la cuenta al gateway para
+  ventas y consultas de saldo. El gateway lo transmite en ISO DE42; las
+  anulaciones y reversos consultan el comercio asociado a la cuenta de la venta.
 - Identificador de terminal (`installation_id` / terminal id, 8 caracteres)
   configurado en el dispositivo; el operador no lo inventa por operación.
 - Pantalla inicial simple orientada a la venta.
@@ -136,9 +139,8 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - Autenticación, sesión por token, cambio de contraseña.
 - Validación de usuario habilitado (según política de altas).
 - **Provisión de usuarios centralizada**: los usuarios (empleados) son dados
-  de alta únicamente por la empresa; no se usa el registro desde la app. El
-  endpoint `POST /v1/auth/register` se mantiene como utilidad para que la
-  empresa registre usuarios vía Postman/central.
+  de alta únicamente por la empresa en la base de datos, con comercio asignado;
+  no existe endpoint de registro público.
 - Terminal origen: el `installation_id` del login es el terminal id que se
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).

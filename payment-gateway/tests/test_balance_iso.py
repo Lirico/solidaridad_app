@@ -15,6 +15,7 @@ def test_build_balance_request_sets_fields() -> None:
         product_code="993",
         card_number="6063007014007403",
         terminal_id="TERM0001",
+        merchant_code="012502",
         stan="000001",
         expiration_date="1228",
     )
@@ -43,6 +44,7 @@ def test_build_balance_request_sets_fields() -> None:
     parsed = unpack_iso(pack_iso(iso))
     assert parsed.mtype == "0100"
     assert parsed.currcode_49 == "993"
+    assert parsed.merchid_42 == "012502".ljust(15)
 
 
 def test_map_balance_response_approved() -> None:

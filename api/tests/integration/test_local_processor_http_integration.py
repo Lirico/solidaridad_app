@@ -49,30 +49,16 @@ def _sale(
     )
 
 
-def _local_processor_operator(api: httpx.Client) -> Operator:
-    unique = uuid4().hex
-    password = "integration-password-123"
-    response = api.post(
-        "/v1/auth/register",
-        json={
-            "name": "Local Processor Integration Operator",
-            "email": f"processor-integration-{unique}@example.com",
-            "password": password,
-            # This is the terminal configured by 03_fix_demo.sql.
-            "installation_id": "05000001",
-        },
-    )
-    assert response.status_code == 201, response.text
-    return Operator(
-        token=response.json()["token"],
-        email=response.json()["email"],
-        password=password,
-        installation_id="05000001",
-    )
+@pytest.fixture
+def local_processor_operator(make_operator: object) -> Operator:
+    assert callable(make_operator)
+    return make_operator(installation_id="05000001", merchant_code="012502")
 
 
-def test_local_processor_approves_known_funded_card(api: httpx.Client) -> None:
-    response = _sale(api, _local_processor_operator(api), card_number=APPROVED_CARD)
+def test_local_processor_approves_known_funded_card(
+    api: httpx.Client, local_processor_operator: Operator
+) -> None:
+    response = _sale(api, local_processor_operator, card_number=APPROVED_CARD)
 
     assert response.status_code == 201, response.text
     assert response.json()["status"] == "APPROVED"
@@ -85,17 +71,20 @@ def test_local_processor_approves_known_funded_card(api: httpx.Client) -> None:
 def test_local_processor_rejects_known_fixture_cards(
     api: httpx.Client,
     card_number: str,
+    local_processor_operator: Operator,
 ) -> None:
-    response = _sale(api, _local_processor_operator(api), card_number=card_number)
+    response = _sale(api, local_processor_operator, card_number=card_number)
 
     assert response.status_code == 201, response.text
     assert response.json()["status"] == "DECLINED"
 
 
-def test_local_processor_balance_exposes_fixture_balance(api: httpx.Client) -> None:
+def test_local_processor_balance_exposes_fixture_balance(
+    api: httpx.Client, local_processor_operator: Operator
+) -> None:
     response = api.post(
         "/v1/balance",
-        headers=_local_processor_operator(api).headers,
+        headers=local_processor_operator.headers,
         json={"card_number": BALANCE_CARD, "expiration_date": EXPIRATION_DATE},
     )
 

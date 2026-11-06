@@ -16,7 +16,7 @@ from infrastructure.iso.response_mapper import map_reversal_response
 from infrastructure.iso.tcp_processor import TcpIsoProcessor
 
 _FIXTURE_PATH = Path(__file__).parent / "fixtures" / "legacy_reversal_contract.json"
-_EXPECTED_BITS = {2, 3, 4, 11, 12, 13, 14, 22, 24, 25, 41, 49, 62}
+_EXPECTED_BITS = {2, 3, 4, 11, 12, 13, 14, 22, 24, 25, 41, 42, 49, 62}
 
 
 def _command(**overrides: object) -> ReverseCommand:
@@ -26,6 +26,7 @@ def _command(**overrides: object) -> ReverseCommand:
         "card_number": "6063007014007403",
         "expiration_date": "1228",
         "terminal_id": "05000001",
+        "merchant_code": "012502",
         "original_stan": "890001",
         "original_ticket": "890001",
         "reversal_stan": "654321",
@@ -59,6 +60,8 @@ def test_build_reversal_matches_ra00_binary_vector() -> None:
         now=datetime(2026, 10, 12, 12, 0, 0),
     )
 
+    assert message.merchid_42 == "012502".ljust(15)
+    message.bitmap[5] &= ~0x40  # DE42; compare the remaining original wire vector.
     assert pack_iso(message).hex() == expected
 
 
@@ -85,6 +88,7 @@ def test_build_reversal_normalizes_original_identifiers() -> None:
         _command(
             expiration_date="12/28",
             terminal_id="0500000199",
+            merchant_code="012502",
             original_stan="89-0001",
             original_ticket="ticket-890001",
         ),

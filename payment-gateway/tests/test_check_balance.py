@@ -15,6 +15,7 @@ def _cmd(**overrides: object) -> BalanceCommand:
         "product_code": "993",
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
+        "merchant_code": "012502",
         "stan": "123456",
     }
     base.update(overrides)

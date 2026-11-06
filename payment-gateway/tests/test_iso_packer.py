@@ -167,6 +167,7 @@ def test_build_purchase_request_sets_fields() -> None:
         amount_minor=150050,
         card_number="4111111111111111",
         terminal_id="TERM0001",
+        merchant_code="012502",
         stan="000001",
         ticket_number="00000042",
         expiration_date="2912",
@@ -185,7 +186,8 @@ def test_build_purchase_request_sets_fields() -> None:
     assert iso.termid_41 == "TERM0001"
     assert iso.field_62 == "00000042"
     assert bitmap_get(iso.bitmap, 62)
-    assert not bitmap_get(iso.bitmap, 42)
+    assert bitmap_get(iso.bitmap, 42)
+    assert iso.merchid_42 == "012502".ljust(15)
 
 
 def test_build_purchase_request_uses_legacy_manual_layout() -> None:
@@ -196,6 +198,7 @@ def test_build_purchase_request_uses_legacy_manual_layout() -> None:
         amount_minor=150050,
         card_number="4111111111111111",
         terminal_id="TERM0001",
+        merchant_code="012502",
         stan="000001",
         ticket_number="00000042",
         expiration_date="2912",
@@ -221,6 +224,7 @@ def test_build_void_request_sets_fields() -> None:
         amount_minor=150050,
         card_number="4111111111111111",
         terminal_id="TERM0001",
+        merchant_code="012502",
         stan="654321",
         original_ticket="00000042",
         void_ticket="654321",

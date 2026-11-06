@@ -10,6 +10,7 @@ class BalanceCommand:
     product_code: str
     card_number: str
     terminal_id: str
+    merchant_code: str
     stan: str
     expiration_date: str | None = None
 

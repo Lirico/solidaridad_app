@@ -62,8 +62,22 @@ UPDATE users SET merchant_id = (SELECT id FROM merchants WHERE code = 'CODIGO')
 WHERE email = 'cuenta@ejemplo.com';
 ```
 
-El registro público responde 403: el alta de cuentas es manual y debe incluir
-`merchant_id` y una contraseña almacenada con el hash compatible con la API.
+No existe un endpoint de registro público. El alta se realiza directamente en
+la base y debe incluir `merchant_id` y un hash de contraseña compatible con la
+API. Para generar el hash sin escribir la contraseña en el comando:
+
+```bash
+uv run python -c 'from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass("Contraseña inicial: ")))'
+```
+
+Usar el hash obtenido en una conexión administrativa segura:
+
+```sql
+INSERT INTO users (merchant_id, name, email, password_hash, must_change_password)
+SELECT id, 'NOMBRE', 'cuenta@ejemplo.com', 'HASH_GENERADO', true
+FROM merchants WHERE code = 'CODIGO';
+```
+
 El seed local crea un comercio de demostración con datos ficticios y lo asigna
 a las cuentas demo.
 
@@ -72,8 +86,12 @@ Para una base con cuentas existentes, aplicar primero
 `make migrate`. La migración `20261105_0015` rechaza cuentas sin asociación;
 no inventa un comercio para ellas. Una base nueva puede migrarse normalmente.
 
-La asociación de terminal a comercio y su validación contra el procesador aún
-no están implementadas; deben verificarse durante la configuración manual.
+La API envía el código en DE42 mediante el gateway. Para anulaciones y reversos
+consulta el comercio asociado a la cuenta que hizo la venta; se asume que esa
+asociación y su código permanecen estables. Si falta un comercio válido, la
+anulación se rechaza y el reverso pasa a revisión manual. La validación de la
+relación cuenta-terminal dentro de la API sigue pendiente; el procesador
+verifica terminal y comercio para Verifone.
 
 Re-ejecutar seed es seguro (idempotente):
 
@@ -154,8 +172,9 @@ already running API over HTTP. It does not use FastAPI `TestClient` or
 dependency overrides. The API must use an isolated database migrated to `head`
 and its `PAYMENT_GATEWAY_URL` must point to the controlled integration stub.
 
-The gate does not create or wipe the database: point the API at a dedicated,
-disposable integration database before starting it. In separate terminals,
+The gate does not create or wipe the database; it inserts test merchants and
+operators directly. Set `INTEGRATION_DATABASE_URL` to the same dedicated,
+disposable database used by the API, never to a production database. In separate terminals,
 from `api/`:
 
 ```bash
@@ -168,7 +187,8 @@ DATABASE_URL=postgresql+psycopg://... PAYMENT_GATEWAY_URL=http://127.0.0.1:8011 
   make run HOST=127.0.0.1
 
 # 3. In a third terminal, execute the gate.
-make integ-test API_BASE_URL=http://127.0.0.1:8000 \
+INTEGRATION_DATABASE_URL=postgresql+psycopg://... \
+  make integ-test API_BASE_URL=http://127.0.0.1:8000 \
   INTEGRATION_GATEWAY_CONTROL_URL=http://127.0.0.1:8011
 ```
 

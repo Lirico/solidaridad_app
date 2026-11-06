@@ -17,6 +17,7 @@ def _cmd(**overrides: object) -> VoidCommand:
         "amount_minor": 150050,
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
+        "merchant_code": "012502",
         "stan": "654321",
         "original_ticket": "00000042",
         "void_ticket": "654321",

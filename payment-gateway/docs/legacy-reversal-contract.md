@@ -42,11 +42,14 @@ MTI `0410`.
 | 22 | Entry mode `0012` | Obligatorio; si falta responde `19` |
 | 24 | NII | Se refleja en la respuesta |
 | 25 | Condición POS | Presente en el vector histórico; no participa del match |
-| 41 | Terminal, 8 caracteres | Parte del match y resuelve el comercio |
+| 41 | Terminal, 8 caracteres | Parte del match |
+| 42 | Comercio, 15 caracteres ASCII | Comercio asociado a la cuenta de la venta |
 | 49 | Producto | Parte de la coincidencia estricta |
 | 62 | Ticket original | Parte de la coincidencia estricta |
 
-El comercio no necesita DE42 en el vector Verifone/IVR: se obtiene desde DE41.
+El vector histórico RA-00 no incluía DE42. Desde la restauración del contrato
+de comercio, los nuevos mensajes incluyen DE42 con el comercio de la cuenta;
+no se modifica la captura histórica.
 El lote se obtiene de DE63; al estar ausente en el contrato vigente toma valor
 `0`. Ambos valores participan en la búsqueda de la venta original.
 

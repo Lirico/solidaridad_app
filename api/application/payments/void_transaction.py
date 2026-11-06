@@ -42,6 +42,7 @@ from persistence.repositories.transaction_repository import (
     TransactionRepository,
     ticket_from_transaction_number,
 )
+from persistence.repositories.user_repository import UserRepository
 from persistence.repositories.void_operation_repository import VoidOperationRepository
 
 
@@ -130,6 +131,15 @@ class VoidTransaction:
                 "La anulación anterior sigue en verificación con casa central"
             )
 
+        merchant = UserRepository(self._session).get_merchant(transaction.user_id)
+        if (
+            merchant is None
+            or not merchant.code.isascii()
+            or not merchant.code.isalnum()
+            or len(merchant.code) > 15
+        ):
+            raise TransactionNotVoidable("La cuenta no tiene un comercio válido")
+
         original_ticket = (
             transaction.processor_ticket
             or ticket_from_transaction_number(transaction.transaction_number)
@@ -164,6 +174,7 @@ class VoidTransaction:
                     amount_minor=transaction.amount_minor,
                     card_number=pan,
                     terminal_id=transaction.terminal_id[:8].ljust(8),
+                    merchant_code=merchant.code,
                     stan=operation.stan,
                     original_ticket=operation.original_ticket,
                     void_ticket=operation.void_ticket,

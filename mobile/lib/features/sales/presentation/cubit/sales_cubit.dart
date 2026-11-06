@@ -406,6 +406,7 @@ class SalesCubit extends Cubit<SalesState> {
         errorCode: paymentResult != PaymentResult.approved
             ? response.errorCode
             : null,
+        responseCode: response.responseCode,
       ),
     );
   }
@@ -433,6 +434,7 @@ class SalesCubit extends Cubit<SalesState> {
       mayStartNewSale: response.mayStartNewSale,
       date: _now(),
       userMessage: response.message,
+      responseCode: response.responseCode,
     );
   }
 
@@ -536,6 +538,7 @@ class SalesCubit extends Cubit<SalesState> {
           result: mappedResult,
           date: op.date,
           userMessage: result.message,
+          responseCode: op.responseCode,
         );
       }
       return op;

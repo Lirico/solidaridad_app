@@ -23,12 +23,14 @@ class ReceiptFormatter {
   static String _formatTime(DateTime d) =>
       '${_two(d.hour)}:${_two(d.minute)}:${_two(d.second)}';
 
-  static String _statusLabel(PaymentResult result) {
-    switch (result) {
+  static String _statusLabel(OperationModel op) {
+    switch (op.result) {
       case PaymentResult.approved:
         return 'Aprobada';
       case PaymentResult.declined:
-        return 'RECHAZADA';
+        final code = op.responseCode?.trim() ?? '';
+        if (code.isEmpty) return 'Denegada';
+        return 'Denegada ($code)';
       case PaymentResult.pending:
         return 'EN PROCESO';
       case PaymentResult.underReview:
@@ -77,15 +79,21 @@ class ReceiptFormatter {
       buf.writeln('Cargo original: ${defaults.originalChargeNumber}');
     }
     final message = op.userMessage?.trim() ?? '';
-    if (message.isNotEmpty) {
+    final declined = op.result == PaymentResult.declined;
+    if (message.isNotEmpty && !declined) {
       buf.writeln('Mensaje: $message');
     }
-    buf.writeln(_statusLabel(op.result));
+    buf.writeln(_statusLabel(op));
+    if (declined && message.isNotEmpty) {
+      buf.writeln(message);
+    }
     if (op.result == PaymentResult.underReview) {
       buf.writeln('No cobre nuevamente: podría producirse un cobro duplicado.');
       buf.writeln('Verifique esta referencia con casa central.');
     }
-    buf.writeln('Firma: ${'.' * 48}');
+    if (!declined) {
+      buf.writeln('Firma: ${'.' * 48}');
+    }
     return buf.toString();
   }
 
@@ -109,12 +117,19 @@ class ReceiptFormatter {
       lines.add(_line('Cargo original', defaults.originalChargeNumber));
     }
     final message = op.userMessage?.trim() ?? '';
-    if (message.isNotEmpty) {
+    final declined = op.result == PaymentResult.declined;
+    if (message.isNotEmpty && !declined) {
       lines.add(_line('Mensaje', message));
     }
     final verificationWarning = op.result == PaymentResult.underReview
         ? '<div class="c">No cobre nuevamente: podría producirse un cobro duplicado.<br/>Verifique esta referencia con casa central.</div>'
         : '';
+    final declineReason = declined && message.isNotEmpty
+        ? '<div class="c">${_esc(message)}</div>'
+        : '';
+    final signature = declined
+        ? ''
+        : '<div class="firma">Firma: ${'.' * 32}</div>';
 
     return '''
 <!DOCTYPE html>
@@ -152,9 +167,10 @@ class ReceiptFormatter {
   <div class="detail">
     ${lines.join('\n    ')}
   </div>
-  <div class="c big status">${_esc(_statusLabel(op.result))}</div>
+  <div class="c big status">${_esc(_statusLabel(op))}</div>
+  $declineReason
   $verificationWarning
-  <div class="firma">Firma: ${'.' * 32}</div>
+  $signature
   <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 </body>
 </html>

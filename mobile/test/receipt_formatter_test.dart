@@ -24,6 +24,7 @@ OperationModel _operation({
   PaymentResult result = PaymentResult.underReview,
   String card = '6063007014007403',
   String? userMessage = 'Verifique con casa central.',
+  String? responseCode,
 }) {
   return OperationModel(
     id: 'OP-REF-123',
@@ -34,6 +35,7 @@ OperationModel _operation({
     result: result,
     date: DateTime(2026, 10, 14, 15, 30, 5),
     userMessage: userMessage,
+    responseCode: responseCode,
   );
 }
 
@@ -89,6 +91,38 @@ void main() {
       expect(text, contains(value));
       expect(html, contains(value));
     }
+  });
+
+  test('un rechazo dice Denegada con el código y el motivo, sin firma', () {
+    final operation = _operation(
+      result: PaymentResult.declined,
+      userMessage: 'CVV Inválido',
+      responseCode: '05',
+    );
+    final text = ReceiptFormatter.toPlainText(operation, _defaults());
+    final html = ReceiptFormatter.toHtml(operation, _defaults());
+
+    expect(text, contains('Denegada (05)'));
+    expect(html, contains('Denegada (05)'));
+    expect(text, contains('CVV Inválido'));
+    expect(html, contains('CVV Inválido'));
+    expect(text, isNot(contains('Mensaje:')));
+    expect(html, isNot(contains('Mensaje:')));
+    expect(text, isNot(contains('Firma:')));
+    expect(html, isNot(contains('Firma:')));
+    expect(text, contains('Cupón: 00000001'));
+    expect(text, contains('Autorización: MOCK01'));
+  });
+
+  test('un rechazo sin código queda en Denegada', () {
+    final text = ReceiptFormatter.toPlainText(
+      _operation(result: PaymentResult.declined, userMessage: null),
+      _defaults(),
+    );
+
+    expect(text, contains('Denegada'));
+    expect(text, isNot(contains('Denegada (')));
+    expect(text, isNot(contains('Firma:')));
   });
 
   test('el cargo original solo aparece en una anulación', () {

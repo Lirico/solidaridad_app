@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:solidaridad_app/features/auth/data/auth_repository.dart';
@@ -36,6 +37,25 @@ void main() {
   });
 
   testWidgets('con un rechazo muestra Transacción Rechazada', (tester) async {
+    const channel = MethodChannel('com.solidaridad.poc_verifone/psdk');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      if (call.method == 'getStatus') {
+        return <String, dynamic>{'sdiReady': true};
+      }
+      if (call.method == 'printHtml') {
+        return <String, dynamic>{'ok': true};
+      }
+      return <String, dynamic>{'ok': true};
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+
     await _openStatus(
       tester,
       arguments: OperationModel(
@@ -52,6 +72,9 @@ void main() {
     expect(find.text('Transacción Rechazada'), findsOneWidget);
     expect(find.text('No hay datos de la operación disponibles'), findsNothing);
     expect(find.text('¡Transacción Aprobada!'), findsNothing);
+
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
   });
 }
 

@@ -1,5 +1,20 @@
 # Bitácora de cambios excepcionales al procesador legacy
 
+## 2026-11-06 — Restauración exacta del código inicial
+
+- **Cambio solicitado:** eliminar las diferencias restantes de
+  `legacy/bin/auth_mycli.c` respecto del primer commit `e94bbee`, incluyendo
+  las comprobaciones añadidas para comercio vacío y producto Ingenico vacío.
+  El contenido de `payment_processor/legacy/` queda idéntico a ese commit.
+- **Validación:** authkig compilado con MySQL aislado; venta, saldo, anulación
+  y reverso Verifone con comercio correcto `00`; comercio incorrecto `89`.
+  En consultas de saldo, Verifone con comercio NULL rechazó `89`, IVR con
+  comercio NULL respondió `00` e Ingenico con producto vacío terminó en error
+  `96` en el gateway. El schema local no admite NULL en `cod_moneda`.
+- **Compatibilidad:** se mantiene el comportamiento original de Ingenico e IVR;
+  estos casos no se comprobaron en hardware ni en la base de producción. API y
+  gateway siguen enviando DE42. No se desplegó ni modificó el procesador activo.
+
 ## 2026-11-05 — Restauración explícita de la validación de comercio
 
 - **Cambio solicitado:** revertir la modificación de `24b20b2` que ignoraba

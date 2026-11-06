@@ -38,7 +38,7 @@ class ReceiptPrinter {
   /// [initRetryDelay] entre intentos. Cada espera de `sdiReady` dura como
   /// máximo [readyTimeoutSec]. Si [PsdkCardReader.ensureReady] no ve el
   /// manager, o si [PsdkBridge.printHtml] responde `PSDK_NOT_READY` antes de
-  /// llamar a la térmica, apaga el SDK y vuelve a crearlo. Un código de
+  /// llamar a la térmica, cierra la sesión antes de reinicializarla. Un código de
   /// `printHTML` ya ejecutado no se reintenta.
   ///
   /// Devuelve [PrintResult.success] si la impresión fue OK, o un
@@ -60,7 +60,11 @@ class ReceiptPrinter {
           timeoutSec: readyTimeoutSec,
         );
         if (!ready) {
-          await _releaseForRetry();
+          if (!await _releaseForRetry()) {
+            return const PrintResult.failure(
+              'No se pudo recuperar la conexión de la impresora.',
+            );
+          }
           if (willRetry) {
             await Future<void>.delayed(initRetryDelay);
             continue;
@@ -77,12 +81,18 @@ class ReceiptPrinter {
         final String code = result['result'] as String? ?? 'UNKNOWN';
         return PrintResult.failure('La impresora no imprimió (código $code).');
       } on PlatformException catch (error) {
-        if (error.code != 'PSDK_NOT_READY') {
+        if (error.code != 'PSDK_NOT_READY' &&
+            error.code != 'PSDK_INVALID_STATE' &&
+            error.code != 'PSDK_INIT_FAILED') {
           return const PrintResult.failure(
             'Error al imprimir el ticket. Reintente.',
           );
         }
-        await _releaseForRetry();
+        if (!await _releaseForRetry()) {
+          return const PrintResult.failure(
+            'No se pudo recuperar la conexión de la impresora.',
+          );
+        }
         if (willRetry) {
           await Future<void>.delayed(initRetryDelay);
           continue;
@@ -102,11 +112,13 @@ class ReceiptPrinter {
     );
   }
 
-  /// Apaga el SDK entre arranques fallidos para que el siguiente `initialize`
-  /// cree uno nuevo. Un tearDown fallido no debe tapar el reintento.
-  Future<void> _releaseForRetry() async {
+  /// Espera el cierre confirmado antes de reintentar la sesión compartida.
+  Future<bool> _releaseForRetry() async {
     try {
-      await _psdk.tearDown();
-    } catch (_) {}
+      await _psdk.tearDown().timeout(const Duration(seconds: 10));
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }

@@ -19,26 +19,38 @@ const bool kUseMsrMock = bool.fromEnvironment('USE_MSR_MOCK');
 /// - events: status maps from `CommerceListenerAdapter.handleStatus`
 class PsdkBridge {
   PsdkBridge({MethodChannel? methodChannel, EventChannel? eventChannel})
-    : _methods =
+    : _usesDefaultEvents = eventChannel == null,
+      _methods =
           methodChannel ??
           const MethodChannel('com.solidaridad.poc_verifone/psdk'),
       _events =
           eventChannel ??
           const EventChannel('com.solidaridad.poc_verifone/psdk_events');
 
+  static int _nextOwner = 0;
+  final String _owner = '${_nextOwner++}';
+  final bool _usesDefaultEvents;
   final MethodChannel _methods;
   final EventChannel _events;
 
+  static Stream<Map<String, dynamic>>? _sharedStatusStream;
   Stream<Map<String, dynamic>>? _statusStream;
 
   /// Live status / lifecycle events from the native SDK.
   Stream<Map<String, dynamic>> get statusEvents {
-    return _statusStream ??= _events.receiveBroadcastStream().map((event) {
+    if (_usesDefaultEvents && _sharedStatusStream != null) {
+      return _sharedStatusStream!;
+    }
+    final stream = _statusStream ??= _events.receiveBroadcastStream().map((
+      event,
+    ) {
       if (event is Map) {
         return Map<String, dynamic>.from(event);
       }
       return <String, dynamic>{'raw': event};
     });
+    if (_usesDefaultEvents) _sharedStatusStream = stream;
+    return stream;
   }
 
   /// Creates the native [PaymentSdk] and starts async initialize.
@@ -76,7 +88,7 @@ class PsdkBridge {
     }
     final result = await _methods.invokeMethod<dynamic>(
       'readMsr',
-      <String, dynamic>{'timeoutSec': timeoutSec},
+      <String, dynamic>{'timeoutSec': timeoutSec, 'owner': _owner},
     );
     return _asStringKeyMap(result);
   }
@@ -89,7 +101,10 @@ class PsdkBridge {
     if (kUseMsrMock) {
       return <String, dynamic>{'ok': true, 'mocked': true};
     }
-    final result = await _methods.invokeMethod<dynamic>('cancelReadMsr');
+    final result = await _methods.invokeMethod<dynamic>(
+      'cancelReadMsr',
+      <String, dynamic>{'owner': _owner},
+    );
     return _asStringKeyMap(result);
   }
 

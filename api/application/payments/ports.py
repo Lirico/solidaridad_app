@@ -36,6 +36,7 @@ class AuthorizeRequest:
     amount_minor: int
     card_number: str = field(repr=False)
     terminal_id: str
+    merchant_code: str
     stan: str
     ticket_number: str
     idempotency_key: str
@@ -48,6 +49,7 @@ class VoidRequest:
     amount_minor: int
     card_number: str = field(repr=False)
     terminal_id: str
+    merchant_code: str
     stan: str
     original_ticket: str
     void_ticket: str
@@ -68,6 +70,7 @@ class BalanceRequest:
     product_code: str
     card_number: str = field(repr=False)
     terminal_id: str
+    merchant_code: str
     stan: str
     expiration_date: str | None = None
 
@@ -97,6 +100,7 @@ class ReverseRequest:
     card_number: str = field(repr=False)
     expiration_date: str
     terminal_id: str
+    merchant_code: str
     original_stan: str
     original_ticket: str
     reversal_stan: str

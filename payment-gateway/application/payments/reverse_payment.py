@@ -57,6 +57,7 @@ class ReversePayment:
             card_number=pan,
             expiration_date=expiration_date,
             terminal_id=terminal_id[:8].ljust(8),
+            merchant_code=command.merchant_code,
             original_stan=original_stan.zfill(6),
             original_ticket=original_ticket,
             reversal_stan=reversal_stan.zfill(6),

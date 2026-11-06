@@ -54,6 +54,9 @@ impresión de ticket.
   `GET /v1/me/merchant` permite refrescarlos. Los datos se administran
   manualmente en la API y no se guardan como instantánea en cada venta. La
   actualización de la app para consumirlos queda pendiente.
+- La API envía el código de comercio asociado a la cuenta al gateway para
+  ventas y consultas de saldo. El gateway lo transmite en ISO DE42; las
+  anulaciones y reversos consultan el comercio asociado a la cuenta de la venta.
 - Identificador de terminal (`installation_id` / terminal id, 8 caracteres)
   configurado en el dispositivo; el operador no lo inventa por operación.
 - Pantalla inicial simple orientada a la venta.

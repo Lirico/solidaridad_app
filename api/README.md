@@ -86,8 +86,12 @@ Para una base con cuentas existentes, aplicar primero
 `make migrate`. La migración `20261105_0015` rechaza cuentas sin asociación;
 no inventa un comercio para ellas. Una base nueva puede migrarse normalmente.
 
-La asociación de terminal a comercio y su validación contra el procesador aún
-no están implementadas; deben verificarse durante la configuración manual.
+La API envía el código en DE42 mediante el gateway. Para anulaciones y reversos
+consulta el comercio asociado a la cuenta que hizo la venta; se asume que esa
+asociación y su código permanecen estables. Si falta un comercio válido, la
+anulación se rechaza y el reverso pasa a revisión manual. La validación de la
+relación cuenta-terminal dentro de la API sigue pendiente; el procesador
+verifica terminal y comercio para Verifone.
 
 Re-ejecutar seed es seguro (idempotente):
 

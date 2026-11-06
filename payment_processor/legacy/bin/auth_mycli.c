@@ -335,12 +335,7 @@ int valida_terminal(MYSQL* con, struct iso8583* iso)
                 iso->flag_ingenico = 2;
             }
 
-            /* Comercio siempre desde terminales (solo DE41). */
-            memset(iso->merchid_42, '\0', 16);
-            sprintf(iso->merchid_42, "%s", row[3]);
-
-            /* Producto/DE49: solo Ingenico lo toma de terminales.cod_moneda.
-             * VeriFone/IVR conservan el DE49 enviado en el mensaje. */
+            /* Ingenico obtiene comercio y producto desde la terminal. */
             if (iso->flag_ingenico == 1
                 && row[2] != NULL
                 && row[2][0] != '\0')
@@ -348,8 +343,16 @@ int valida_terminal(MYSQL* con, struct iso8583* iso)
                 memset(iso->currcode_49, '\0', 4);
                 sprintf(iso->currcode_49, "%s", row[2]);
             }
+            if (iso->flag_ingenico == 1)
+            {
+                memset(iso->merchid_42, '\0', 16);
+                sprintf(iso->merchid_42, "%s", row[3]);
+            }
 
-            ret = TRANS_OK;
+            if (valida_terminal_comercio(con, iso) == TRANS_OK || iso->flag_ingenico == 2)
+                ret = TRANS_OK;
+            else
+                ret = TERMINAL_UNK;
         } else {
             ret = TERMINAL_UNK;
         }

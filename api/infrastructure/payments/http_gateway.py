@@ -42,6 +42,7 @@ class HttpPaymentGateway:
             "amount_minor": request.amount_minor,
             "card_number": request.card_number,
             "terminal_id": request.terminal_id,
+            "merchant_code": request.merchant_code,
             "stan": request.stan,
             "ticket_number": request.ticket_number,
         }
@@ -59,6 +60,7 @@ class HttpPaymentGateway:
             "amount_minor": request.amount_minor,
             "card_number": request.card_number,
             "terminal_id": request.terminal_id,
+            "merchant_code": request.merchant_code,
             "stan": request.stan,
             "original_ticket": request.original_ticket,
             "void_ticket": request.void_ticket,
@@ -72,6 +74,7 @@ class HttpPaymentGateway:
             "product_code": request.product_code,
             "card_number": request.card_number,
             "terminal_id": request.terminal_id,
+            "merchant_code": request.merchant_code,
             "stan": request.stan,
         }
         if request.expiration_date is not None:
@@ -85,6 +88,7 @@ class HttpPaymentGateway:
             "card_number": request.card_number,
             "expiration_date": request.expiration_date,
             "terminal_id": request.terminal_id,
+            "merchant_code": request.merchant_code,
             "original_stan": request.original_stan,
             "original_ticket": request.original_ticket,
             "reversal_stan": request.reversal_stan,

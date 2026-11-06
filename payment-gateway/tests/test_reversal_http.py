@@ -19,6 +19,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
         "card_number": "4111111111111111",
         "expiration_date": "3012",
         "terminal_id": "TERM0001",
+        "merchant_code": "012502",
         "original_stan": "123456",
         "original_ticket": "00000042",
         "reversal_stan": "654321",

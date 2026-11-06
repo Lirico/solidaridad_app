@@ -74,6 +74,7 @@ def reverse(
         card_number=body.card_number,
         expiration_date=body.expiration_date,
         terminal_id=body.terminal_id,
+        merchant_code=body.merchant_code,
         original_stan=body.original_stan,
         original_ticket=body.original_ticket,
         reversal_stan=body.reversal_stan,

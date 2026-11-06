@@ -67,7 +67,9 @@ def gateway(gateway_control_url: str) -> Generator[httpx.Client, None, None]:
 
 @pytest.fixture
 def make_operator(api: httpx.Client) -> Callable[..., Operator]:
-    def _make(*, installation_id: str | None = None) -> Operator:
+    def _make(
+        *, installation_id: str | None = None, merchant_code: str | None = None
+    ) -> Operator:
         unique = uuid4().hex
         password = "integration-password-123"
         terminal = installation_id or f"I{unique[:7]}"
@@ -80,12 +82,17 @@ def make_operator(api: httpx.Client) -> Callable[..., Operator]:
         engine = create_engine(database_url)
         try:
             with engine.begin() as connection:
-                merchant_id = connection.scalar(
+                code = merchant_code or unique[:15]
+                connection.execute(
                     text(
                         "INSERT INTO merchants (code, name, address, city, tax_id) "
-                        "VALUES (:code, 'Test', 'Test', 'Test', 'Test') RETURNING id"
+                        "VALUES (:code, 'Test', 'Test', 'Test', 'Test') "
+                        "ON CONFLICT (code) DO NOTHING"
                     ),
-                    {"code": unique},
+                    {"code": code},
+                )
+                merchant_id = connection.scalar(
+                    text("SELECT id FROM merchants WHERE code = :code"), {"code": code}
                 )
                 connection.execute(
                     text(

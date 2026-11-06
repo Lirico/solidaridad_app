@@ -57,6 +57,7 @@ from persistence.repositories.transaction_repository import (
     TransactionRepository,
     ticket_from_transaction_number,
 )
+from persistence.repositories.user_repository import UserRepository
 
 
 class CreateTransactionHttpStatus(IntEnum):
@@ -146,10 +147,7 @@ class CreateTransaction:
 
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
-        if (
-            requires_integer_quantity(parsed_product)
-            and money.amount_minor % 100 != 0
-        ):
+        if requires_integer_quantity(parsed_product) and money.amount_minor % 100 != 0:
             raise InvalidAmount("La cantidad debe ser un número entero")
         pan = _validate_pan(card_number)
         exp = expiration_date.strip() if expiration_date else None
@@ -184,6 +182,15 @@ class CreateTransaction:
         terminal_id = installation.installation_id.strip()
         if not terminal_id:
             raise MissingTerminalId()
+
+        merchant = UserRepository(self._session).get_merchant(user_id)
+        if (
+            merchant is None
+            or not merchant.code.isascii()
+            or not merchant.code.isalnum()
+            or len(merchant.code) > 15
+        ):
+            raise MissingTerminalId("Comercio no configurado para el procesador")
 
         business_date = datetime.now(UTC).date()
         transaction_number = self._transactions.next_transaction_number(business_date)
@@ -225,6 +232,7 @@ class CreateTransaction:
             amount_minor=money.amount_minor,
             card_number=pan,
             terminal_id=terminal_id[:8].ljust(8),
+            merchant_code=merchant.code,
             stan=stan,
             ticket_number=processor_ticket,
             idempotency_key=key,

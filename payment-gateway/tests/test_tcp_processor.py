@@ -16,6 +16,7 @@ def _cmd() -> AuthorizeCommand:
         amount_minor=100,
         card_number="4111111111111111",
         terminal_id="TERM0001",
+        merchant_code="012502",
         stan="000001",
         ticket_number="00000001",
     )
@@ -27,6 +28,7 @@ def _void_cmd() -> VoidCommand:
         amount_minor=100,
         card_number="4111111111111111",
         terminal_id="TERM0001",
+        merchant_code="012502",
         stan="000002",
         original_ticket="00000001",
         void_ticket="000002",
@@ -154,6 +156,7 @@ def _balance_cmd() -> BalanceCommand:
         product_code="993",
         card_number="4111111111111111",
         terminal_id="TERM0001",
+        merchant_code="012502",
         stan="000003",
     )
 

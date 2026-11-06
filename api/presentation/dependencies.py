@@ -153,6 +153,7 @@ def get_check_balance(
     return CheckBalance(
         installations=InstallationRepository(db),
         gateway=gateway,
+        users=UserRepository(db),
     )
 
 

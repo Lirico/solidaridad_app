@@ -28,7 +28,10 @@ Desde la raíz del monorepo: `make processor-up` / `make up`.
 
 Si la terminal está vigente (`situacion = 'V'`) y tiene `cod_comercio` no vacío:
 
-- **Comercio** (`merchid_42`): siempre se completa desde `terminales` vía DE41. No exige que DE42 del mensaje coincida con la DB. Sin `cod_comercio` → terminal desconocida / mal configurada.
+- **Comercio** (`merchid_42`): Verifone utiliza DE42 y valida que corresponda
+  a la terminal; Ingenico lo obtiene de `terminales` y IVR conserva la excepción
+  original de esa validación. Sin `cod_comercio` configurado la terminal se
+  considera inválida.
 - **Producto** (`currcode_49` / DE49): no es moneda ISO; es el código de producto (`sgas_productos.cod_moneda`, p.ej. `993`–`997`).
   - **Ingenico**: sobrescribe DE49 con `terminales.cod_moneda`.
   - **VeriFone / IVR**: conserva el DE49 enviado en el mensaje (producto elegido en la terminal).

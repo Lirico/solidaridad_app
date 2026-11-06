@@ -52,7 +52,7 @@ def _sale(
 @pytest.fixture
 def local_processor_operator(make_operator: object) -> Operator:
     assert callable(make_operator)
-    return make_operator(installation_id="05000001")
+    return make_operator(installation_id="05000001", merchant_code="012502")
 
 
 def test_local_processor_approves_known_funded_card(

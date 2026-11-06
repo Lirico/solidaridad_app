@@ -5,6 +5,8 @@ import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/manual_card_content.dart';
@@ -22,6 +24,7 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
   final _cardNumberController = TextEditingController();
   final _expiryController = TextEditingController();
   final _cvvController = TextEditingController();
+  bool _charging = false;
 
   @override
   void dispose() {
@@ -31,25 +34,36 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
     super.dispose();
   }
 
-  void _onContinue() {
-    if (_formKey.currentState!.validate()) {
-      final cubit = context.read<SalesCubit>();
-      final state = cubit.state;
-      final expiry = _expiryController.text.replaceAll('/', '');
+  void _onCharge() {
+    // showReview emite otra clave de idempotencia. Si un segundo toque
+    // llegara a llamarlo, sendIsoMessage ya no vería SalesProcessing y
+    // dispararía otro cobro.
+    if (_charging) return;
+    if (!_formKey.currentState!.validate()) return;
 
-      cubit.showReview(
-        productCode: state.productCode,
-        productLabel: state.productLabel,
-        amount: state.amount,
-        cardNumber: _cardNumberController.text,
-        cvv: _cvvController.text,
-        expirationDate: expiry.length == 4
-            ? '${expiry.substring(2)}${expiry.substring(0, 2)}'
-            : expiry,
-      );
+    _charging = true;
+    setState(() {});
 
-      Navigator.pushNamed(context, AppRoutes.saleReview);
-    }
+    final cubit = context.read<SalesCubit>();
+    final state = cubit.state;
+    final expiry = _expiryController.text.replaceAll('/', '');
+
+    cubit.showReview(
+      productCode: state.productCode,
+      productLabel: state.productLabel,
+      amount: state.amount,
+      cardNumber: _cardNumberController.text,
+      cvv: _cvvController.text,
+      expirationDate: expiry.length == 4
+          ? '${expiry.substring(2)}${expiry.substring(0, 2)}'
+          : expiry,
+    );
+
+    final authState = context.read<AuthCubit>().state;
+    final token = authState is AuthSuccess ? authState.user!.token : '';
+    cubit.sendIsoMessage(token: token);
+
+    Navigator.pushNamed(context, AppRoutes.saleProcessing);
   }
 
   @override
@@ -69,7 +83,7 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
             cardNumberController: _cardNumberController,
             expiryController: _expiryController,
             cvvController: _cvvController,
-            onContinue: _onContinue,
+            onContinue: _charging ? null : _onCharge,
           ),
         ),
       ),

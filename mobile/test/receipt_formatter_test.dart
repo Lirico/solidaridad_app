@@ -108,6 +108,54 @@ void main() {
     expect(voided, contains('Cargo original: 00000000'));
   });
 
+  test('la venta aprobada separa original del comercio y copia del cliente', () {
+    final operation = _operation(
+      result: PaymentResult.approved,
+      userMessage: null,
+    );
+    final defaults = _defaults();
+    final original = ReceiptFormatter.toHtml(
+      operation,
+      defaults,
+      copy: ReceiptCopy.merchant,
+    );
+    final customer = ReceiptFormatter.toHtml(
+      operation,
+      defaults,
+      copy: ReceiptCopy.customer,
+    );
+
+    expect(original, contains('Aprobada'));
+    expect(
+      original.indexOf('Firma:'),
+      lessThan(original.indexOf('ORIGINAL COMERCIO')),
+    );
+    expect(original, isNot(contains('COPIA CLIENTE')));
+
+    expect(
+      customer.indexOf('Aprobada'),
+      lessThan(customer.indexOf('COPIA CLIENTE')),
+    );
+    expect(customer, isNot(contains('Firma:')));
+    expect(
+      customer,
+      contains('<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>'),
+    );
+  });
+
+  test('verificación y anulación siguen en un ticket con firma', () {
+    final defaults = _defaults();
+    for (final result in [PaymentResult.underReview, PaymentResult.voided]) {
+      final html = ReceiptFormatter.toHtml(
+        _operation(result: result, userMessage: null),
+        defaults,
+      );
+      expect(html, contains('Firma:'));
+      expect(html, isNot(contains('ORIGINAL COMERCIO')));
+      expect(html, isNot(contains('COPIA CLIENTE')));
+    }
+  });
+
   test('el HTML de verificación nunca contiene el PAN completo', () {
     const pan = '6063007014007403';
     final html = ReceiptFormatter.toHtml(_operation(card: pan), _defaults());

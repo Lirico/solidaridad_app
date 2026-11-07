@@ -144,6 +144,7 @@ def list_transactions(
             status=t.status.value,
             user_message=t.user_message or "",
             created_at=t.created_at,
+            response_code=t.processor_response_code,
             receipt=_receipt(t),
         )
         for t in result.transactions
@@ -195,6 +196,7 @@ def get_transaction(
         poll_after_seconds=public_status.poll_after_seconds,
         may_start_new_sale=public_status.may_start_new_sale,
         created_at=result.transaction.created_at,
+        response_code=result.transaction.processor_response_code,
         receipt=_receipt(result.transaction),
     )
     if public_status.poll_after_seconds is not None:
@@ -289,6 +291,7 @@ def create_transaction(
         poll_after_seconds=public_status.poll_after_seconds,
         may_start_new_sale=public_status.may_start_new_sale,
         created_at=result.transaction.created_at,
+        response_code=result.transaction.processor_response_code,
         receipt=_receipt(result.transaction),
     )
     if result.http_status == CreateTransactionHttpStatus.ACCEPTED:
@@ -348,6 +351,7 @@ def close_batch(
             status=t.status.value,
             user_message=t.user_message or "",
             created_at=t.created_at,
+            response_code=t.processor_response_code,
             receipt=_receipt(t),
         )
         for t in result.transactions

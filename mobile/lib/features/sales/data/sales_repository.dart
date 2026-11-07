@@ -388,6 +388,7 @@ class SalesRepository {
       errorCode: authorizationStatus == SaleAuthorizationStatus.approved
           ? '00'
           : rawStatus,
+      responseCode: data['response_code'] as String?,
       authorizationStatus: authorizationStatus,
       pendingReason: pendingReason,
       pollAfterSeconds: data['poll_after_seconds'] as int?,

@@ -195,6 +195,7 @@ def test_create_transaction_201() -> None:
     assert data["transaction_number"] == "OP-260716-00000001"
     assert data["status"] == "APPROVED"
     assert data["user_message"] == "Pago aprobado"
+    assert data["response_code"] == "00"
     assert data["receipt"] == {
         "coupon_number": "00000001",
         "authorization_code": "A1",
@@ -204,6 +205,35 @@ def test_create_transaction_201() -> None:
     assert "expiration_date" not in data
     assert "4111111111111111" not in response.text
     assert "3012" not in response.text
+
+
+def test_create_transaction_declined_returns_response_code() -> None:
+    use_case = MagicMock(spec=CreateTransaction)
+    use_case.execute.return_value = CreateTransactionResult(
+        transaction=_tx(
+            status=TransactionStatus.DECLINED,
+            processor_response_code="05",
+            user_message="Transacción denegada",
+            auth_id=None,
+        ),
+        http_status=CreateTransactionHttpStatus.CREATED,
+    )
+    _override(use_case)
+    try:
+        response = client.post(
+            "/v1/transactions",
+            json=_payload(),
+            headers={"Idempotency-Key": "k1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "DECLINED"
+    assert data["user_message"] == "Transacción denegada"
+    assert data["response_code"] == "05"
+    assert data["receipt"] is None
 
 
 def test_create_transaction_202_pending() -> None:
@@ -379,6 +409,7 @@ def test_list_transactions_200() -> None:
     assert item["card_last4"] == "1111"
     assert item["status"] == "APPROVED"
     assert item["user_message"] == "Pago aprobado"
+    assert item["response_code"] == "00"
     assert item["receipt"] == {
         "coupon_number": "00000001",
         "authorization_code": "A1",
@@ -456,6 +487,7 @@ def test_get_transaction_processing_returns_202_with_polling_instructions() -> N
         "poll_after_seconds": 2,
         "may_start_new_sale": False,
         "created_at": "2026-07-16T19:00:00Z",
+        "response_code": "00",
         "receipt": None,
     }
     use_case.execute.assert_called_once_with(

@@ -32,6 +32,7 @@ class OperationModel {
   final bool mayStartNewSale;
   final DateTime date;
   final String? userMessage;
+  final String? responseCode;
 
   const OperationModel({
     required this.id,
@@ -42,6 +43,7 @@ class OperationModel {
     required this.result,
     required this.date,
     this.userMessage,
+    this.responseCode,
     SaleAuthorizationStatus? authorizationStatus,
     this.pendingReason,
     this.pollAfterSeconds,
@@ -80,6 +82,7 @@ class OperationModel {
           DateTime.now(),
 
       userMessage: json['user_message'] as String?,
+      responseCode: json['response_code'] as String?,
       pendingReason: _parsePendingReason(json['reason'] as String?),
       pollAfterSeconds: json['poll_after_seconds'] as int?,
       mayStartNewSale: json['may_start_new_sale'] as bool? ?? true,
@@ -230,6 +233,7 @@ class SaleResponse {
   final String operationNumber;
   final String message;
   final String errorCode;
+  final String? responseCode;
   final bool connectionError;
   final bool sessionExpired;
   final SaleAuthorizationStatus authorizationStatus;
@@ -242,6 +246,7 @@ class SaleResponse {
     required this.operationNumber,
     required this.message,
     required this.errorCode,
+    this.responseCode,
     this.connectionError = false,
     this.sessionExpired = false,
     SaleAuthorizationStatus? authorizationStatus,

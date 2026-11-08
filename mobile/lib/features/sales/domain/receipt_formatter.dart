@@ -2,6 +2,12 @@ import '../../../core/formatters/amount_formatter.dart';
 import 'receipt_defaults.dart';
 import 'sale_model.dart';
 
+/// Ticket único, original del comercio o copia del cliente.
+///
+/// [ReceiptCopy.single] no agrega leyenda. Una venta aprobada imprime
+/// [ReceiptCopy.merchant] y después [ReceiptCopy.customer].
+enum ReceiptCopy { single, merchant, customer }
+
 /// Genera el ticket térmico (HTML para `SdiPrinter.printHTML`) a partir de los
 /// datos de una venta y del perfil [ReceiptDefaults].
 ///
@@ -49,7 +55,11 @@ class ReceiptFormatter {
   }
 
   /// Texto plano para previsualización / log.
-  static String toPlainText(OperationModel op, ReceiptDefaults defaults) {
+  static String toPlainText(
+    OperationModel op,
+    ReceiptDefaults defaults, {
+    ReceiptCopy copy = ReceiptCopy.single,
+  }) {
     final date = _formatDate(op.date);
     final time = _formatTime(op.date);
     final type = operationTypeLabel(op.result);
@@ -81,16 +91,28 @@ class ReceiptFormatter {
       buf.writeln('Mensaje: $message');
     }
     buf.writeln(_statusLabel(op.result));
+    if (copy == ReceiptCopy.customer) {
+      buf.writeln('COPIA CLIENTE');
+    }
     if (op.result == PaymentResult.underReview) {
       buf.writeln('No cobre nuevamente: podría producirse un cobro duplicado.');
       buf.writeln('Verifique esta referencia con casa central.');
     }
-    buf.writeln('Firma: ${'.' * 48}');
+    if (copy != ReceiptCopy.customer) {
+      buf.writeln('Firma: ${'.' * 48}');
+      if (copy == ReceiptCopy.merchant) {
+        buf.writeln('ORIGINAL COMERCIO');
+      }
+    }
     return buf.toString();
   }
 
   /// HTML compacto para [SdiPrinter.printHTML] (térmica portrait).
-  static String toHtml(OperationModel op, ReceiptDefaults defaults) {
+  static String toHtml(
+    OperationModel op,
+    ReceiptDefaults defaults, {
+    ReceiptCopy copy = ReceiptCopy.single,
+  }) {
     final lines = <String>[
       _line('Cód. establecimiento', defaults.establishmentCode),
       _line('Cupón', defaults.couponNumber),
@@ -112,8 +134,17 @@ class ReceiptFormatter {
     if (message.isNotEmpty) {
       lines.add(_line('Mensaje', message));
     }
+    final customerLegend = copy == ReceiptCopy.customer
+        ? '<div class="c b">COPIA CLIENTE</div>'
+        : '';
     final verificationWarning = op.result == PaymentResult.underReview
         ? '<div class="c">No cobre nuevamente: podría producirse un cobro duplicado.<br/>Verifique esta referencia con casa central.</div>'
+        : '';
+    final signature = copy == ReceiptCopy.customer
+        ? ''
+        : '<div class="firma">Firma: ${'.' * 32}</div>';
+    final merchantLegend = copy == ReceiptCopy.merchant
+        ? '<div class="firma">ORIGINAL COMERCIO</div>'
         : '';
 
     return '''
@@ -153,8 +184,10 @@ class ReceiptFormatter {
     ${lines.join('\n    ')}
   </div>
   <div class="c big status">${_esc(_statusLabel(op.result))}</div>
+  $customerLegend
   $verificationWarning
-  <div class="firma">Firma: ${'.' * 32}</div>
+  $signature
+  $merchantLegend
   <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 </body>
 </html>

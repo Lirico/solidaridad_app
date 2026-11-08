@@ -28,7 +28,8 @@ class SaleDetailTicket extends StatelessWidget {
       case PaymentResult.declined:
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
-        statusTitle = 'VENTA RECHAZADA';
+        final code = operation.responseCode?.trim() ?? '';
+        statusTitle = code.isEmpty ? 'Denegada' : 'Denegada ($code)';
       case PaymentResult.pending:
         statusColor = Colors.orange;
         statusIcon = Icons.hourglass_top;
@@ -52,8 +53,7 @@ class SaleDetailTicket extends StatelessWidget {
     }
 
     final date =
-        _two(operation.date.day) +
-        '/${_two(operation.date.month)}/${operation.date.year}';
+        '${_two(operation.date.day)}/${_two(operation.date.month)}/${operation.date.year}';
     final time =
         '${_two(operation.date.hour)}:${_two(operation.date.minute)}:${_two(operation.date.second)}';
     final rows = <String>[
@@ -71,10 +71,14 @@ class SaleDetailTicket extends StatelessWidget {
       'Plan: ${defaults.installmentPlan}',
       if (operation.result == PaymentResult.voided)
         'Cargo original: ${defaults.originalChargeNumber}',
-      if (operation.userMessage != null &&
+      if (operation.result != PaymentResult.declined &&
+          operation.userMessage != null &&
           operation.userMessage!.trim().isNotEmpty)
         'Mensaje: ${operation.userMessage!.trim()}',
     ];
+    final declineReason = operation.result == PaymentResult.declined
+        ? operation.userMessage?.trim() ?? ''
+        : '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,23 +147,29 @@ class SaleDetailTicket extends StatelessWidget {
                   color: statusColor,
                 ),
               ),
+              if (declineReason.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(declineReason, textAlign: TextAlign.center),
+              ],
             ],
           ),
         ),
-        const SizedBox(height: 40),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const Text('Firma: '),
-            Expanded(
-              child: Text(
-                '.' * 80,
-                maxLines: 1,
-                overflow: TextOverflow.clip,
+        if (operation.result != PaymentResult.declined) ...[
+          const SizedBox(height: 40),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text('Firma: '),
+              Expanded(
+                child: Text(
+                  '.' * 80,
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ],
     );
   }

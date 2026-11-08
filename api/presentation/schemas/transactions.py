@@ -53,6 +53,7 @@ class PublicTransactionResponse(TransactionResponse):
     reason: str | None
     poll_after_seconds: int | None
     may_start_new_sale: bool
+    response_code: str | None = None
     receipt: ReceiptData | None = None
 
 
@@ -66,6 +67,7 @@ class TransactionItemResponse(BaseModel):
     status: str
     user_message: str
     created_at: datetime
+    response_code: str | None = None
     receipt: ReceiptData | None = None
 
 

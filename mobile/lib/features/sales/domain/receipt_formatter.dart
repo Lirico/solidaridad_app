@@ -29,12 +29,14 @@ class ReceiptFormatter {
   static String _formatTime(DateTime d) =>
       '${_two(d.hour)}:${_two(d.minute)}:${_two(d.second)}';
 
-  static String _statusLabel(PaymentResult result) {
-    switch (result) {
+  static String _statusLabel(OperationModel op) {
+    switch (op.result) {
       case PaymentResult.approved:
         return 'Aprobada';
       case PaymentResult.declined:
-        return 'RECHAZADA';
+        final code = op.responseCode?.trim() ?? '';
+        if (code.isEmpty) return 'Denegada';
+        return 'Denegada ($code)';
       case PaymentResult.pending:
         return 'EN PROCESO';
       case PaymentResult.underReview:
@@ -87,10 +89,14 @@ class ReceiptFormatter {
       buf.writeln('Cargo original: ${defaults.originalChargeNumber}');
     }
     final message = op.userMessage?.trim() ?? '';
-    if (message.isNotEmpty) {
+    final declined = op.result == PaymentResult.declined;
+    if (message.isNotEmpty && !declined) {
       buf.writeln('Mensaje: $message');
     }
-    buf.writeln(_statusLabel(op.result));
+    buf.writeln(_statusLabel(op));
+    if (declined && message.isNotEmpty) {
+      buf.writeln(message);
+    }
     if (copy == ReceiptCopy.customer) {
       buf.writeln('COPIA CLIENTE');
     }
@@ -98,7 +104,7 @@ class ReceiptFormatter {
       buf.writeln('No cobre nuevamente: podría producirse un cobro duplicado.');
       buf.writeln('Verifique esta referencia con casa central.');
     }
-    if (copy != ReceiptCopy.customer) {
+    if (!declined && copy != ReceiptCopy.customer) {
       buf.writeln('Firma: ${'.' * 48}');
       if (copy == ReceiptCopy.merchant) {
         buf.writeln('ORIGINAL COMERCIO');
@@ -131,7 +137,8 @@ class ReceiptFormatter {
       lines.add(_line('Cargo original', defaults.originalChargeNumber));
     }
     final message = op.userMessage?.trim() ?? '';
-    if (message.isNotEmpty) {
+    final declined = op.result == PaymentResult.declined;
+    if (message.isNotEmpty && !declined) {
       lines.add(_line('Mensaje', message));
     }
     final customerLegend = copy == ReceiptCopy.customer
@@ -140,10 +147,13 @@ class ReceiptFormatter {
     final verificationWarning = op.result == PaymentResult.underReview
         ? '<div class="c">No cobre nuevamente: podría producirse un cobro duplicado.<br/>Verifique esta referencia con casa central.</div>'
         : '';
-    final signature = copy == ReceiptCopy.customer
+    final declineReason = declined && message.isNotEmpty
+        ? '<div class="c">${_esc(message)}</div>'
+        : '';
+    final signature = declined || copy == ReceiptCopy.customer
         ? ''
         : '<div class="firma">Firma: ${'.' * 32}</div>';
-    final merchantLegend = copy == ReceiptCopy.merchant
+    final merchantLegend = !declined && copy == ReceiptCopy.merchant
         ? '<div class="firma">ORIGINAL COMERCIO</div>'
         : '';
 
@@ -183,10 +193,11 @@ class ReceiptFormatter {
   <div class="detail">
     ${lines.join('\n    ')}
   </div>
-  <div class="c big status">${_esc(_statusLabel(op.result))}</div>
-  $customerLegend
+  <div class="c big status">${_esc(_statusLabel(op))}</div>
+  $declineReason
   $verificationWarning
   $signature
+  $customerLegend
   $merchantLegend
   <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 </body>

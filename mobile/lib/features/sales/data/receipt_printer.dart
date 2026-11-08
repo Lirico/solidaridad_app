@@ -91,7 +91,7 @@ class ReceiptPrinter {
         );
       }
 
-      return _printHtml(ReceiptFormatter.toHtml(operation, defaults));
+      return await _printHtml(ReceiptFormatter.toHtml(operation, defaults));
     } catch (_) {
       return const PrintResult.failure(
         'Error al imprimir el ticket. Reintente.',

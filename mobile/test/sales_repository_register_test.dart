@@ -81,6 +81,7 @@ void main() {
         'status': 'DECLINED',
         'transaction_number': 'OP-2',
         'user_message': 'Fondos insuficientes',
+        'response_code': '51',
       }),
     );
 
@@ -88,6 +89,7 @@ void main() {
     expect(declined.isApproved, isFalse);
     expect(declined.isPending, isFalse);
     expect(declined.authorizationStatus, SaleAuthorizationStatus.declined);
+    expect(declined.responseCode, '51');
   });
 
   test('el historial lee PENDING como cobro en curso', () {

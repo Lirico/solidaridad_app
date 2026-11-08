@@ -6,7 +6,9 @@ import '../domain/receipt_defaults.dart';
 
 /// Lee el perfil mock del comprobante y lo conserva en memoria.
 class ReceiptDefaultsRepository {
-  ReceiptDefaultsRepository({AssetBundle? bundle}) : _bundle = bundle;
+  ReceiptDefaultsRepository({AssetBundle? bundle}) : this._(bundle);
+
+  ReceiptDefaultsRepository._(this._bundle);
 
   final AssetBundle? _bundle;
   ReceiptDefaults? _cached;

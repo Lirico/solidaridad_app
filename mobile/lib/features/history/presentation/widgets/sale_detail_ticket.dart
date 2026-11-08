@@ -53,8 +53,7 @@ class SaleDetailTicket extends StatelessWidget {
     }
 
     final date =
-        _two(operation.date.day) +
-        '/${_two(operation.date.month)}/${operation.date.year}';
+        '${_two(operation.date.day)}/${_two(operation.date.month)}/${operation.date.year}';
     final time =
         '${_two(operation.date.hour)}:${_two(operation.date.minute)}:${_two(operation.date.second)}';
     final rows = <String>[

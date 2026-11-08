@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-22
+Última revisión: 2026-11-07
 
 > ✅ **Último cambio (2026-10-22, catálogo de respuestas):** la API traduce
 > los DE39 del catálogo del cliente al mismo registro de la app antes de
@@ -30,14 +30,33 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > de intento, que sigue siendo obligatorio únicamente para
 > `AUTHORIZATION_ATTEMPT`.
 
-> ✅ **Fixtures E2E del procesador local (2026-10-15):**
-> `make integ-test-processor` recrea explícitamente el volumen MySQL local del
-> procesador, carga tarjetas versionadas con saldo, sin saldo, sin producto y
-> ausente, y ejecuta el recorrido API → gateway TCP → autorizador C. Los
-> escenarios de fallas de red continúan en el gateway HTTP programable, porque
-> no son deterministas contra el autorizador. Evidencia:
+> ✅ **Gate E2E local aislado (2026-11-07):** `make e2e-test` recrea una
+> PostgreSQL dedicada (`solidaridad-e2e`, puerto 5435) y el volumen MySQL local
+> del procesador en cada corrida; luego migra y carga el seed de API, instala
+> tarjetas versionadas con saldo, sin saldo, sin producto y ausente, y ejecuta
+> el recorrido API → gateway HTTP → ISO8583 TCP → autorizador C → MySQL. El
+> gate no usa stubs ni comparte datos con la base de desarrollo. Los escenarios
+> de fallas de red continúan en el gateway HTTP programable, porque no son
+> deterministas contra el autorizador. Evidencia: `Makefile`,
+> `api/docker-compose.e2e.yml`,
 > `payment_processor/utils/demo/integration_fixtures.sql` y
 > `api/tests/integration/test_local_processor_http_integration.py`.
+
+> ✅ **Cobertura E2E funcional completa (2026-11-07):** el gate contra el
+> procesador local ahora cubre health, autenticación (incluido cambio de
+> clave), autorización, acceso protegido, comercio, catálogo, validaciones,
+> idempotencia, consulta/listado de ventas, anulación, cierre de lote y saldo,
+> además de las respuestas de negocio del autorizador. Las tarjetas mutables
+> tienen fixtures exclusivos por caso (idempotencia, anulación y cierre),
+> instalados por cada reset. Evidencia:
+> `api/tests/integration/test_local_processor_http_integration.py` y
+> `payment_processor/utils/demo/integration_fixtures.sql`.
+
+> ✅ **Comando unificado de verificación local (2026-11-07):**
+> `make test-all` ejecuta los checks de catálogo, API y gateway y termina con
+> los dos gates de integración: `make integ-test` en un entorno temporal con
+> gateway programable para timeout/reintento/ambigüedad, y `make e2e-test`
+> contra el procesador local real. Evidencia: `Makefile` y `README.md`.
 
 > ✅ **Último cambio (2026-10-15, RA-17):** la matriz determinista completa
 > prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
@@ -629,7 +648,7 @@ Verifone (banda + térmica).
 | G-P1-17 | Anulación ambigua sin recuperación durable | partial | **2026-10-22 (VA-00/VA-01):** la sonda contra `authkig` probó que el `0400/020000` recibe `0410/00` pero deja activa la fila de anulación: `anula_cupon()` guarda vencimiento `NULL` y `reversa_cupon()` exige DE14 para hallarla. La migración `20261022_0013` agrega `void_operations` y alertas únicas; la API persiste la intención antes del gateway, mantiene la venta `APPROVED`, clasifica `NOT_SENT`/`INDETERMINATE`, expone `POST`/`GET .../void` y proyecta lo ambiguo como `FAILED` con `reason=UNDER_REVIEW` (estado interno `UNDER_REVIEW`) sin job emisor de `0400`. `202` queda reservado para estado público `PENDING`; las anulaciones terminales devuelven `200`. El cierre de lote y solo una nueva anulación del mismo cupón quedan bloqueados; las demás ventas permanecen independientes. Mobile presenta el handoff. Pendiente: aplicar la migración en los ambientes, herramienta administrativa auditada para resolver revisiones y validación V660P. Evidencia: `docs/diseno-recuperacion-anulaciones.md`, `api/tests/test_void_transaction.py` y contrato legacy. |
 | G-P1-15 | PAN de recuperación persistido en texto plano amplía deuda PCI | open | **RA-03 (2026-10-13):** aceptación de riesgo ya definida en `plan-reversos-automaticos.md`. El PAN y vencimiento se guardan para recuperación durable, pero se excluyen de respuestas, eventos, errores y `repr`; CVV nunca se persiste. Pendiente: cifrado/tokenización a nivel aplicación, política de retención/borrado, controles y auditoría de acceso a DB/backups. |
 | G-P1-16 | Métricas y alertas automáticas de recuperación | open | **RA-16 (2026-10-15):** se difiere la exposición de métricas por estado, antigüedad, intentos y tiempo de resolución. Mientras tanto, operación usa `GET /health/ready`, alertas durables `recovery_alerts` y eventos estructurados sin datos sensibles; ver `docs/runbook-recuperacion-pagos.md`. |
-| G-P1-11 | Resultado de venta con texto y código fijos | done | **2026-09-24 (VE-05):** el rechazo, el fallo técnico y el error de conexión muestran `userMessage` en el subtítulo. La fila de un rechazo usa ese texto, o «Rechazada» si no hay mensaje; ya no pinta `51 (Fondos insuficientes)`. **2026-10-15:** un `status: UNKNOWN` queda en `PaymentResult.failed` y un `PENDING` sigue en curso. El timeout del cliente permanece como error de conexión para reintentar con la misma clave. **2026-10-22:** `response_messages.py` adopta las descripciones del catálogo del cliente para los DE39 listados (`00` → «Aprobada»); los no incluidos conservan «Pago rechazado», y una anulación aprobada mantiene «Anulación aprobada». Tests: `api/tests/test_response_messages.py`, `api/tests/test_void_transaction.py` y `make -C api check`. |
+| G-P1-11 | Resultado de venta con texto y código fijos | done | **2026-09-24 (VE-05):** el rechazo, el fallo técnico y el error de conexión muestran `userMessage` en el subtítulo. La fila de un rechazo usa ese texto, o «Rechazada» si no hay mensaje; ya no pinta `51 (Fondos insuficientes)`. **2026-10-15:** un `status: UNKNOWN` queda en `PaymentResult.failed` y un `PENDING` sigue en curso. El timeout del cliente permanece como error de conexión para reintentar con la misma clave. **2026-10-22:** `response_messages.py` adopta las descripciones del catálogo del cliente para los DE39 listados (`00` → «Aprobada»); los no incluidos conservan «Pago rechazado», y una anulación aprobada mantiene «Anulación aprobada». **2026-11-07 (QA-005):** la API publica `response_code` en creación, detalle, listado y cierre de lote; mobile lo conserva en la operación y el comprobante de un rechazo muestra «Denegada (DE39)», su motivo y no agrega firma. La venta aprobada conserva original para comercio y copia para cliente. Evidencia: `api/tests/test_transactions_http.py`, `mobile/test/{sales_repository_register_test,receipt_formatter_test}.dart`. El cupón y la autorización siguen siendo datos mock en mobile hasta resolver G-P0-19. |
 | G-P1-12 | Errores 400/409 de la API no llegan al operador | done | **2026-09-24 (VE-06):** `apiUserMessage` lee `user_message` y, si no viene, `message`, en la venta y en la anulación. Si el servidor no manda texto, se mantiene el fallback genérico. Test: `mobile/test/sales_repository_messages_test.dart`. |
 | G-P1-10 | Historial de estados de transacción (audit trail) | partial | Tabla `transaction_status_events` + escritura en `TransactionRepository` (`CREATED`, `AUTHORIZATION_ATTEMPT`, `GATEWAY_RESULT`, `REVERSAL_ENQUEUED`, `VOID_RESULT`, `IDEMPOTENT_HIT`). Migraciones `20260807_0006` y `20261014_0010`; esta última agrega número y outcome de cada intento de autorización sin PAN, vencimiento ni `Idempotency-Key`. **RA-07 (2026-10-14):** el resultado ambiguo y el enqueue del job de reverso quedan auditados antes de responder. **Pendiente:** exposición API/detalle (cuando se priorice; no en esta etapa). Distinto de G-P1-03 (audit ISO del gateway). Última revisión: 2026-10-14. |
 | G-P1-13 | Pantalla de resultado desbordada en el V660P ("Bottom overflowed by 79 pixels") | done | **2026-08-24:** la pantalla de venta aprobada mostraba el error de debug "Bottom overflowed by 79 pixels" (contenido que no cabía en la altura y se cortaba por abajo). Se corrigió compactando el layout sin scroll (no apto para POS touch): header 180→120px, se eliminó el `Transform.translate(0,-20)`, ícono 100→64, espaciados/paddings reducidos y `maxLines`+elipsis en títulos. Aplicado a `SaleStatusScreen` y `VoidResultScreen`. `flutter analyze` OK y tests OK. Ver "Último cambio" 2026-08-24 (UI). |

@@ -174,12 +174,12 @@ class SaleStatusContent extends StatelessWidget {
       case PrintStatus.printed:
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.check_circle, color: Colors.green, size: 18),
-            SizedBox(width: 8),
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 18),
+            const SizedBox(width: 8),
             Text(
-              'Ticket impreso',
-              style: TextStyle(fontSize: 13, color: Colors.green),
+              printMessage.isEmpty ? 'Ticket impreso' : printMessage,
+              style: const TextStyle(fontSize: 13, color: Colors.green),
             ),
           ],
         );

@@ -11,12 +11,16 @@
 -- para poder autorizar ventas aprobadas en el stack local.
 -- ============================================================
 
--- 1) Comercio del terminal 05000001.
+-- 1) Comercio y marca del terminal 05000001.
 --    En el seed viene cod_comercio='000000' (no existe en
 --    sgas_comercio) → valida_comercio() rechaza. GOBIERNO 012502
 --    existe y está vigente (situacion='V').
+--    La marca del seed es IVR. Las pruebas usan VeriFone: solo esa
+--    marca deja el comercio de 15 caracteres que vino en el mensaje.
+--    Ingenico lo reemplaza por el código corto de la tabla.
 UPDATE terminales
-   SET cod_comercio = '012502'
+   SET cod_comercio = '012502',
+       marca = 'VeriFone'
  WHERE codigo_terminales = '05000001';
 
 -- 2) Saldo/recarga para 6063007014007403 (Lillo original) en TODOS los productos.

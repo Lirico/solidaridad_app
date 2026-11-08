@@ -101,10 +101,15 @@ terminal `PENDING` con el worker desactivado.
 
 ### Procesador local con fixtures SQL
 
-`make integ-test-processor` resetea el volumen Docker local de MySQL del
-procesador y carga `payment_processor/utils/demo/integration_fixtures.sql`
-antes de correr `api/tests/integration/test_local_processor_http_integration.py`.
-El gate verifica por HTTP que una tarjeta con saldo sea aprobada, y que las
-tarjetas sin saldo, sin producto y ausente sean rechazadas. Las tarjetas y sus
-resultados esperados están versionados en `payment_processor/README.md`; los
-casos de red permanecen en la suite de gateway controlado.
+`make e2e-test` recrea las dos bases locales del gate: la PostgreSQL dedicada
+de E2E y el volumen Docker MySQL del procesador. Carga
+`payment_processor/utils/demo/integration_fixtures.sql`, levanta la API y el
+gateway con ISO/TCP y luego corre
+`api/tests/integration/test_local_processor_http_integration.py`. El gate
+verifica por HTTP health, autenticación y cambio de clave, acceso protegido,
+datos de comercio, catálogo, validaciones, idempotencia, consulta/listado de
+ventas, anulación y cierre de lote. Contra el procesador verifica además que
+una tarjeta con saldo sea aprobada, y que las tarjetas sin saldo, sin producto
+y ausente sean rechazadas, junto con una consulta de saldo. Las tarjetas y sus
+resultados esperados están versionados en `payment_processor/README.md`; este
+comando no usa stubs.

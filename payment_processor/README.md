@@ -73,6 +73,9 @@ compartida.
 | `6063007014990003` | Rechazada; producto sin cuenta asignada |
 | `6063007014990099` | Rechazada; tarjeta inexistente |
 | `6063007014990004` | Consulta de saldo; `100` unidades disponibles para `993` |
+| `6063007014990005` | Aprobada; replay idempotente de la venta |
+| `6063007014990006` | Aprobada; anulación posterior |
+| `6063007014990007` | Aprobada; cierre administrativo de lote posterior |
 
 Para regenerar desde desa (VPN + credenciales en `.env`):
 

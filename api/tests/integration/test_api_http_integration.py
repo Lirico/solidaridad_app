@@ -413,7 +413,7 @@ def test_void_approved_declined_and_card_mismatch(
         json={"card_number": sale_payload["card_number"], "expiration_date": "2912"},
     )
     assert declined.status_code == 200
-    assert declined.json()["status"] == "APPROVED"
+    assert declined.json()["status"] == "DECLINED"
 
     voided = api.post(
         target,

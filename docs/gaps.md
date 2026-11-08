@@ -4,7 +4,7 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-10-22
+Última revisión: 2026-11-07
 
 > ✅ **Último cambio (2026-10-22, catálogo de respuestas):** la API traduce
 > los DE39 del catálogo del cliente al mismo registro de la app antes de
@@ -30,14 +30,33 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > de intento, que sigue siendo obligatorio únicamente para
 > `AUTHORIZATION_ATTEMPT`.
 
-> ✅ **Fixtures E2E del procesador local (2026-10-15):**
-> `make integ-test-processor` recrea explícitamente el volumen MySQL local del
-> procesador, carga tarjetas versionadas con saldo, sin saldo, sin producto y
-> ausente, y ejecuta el recorrido API → gateway TCP → autorizador C. Los
-> escenarios de fallas de red continúan en el gateway HTTP programable, porque
-> no son deterministas contra el autorizador. Evidencia:
+> ✅ **Gate E2E local aislado (2026-11-07):** `make e2e-test` recrea una
+> PostgreSQL dedicada (`solidaridad-e2e`, puerto 5435) y el volumen MySQL local
+> del procesador en cada corrida; luego migra y carga el seed de API, instala
+> tarjetas versionadas con saldo, sin saldo, sin producto y ausente, y ejecuta
+> el recorrido API → gateway HTTP → ISO8583 TCP → autorizador C → MySQL. El
+> gate no usa stubs ni comparte datos con la base de desarrollo. Los escenarios
+> de fallas de red continúan en el gateway HTTP programable, porque no son
+> deterministas contra el autorizador. Evidencia: `Makefile`,
+> `api/docker-compose.e2e.yml`,
 > `payment_processor/utils/demo/integration_fixtures.sql` y
 > `api/tests/integration/test_local_processor_http_integration.py`.
+
+> ✅ **Cobertura E2E funcional completa (2026-11-07):** el gate contra el
+> procesador local ahora cubre health, autenticación (incluido cambio de
+> clave), autorización, acceso protegido, comercio, catálogo, validaciones,
+> idempotencia, consulta/listado de ventas, anulación, cierre de lote y saldo,
+> además de las respuestas de negocio del autorizador. Las tarjetas mutables
+> tienen fixtures exclusivos por caso (idempotencia, anulación y cierre),
+> instalados por cada reset. Evidencia:
+> `api/tests/integration/test_local_processor_http_integration.py` y
+> `payment_processor/utils/demo/integration_fixtures.sql`.
+
+> ✅ **Comando unificado de verificación local (2026-11-07):**
+> `make test-all` ejecuta los checks de catálogo, API y gateway y termina con
+> los dos gates de integración: `make integ-test` en un entorno temporal con
+> gateway programable para timeout/reintento/ambigüedad, y `make e2e-test`
+> contra el procesador local real. Evidencia: `Makefile` y `README.md`.
 
 > ✅ **Último cambio (2026-10-15, RA-17):** la matriz determinista completa
 > prueba autorización, reverso, reintentos, pérdida de respuesta, crash,

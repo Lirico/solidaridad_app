@@ -201,19 +201,21 @@ or its `__test__` endpoints in an environment that handles real payment data.
 
 El gate controlado anterior sigue siendo el que cubre timeouts, reintentos y
 respuestas ambiguas. Para comprobar el recorrido real API → gateway TCP →
-autorizador C, iniciar API y gateway con la configuración local normal
-(`PAYMENT_GATEWAY_URL=http://127.0.0.1:8001`, `ISO_TRANSPORT=tcp`) y ejecutar
-desde la raíz del monorepo:
+autorizador C de manera repetible, ejecutar desde la raíz del monorepo:
 
 ```bash
-make integ-test-processor
+make e2e-test
 ```
 
-El comando **borra el volumen local de MySQL del procesador**, carga tarjetas
-con saldo, sin saldo, sin producto y ausente, y corre únicamente
-`tests/integration/test_local_processor_http_integration.py`. La API debe
-estar migrada y levantada antes de invocarlo; el target no modifica su base de
-datos.
+El comando usa una PostgreSQL dedicada y descartable en el puerto `5435`; la
+resetea, migra y carga antes de iniciar la API. También **borra el volumen
+local de MySQL del procesador**, instala las tarjetas E2E con saldo, sin saldo,
+sin producto y ausente, inicia el gateway con `ISO_TRANSPORT=tcp` y corre
+únicamente `tests/integration/test_local_processor_http_integration.py`.
+No usa el gateway stub ni comparte datos con la PostgreSQL de desarrollo.
+
+`make integ-test-processor` se conserva para ejecutar sólo ese módulo contra
+una API/gateway ya levantados; el invocador debe preparar la base de API.
 
 ## Architecture
 

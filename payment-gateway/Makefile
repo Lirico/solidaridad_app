@@ -1,4 +1,4 @@
-.PHONY: install run dev lint lint-fix typecheck test test-cov check
+.PHONY: install run run-once dev lint lint-fix typecheck test test-cov check
 
 HOST ?= 127.0.0.1
 
@@ -7,6 +7,9 @@ install:
 
 run:
 	uv run uvicorn main:app --host $(HOST) --port 8001 --reload
+
+run-once:
+	uv run uvicorn main:app --host $(HOST) --port 8001
 
 dev: run
 

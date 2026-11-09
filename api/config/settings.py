@@ -1,6 +1,7 @@
 from functools import lru_cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "local"
+    business_timezone: str = "America/Argentina/Buenos_Aires"
     database_url: str = (
         "postgresql+psycopg://solidaridad:solidaridad@localhost:5434/solidaridad"
     )
@@ -27,6 +29,15 @@ class Settings(BaseSettings):
     embedded_recovery_worker_enabled: bool = False
     embedded_recovery_worker_shutdown_grace_seconds: float = 40.0
     recovery_worker_max_iteration_age_seconds: float = Field(default=30.0, gt=0)
+
+    @field_validator("business_timezone")
+    @classmethod
+    def validate_business_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("business_timezone debe ser una zona IANA válida") from exc
+        return value
 
 
 @lru_cache

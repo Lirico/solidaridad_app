@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
 
 from config.settings import Settings
 from domain.authorization import AuthorizationStatus, AuthorizeCommand, VoidCommand
@@ -188,6 +189,34 @@ def test_build_purchase_request_sets_fields() -> None:
     assert bitmap_get(iso.bitmap, 62)
     assert bitmap_get(iso.bitmap, 42)
     assert iso.merchid_42 == "012502".ljust(15)
+
+
+def test_build_purchase_request_converts_utc_to_argentina_time() -> None:
+    settings = Settings()
+    cmd = AuthorizeCommand(
+        product_code="993",
+        amount_minor=150050,
+        card_number="4111111111111111",
+        terminal_id="TERM0001",
+        merchant_code="012502",
+        stan="000001",
+        ticket_number="00000042",
+        expiration_date="2912",
+    )
+
+    iso = build_purchase_request(
+        cmd,
+        settings,
+        now=datetime(2026, 11, 10, 0, 30, tzinfo=UTC),
+    )
+
+    assert iso.timetrx_12 == "213000"
+    assert iso.datetrx_13 == "1109"
+
+
+def test_iso_timezone_rejects_unknown_zone() -> None:
+    with pytest.raises(ValidationError, match="zona IANA válida"):
+        Settings(iso_timezone="America/No_Existe")
 
 
 def test_build_purchase_request_uses_legacy_manual_layout() -> None:

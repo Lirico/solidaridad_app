@@ -91,8 +91,13 @@ La imagen compila en `debian:bookworm` con `default-libmysqlclient-dev` y un inc
 
 El **servidor** de datos local es MySQL **5.7** (`mysql:5.7`, `platform: linux/amd64` porque esa tag no publica arm64; en Apple Silicon corre con emulación).
 
-El autorizador local usa UTC por defecto (`AUTH_TIMEZONE=Etc/UTC`). Para el
-gate E2E, `make integration-reset` elige automáticamente una zona horaria
-fuera de la hora 23 del autorizador, cuyo comportamiento heredado no procesa
-ventas normales. Puede cambiarse en `.env` si se necesita reproducir el
-comportamiento horario original.
+El autorizador y MySQL locales usan la hora operativa argentina por defecto
+(`AUTH_TIMEZONE=America/Argentina/Buenos_Aires`). Para el gate E2E,
+`make integration-reset` elige automáticamente una zona horaria fuera de la
+hora 23 del autorizador, cuyo comportamiento heredado no procesa ventas
+normales.
+
+El cron externo que ejecuta `legacy/bin/cierre_lote/run_cierre.sh` debe exportar
+`TZ=America/Argentina/Buenos_Aires` (o ejecutar bajo un host con esa zona). El
+binario decide cuándo son las 23 mediante `localtime()`, por lo que esa variable
+forma parte de la configuración operativa del cierre.

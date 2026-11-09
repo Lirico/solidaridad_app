@@ -3,6 +3,7 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -123,6 +124,7 @@ def get_close_batch(
 def get_create_transaction(
     db: Annotated[Session, Depends(get_db)],
     gateway: Annotated[HttpPaymentGateway, Depends(get_payment_gateway)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> CreateTransaction:
     return CreateTransaction(
         session=db,
@@ -131,6 +133,7 @@ def get_create_transaction(
         gateway=gateway,
         configs=PaymentProcessingConfigRepository(db),
         jobs=ProcessorJobRepository(db),
+        business_timezone=ZoneInfo(settings.business_timezone),
     )
 
 

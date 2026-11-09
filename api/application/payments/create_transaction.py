@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -58,6 +59,12 @@ from persistence.repositories.transaction_repository import (
     ticket_from_transaction_number,
 )
 from persistence.repositories.user_repository import UserRepository
+
+_DEFAULT_BUSINESS_TIMEZONE = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class CreateTransactionHttpStatus(IntEnum):
@@ -117,6 +124,8 @@ class CreateTransaction:
         sleep: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
         random_value: Callable[[], float] = random.random,
+        business_timezone: ZoneInfo = _DEFAULT_BUSINESS_TIMEZONE,
+        now: Callable[[], datetime] = _utc_now,
     ) -> None:
         self._session = session
         self._transactions = transactions
@@ -127,6 +136,8 @@ class CreateTransaction:
         self._sleep = sleep
         self._monotonic = monotonic
         self._random_value = random_value
+        self._business_timezone = business_timezone
+        self._now = now
 
     def execute(
         self,
@@ -192,7 +203,7 @@ class CreateTransaction:
         ):
             raise MissingTerminalId("Comercio no configurado para el procesador")
 
-        business_date = datetime.now(UTC).date()
+        business_date = self._now().astimezone(self._business_timezone).date()
         transaction_number = self._transactions.next_transaction_number(business_date)
         processor_ticket = ticket_from_transaction_number(transaction_number)
         stan = f"{secrets.randbelow(1_000_000):06d}"

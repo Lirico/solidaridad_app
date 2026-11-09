@@ -272,12 +272,15 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > actualizado.
 
 
-> ✅ **Último cambio (2026-09-23, VE-03 idempotencia de venta):** la clave
-> `Idempotency-Key` se genera al abrir la revisión y se reutiliza en el envío y
-> en el reintento por error de red. `CONFIRMAR COBRO` queda deshabilitado
-> mientras el estado es `SalesProcessing`, y un segundo `sendIsoMessage` no
-> dispara otro `POST`. El servidor ya devolvía la venta existente ante la misma
-> clave. Sigue pendiente el manejo de HTTP 202. Ver G-P1-02.
+> ✅ **Último cambio (2026-11-09, cobro directo en todos los medios):** ingreso
+> manual y banda preparan la venta, generan una única `Idempotency-Key`, envían
+> el cobro y abren **Procesando Transacción** sin pantalla de confirmación. Se
+> eliminaron `SaleReviewScreen`, `SaleReviewContent` y `AppRoutes.saleReview`;
+> la guarda de doble toque del formulario manual evita regenerar la clave. QR
+> continúa fuera del MVP y cualquier medio futuro debe usar el mismo flujo
+> directo. Evidencia: `mobile/test/sale_direct_charge_test.dart` cubre manual,
+> doble toque y banda. `flutter analyze --no-pub`, `flutter test --no-pub` (130
+> tests) y `flutter build apk --debug --no-pub` OK. Ver G-P1-02 y G-P2-01.
 
 > ✅ **Último cambio (2026-09-28, VE-11):** `SaleStatusScreen` ya no asume
 > `PaymentResult.approved` cuando la ruta no trae un `OperationModel`. Muestra
@@ -431,7 +434,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > ✅ **Último cambio (2026-08-16):** robustez y seguridad del flujo MSR en
 > `WaitingForCardScreen` (mobile). (1) **Parseo MSR fuera de la pantalla:** se
 > creó `mobile/lib/features/sales/domain/msr_card_data.dart` (`MsrCardData` con
-> `fromBridge`, `expiryYyMm`) y `SalesCubit.showReviewFromMsr()`;
+> `fromBridge`, `expiryYyMm`) y el mapeo luego renombrado a
+> `SalesCubit.prepareSaleFromMsr()`;
 > la pantalla ya no parsea `tags`/`msr` ni convierte fechas. (2) **Reintento:**
 > botón "REINTENTAR" en `WaitingForCardContent` visible tras error/timeout que
 > vuelve a llamar a `_startReading()`. (3) **Cancelación de lectura:** se agregó
@@ -634,7 +638,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. **2026-11-05:** se eliminó `POST /v1/auth/register`; las cuentas se dan de alta directamente en la base con comercio obligatorio. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-09-23 (VE-03):** la venta genera la clave una sola vez en `showReview` / `showReviewFromMsr`, `registerSale` la reenvía, `sendIsoMessage` ignora un segundo envío si ya está `SalesProcessing`, y `CONFIRMAR COBRO` se deshabilita. Error de red: botón `REINTENTAR` en `SaleStatusContent` vuelve a llamar `sendIsoMessage` con la misma clave (el servidor responde la venta ya creada). **2026-10-06 (VE-16):** un HTTP 202 con `PENDING` deja de pintarse como rechazo. **2026-10-14 (RA-14):** `202 PENDING` queda en curso y se consulta por número de operación; los intervalos vienen de la API, los fallos transitorios no reenvían el `POST` y una venta pendiente del historial se retoma solo con `GET`. **2026-10-14 (RA-15):** `UNDER_REVIEW` tiene pantalla y ticket de verificación propios, detiene el polling, conserva la consulta manual y habilita una venta nueva con clave distinta. **2026-08-16:** reintento de lectura MSR en `WaitingForCardContent`. Ver TC-069 en `docs/test_cases_index.md`. |
+| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-11-09:** manual y banda llaman `prepareSale` / `prepareSaleFromMsr`, generan una única clave y envían directo a procesamiento; la pantalla/ruta de confirmación fue eliminada. El formulario manual se bloquea antes de preparar la venta para que dos toques no generen otra clave ni otro `POST`. Cubierto por `mobile/test/sale_direct_charge_test.dart`. El botón `REINTENTAR` de un error de red conserva la misma clave y `sendIsoMessage` ignora un segundo envío durante `SalesProcessing`/`SalesAwaitingAuthorization`. `202 PENDING` se consulta por número de operación, sin reenviar el `POST`; `UNDER_REVIEW` detiene el polling y permite iniciar una venta nueva. Última revisión: 2026-11-09. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |
@@ -716,7 +720,7 @@ retención/borrado y auditoría efectiva de accesos.
 
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
-| G-P2-01 | UX: manual solo como fallback | partial | La opción **Tarjeta** ya navega a `WaitingForCardScreen` (UI de espera). Sigue sin lectura real de banda/chip/NFC (G-P0-06). **Ingreso manual** sigue siendo el único camino que completa el cobro. QR muestra aviso “disponible pronto” (G-P2-03). |
+| G-P2-01 | UX: manual solo como fallback | done | **2026-11-09:** **Tarjeta** usa la lectura de banda real de `WaitingForCardScreen` y **Ingreso manual** permanece como fallback. Ambos medios validan/preparan la captura, envían el cobro y abren **Procesando Transacción** sin confirmación intermedia. QR sigue fuera del MVP y muestra “disponible pronto” (G-P2-03); cuando se implemente deberá conservar el mismo cobro directo. Evidencia: `mobile/test/sale_direct_charge_test.dart`. Última revisión: 2026-11-09. |
 | G-P2-02 | Track2 en authorize cuando hay swipe | invalidated | **2026-10-05:** se decidió no transportar Track 2 fuera de la capa de captura. El procesador recibe el layout manual histórico con PAN y vencimiento; ver G-P1-06. |
 | G-P2-03 | App usuario + QR | open | Módulo posterior del PDF; no iniciado. |
 | G-P2-04 | Web de observabilidad | open | Módulo posterior del PDF; no iniciado. |

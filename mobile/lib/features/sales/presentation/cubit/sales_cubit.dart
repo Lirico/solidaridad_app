@@ -67,7 +67,11 @@ class SalesCubit extends Cubit<SalesState> {
     );
   }
 
-  void showReview({
+  /// Prepara un cobro manual y genera su clave de idempotencia una sola vez.
+  ///
+  /// La UI envía inmediatamente este estado con [sendIsoMessage]; no existe
+  /// una pantalla intermedia de confirmación.
+  void prepareSale({
     required String productCode,
     required String productLabel,
     required double amount,
@@ -76,7 +80,7 @@ class SalesCubit extends Cubit<SalesState> {
     required String expirationDate,
   }) {
     emit(
-      SalesReviewing(
+      SalesReady(
         productCode: productCode,
         productLabel: productLabel,
         amount: amount,
@@ -89,14 +93,13 @@ class SalesCubit extends Cubit<SalesState> {
     );
   }
 
-  /// Prepara la pantalla de revisión a partir de una lectura de banda
-  /// magnética (MSR), sin pasar por el ingreso manual.
+  /// Prepara un cobro a partir de una lectura de banda magnética (MSR).
   ///
   /// La banda magnética no contiene CVV. La lectura completa los mismos datos
   /// que el ingreso manual y el vencimiento ya está en formato YYMM.
-  void showReviewFromMsr(MsrCardData data) {
+  void prepareSaleFromMsr(MsrCardData data) {
     emit(
-      SalesReviewing(
+      SalesReady(
         productCode: state.productCode,
         productLabel: state.productLabel,
         amount: state.amount,
@@ -474,7 +477,7 @@ class SalesCubit extends Cubit<SalesState> {
 
   /// Cierra el handoff visible de una operación bajo revisión sin descartarla.
   /// La operación se conserva para una consulta manual posterior y la próxima
-  /// venta vuelve a generar su propia clave en [showReview].
+  /// venta vuelve a generar su propia clave en [prepareSale].
   bool startNewSaleAfterReview() {
     final current = state;
     if (current is! SalesAwaitingAuthorization ||

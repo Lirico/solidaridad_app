@@ -65,8 +65,8 @@ impresión de ticket.
   - ingreso de cantidad/importe según contrato vigente;
   - **lectura de banda** como flujo principal;
   - **ingreso manual** como fallback;
-  - confirmación previa antes de enviar;
-  - envío al backend;
+  - validación de la captura y envío directo al backend, sin pantalla
+    intermedia de confirmación, para todos los medios de pago implementados;
   - visualización de resultado (aprobada / rechazada / error de
     comunicación o procesamiento).
 - Mensajes de error comprensibles a partir de la respuesta del backend/procesador.
@@ -221,6 +221,7 @@ App Flutter (Verifone)
 | Captura principal | Lectura de banda en Verifone. |
 | Captura fallback | Ingreso manual. |
 | Contrato de captura | Ambos flujos envían PAN y vencimiento (`YYMM`) a la API. La banda es un mecanismo de autocompletar esos datos; `entry_mode` y Track 2 no forman parte del contrato HTTP ni del mensaje ISO. |
+| Confirmación de venta | No hay pantalla intermedia: una captura válida por banda o ingreso manual inicia el cobro y abre **Procesando Transacción**. Los medios futuros deben conservar el mismo comportamiento. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
 | Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |

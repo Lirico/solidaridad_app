@@ -35,7 +35,7 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
   }
 
   void _onCharge() {
-    // showReview emite otra clave de idempotencia. Si un segundo toque
+    // prepareSale emite otra clave de idempotencia. Si un segundo toque
     // llegara a llamarlo, sendIsoMessage ya no vería SalesProcessing y
     // dispararía otro cobro.
     if (_charging) return;
@@ -48,7 +48,7 @@ class _SaleManualCardScreenState extends State<SaleManualCardScreen> {
     final state = cubit.state;
     final expiry = _expiryController.text.replaceAll('/', '');
 
-    cubit.showReview(
+    cubit.prepareSale(
       productCode: state.productCode,
       productLabel: state.productLabel,
       amount: state.amount,

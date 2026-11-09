@@ -7,11 +7,14 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    companion object {
+        private var sharedBridge: PsdkBridge? = null
+    }
     private var psdkBridge: PsdkBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        val bridge = PsdkBridge(applicationContext)
+        val bridge = sharedBridge ?: PsdkBridge(applicationContext).also { sharedBridge = it }
         psdkBridge = bridge
 
         MethodChannel(

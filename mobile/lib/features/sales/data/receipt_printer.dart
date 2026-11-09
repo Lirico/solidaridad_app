@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 import '../../../psdk/psdk_bridge.dart';
 import '../../../psdk/psdk_card_reader.dart';
 import '../domain/receipt_formatter.dart';
@@ -39,63 +41,118 @@ class ReceiptPrinter {
 
   /// Imprime el ticket de [operation] en la térmica.
   ///
-  /// Una venta aprobada imprime el original del comercio y después la copia
-  /// del cliente. El resto de los resultados imprime un solo ticket.
+  /// Reintenta solo el arranque, hasta [initAttempts] veces, con
+  /// [initRetryDelay] entre intentos. Cada espera de `sdiReady` dura como
+  /// máximo [readyTimeoutSec]. Si [PsdkCardReader.ensureReady] no ve el
+  /// manager, o si [PsdkBridge.printHtml] responde `PSDK_NOT_READY` antes de
+  /// llamar a la térmica, cierra la sesión antes de reinicializarla. Un código
+  /// de `printHTML` ya ejecutado no se reintenta.
   ///
-  /// Devuelve [PrintResult.success] si la impresión fue OK, o un
-  /// [PrintResult.failure] con el motivo en caso contrario. Si el original
-  /// salió y la copia no, el mensaje lo indica y no se reintenta sola la copia.
-  Future<PrintResult> printTicket(OperationModel operation) async {
-    try {
-      // 1. Asegurar que el SDK esté inicializado y listo (sdiReady).
-      final bool ready = await _reader.ensureReady(initializeIfNeeded: true);
-      if (!ready) {
-        return const PrintResult.failure(
-          'No se pudo inicializar la impresora. Reintente.',
-        );
-      }
+  /// Una venta aprobada imprime el original del comercio y después la copia
+  /// del cliente. El resto de los resultados imprime un solo ticket. Si el
+  /// original salió y la copia no, el mensaje lo indica y no se reintenta
+  /// sola la copia.
+  Future<PrintResult> printTicket(
+    OperationModel operation, {
+    int initAttempts = 3,
+    Duration initRetryDelay = const Duration(milliseconds: 400),
+    int readyTimeoutSec = 8,
+  }) async {
+    final int attempts = initAttempts < 1 ? 1 : initAttempts;
 
-      // 2. Generar el HTML y enviarlo a la térmica.
-      // Una venta aprobada imprime original y después copia.
-      final defaults = await _defaults.load();
-      if (operation.result == PaymentResult.approved) {
-        final PrintResult original = await _printHtml(
-          ReceiptFormatter.toHtml(
-            operation,
-            defaults,
-            copy: ReceiptCopy.merchant,
-          ),
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      final bool willRetry = attempt < attempts - 1;
+      try {
+        final bool ready = await _reader.ensureReady(
+          initializeIfNeeded: true,
+          timeoutSec: readyTimeoutSec,
         );
-        if (!original.ok) return original;
+        if (!ready) {
+          if (!await _releaseForRetry()) {
+            return const PrintResult.failure(
+              'No se pudo recuperar la conexión de la impresora.',
+            );
+          }
+          if (willRetry) {
+            await Future<void>.delayed(initRetryDelay);
+            continue;
+          }
+          return const PrintResult.failure(
+            'No se pudo inicializar la impresora. Reintente.',
+          );
+        }
 
-        try {
-          final PrintResult copy = await _printHtml(
+        final defaults = await _defaults.load();
+        if (operation.result == PaymentResult.approved) {
+          final PrintResult original = await _printHtml(
             ReceiptFormatter.toHtml(
               operation,
               defaults,
-              copy: ReceiptCopy.customer,
+              copy: ReceiptCopy.merchant,
             ),
           );
-          if (!copy.ok) {
+          if (!original.ok) return original;
+
+          try {
+            final PrintResult copy = await _printHtml(
+              ReceiptFormatter.toHtml(
+                operation,
+                defaults,
+                copy: ReceiptCopy.customer,
+              ),
+            );
+            if (!copy.ok) {
+              return const PrintResult.failure(
+                'Se imprimió el original. La copia no salió.',
+              );
+            }
+          } catch (_) {
             return const PrintResult.failure(
               'Se imprimió el original. La copia no salió.',
             );
           }
-        } catch (_) {
-          return const PrintResult.failure(
-            'Se imprimió el original. La copia no salió.',
+          return const PrintResult.success(
+            message: 'Original y copia impresos',
           );
         }
-        return const PrintResult.success(
-          message: 'Original y copia impresos',
+
+        return await _printHtml(ReceiptFormatter.toHtml(operation, defaults));
+      } on PlatformException catch (error) {
+        if (error.code != 'PSDK_NOT_READY' &&
+            error.code != 'PSDK_INVALID_STATE' &&
+            error.code != 'PSDK_INIT_FAILED') {
+          return const PrintResult.failure(
+            'Error al imprimir el ticket. Reintente.',
+          );
+        }
+        if (!await _releaseForRetry()) {
+          return const PrintResult.failure(
+            'No se pudo recuperar la conexión de la impresora.',
+          );
+        }
+        if (willRetry) {
+          await Future<void>.delayed(initRetryDelay);
+          continue;
+        }
+      } catch (_) {
+        return const PrintResult.failure(
+          'Error al imprimir el ticket. Reintente.',
         );
       }
+    }
 
-      return await _printHtml(ReceiptFormatter.toHtml(operation, defaults));
+    return const PrintResult.failure(
+      'No se pudo inicializar la impresora. Reintente.',
+    );
+  }
+
+  /// Espera el cierre confirmado antes de reintentar la sesión compartida.
+  Future<bool> _releaseForRetry() async {
+    try {
+      await _psdk.tearDown().timeout(const Duration(seconds: 10));
+      return true;
     } catch (_) {
-      return const PrintResult.failure(
-        'Error al imprimir el ticket. Reintente.',
-      );
+      return false;
     }
   }
 

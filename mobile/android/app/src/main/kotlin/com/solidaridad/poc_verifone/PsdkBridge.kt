@@ -483,17 +483,6 @@ class PsdkBridge(private val appContext: Context) :
         }
     }
 
-    private fun statusToMap(status: Status): Map<String, Any?> {
-        return mapOf(
-            "type" to status.type,
-            "status" to status.status,
-            "message" to status.message,
-            "sessionId" to status.sessionId,
-            "success" to (status.status == StatusCode.SUCCESS),
-            "sdiReady" to (paymentSdk?.sdiManager != null && status.status == StatusCode.SUCCESS),
-        )
-    }
-
     private fun emit(payload: Map<String, Any?>) {
         mainHandler.post {
             eventSink?.success(payload)

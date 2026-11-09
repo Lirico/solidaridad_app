@@ -1,11 +1,34 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:solidaridad_app/features/sales/data/receipt_defaults_repository.dart';
 import 'package:solidaridad_app/features/sales/data/receipt_printer.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/psdk/psdk_bridge.dart';
 
 class MockPsdkBridge extends Mock implements PsdkBridge {}
+
+class _DefaultsBundle extends Fake implements AssetBundle {
+  @override
+  Future<String> loadString(String key, {bool cache = true}) async {
+    return '''
+{
+  "issuer_name": "Solidaridad",
+  "establishment_name": "GAS Terminal",
+  "establishment_address": "Av. San Martin 100",
+  "establishment_cuit": "30-00000000-0",
+  "establishment_code": "00000001",
+  "coupon_number": "00000001",
+  "batch_number": "000001",
+  "authorization_code": "MOCK01",
+  "currency": "ARS",
+  "installments": "1",
+  "installment_plan": "Contado",
+  "original_charge_number": "00000000"
+}
+''';
+  }
+}
 
 OperationModel _operation() {
   return OperationModel(
@@ -25,7 +48,10 @@ void main() {
 
   setUp(() {
     bridge = MockPsdkBridge();
-    printer = ReceiptPrinter(psdk: bridge);
+    printer = ReceiptPrinter(
+      psdk: bridge,
+      defaultsRepository: ReceiptDefaultsRepository(bundle: _DefaultsBundle()),
+    );
     when(
       () => bridge.initialize(),
     ).thenAnswer((_) async => <String, dynamic>{});
@@ -65,10 +91,10 @@ void main() {
       final PrintResult result = await printWithShortStartup();
 
       expect(result.ok, isTrue);
-      expect(result.message, 'Ticket impreso');
+      expect(result.message, 'Original y copia impresos');
       verify(() => bridge.initialize()).called(2);
       verify(() => bridge.tearDown()).called(1);
-      verify(() => bridge.printHtml(any())).called(1);
+      verify(() => bridge.printHtml(any())).called(2);
     },
   );
 
@@ -94,7 +120,8 @@ void main() {
     );
 
     expect(result.ok, isTrue);
-    verify(() => bridge.printHtml(any())).called(2);
+    expect(result.message, 'Original y copia impresos');
+    verify(() => bridge.printHtml(any())).called(3);
     verify(() => bridge.tearDown()).called(1);
     verifyNever(() => bridge.initialize());
   });

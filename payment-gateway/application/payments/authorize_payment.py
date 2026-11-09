@@ -40,6 +40,7 @@ class AuthorizePayment:
             amount_minor=command.amount_minor,
             card_number=pan,
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
+            merchant_code=command.merchant_code,
             stan=stan.zfill(6),
             ticket_number=ticket,
             expiration_date=command.expiration_date,

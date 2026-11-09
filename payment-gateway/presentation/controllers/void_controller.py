@@ -66,6 +66,7 @@ def void_transaction(
         amount_minor=body.amount_minor,
         card_number=body.card_number,
         terminal_id=body.terminal_id,
+        merchant_code=body.merchant_code,
         stan=body.stan,
         original_ticket=body.original_ticket,
         void_ticket=body.void_ticket,

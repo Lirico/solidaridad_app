@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../../../core/formatters/amount_formatter.dart';
+import '../../../sales/domain/receipt_defaults.dart';
+import '../../../sales/domain/receipt_formatter.dart';
 import '../../../sales/domain/sale_model.dart';
 
 class SaleDetailTicket extends StatelessWidget {
   final OperationModel operation;
+  final ReceiptDefaults defaults;
 
-  const SaleDetailTicket({super.key, required this.operation});
+  const SaleDetailTicket({
+    super.key,
+    required this.operation,
+    required this.defaults,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,11 +24,12 @@ class SaleDetailTicket extends StatelessWidget {
       case PaymentResult.approved:
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
-        statusTitle = 'VENTA EXITOSA';
+        statusTitle = 'Aprobada';
       case PaymentResult.declined:
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
-        statusTitle = 'VENTA RECHAZADA';
+        final code = operation.responseCode?.trim() ?? '';
+        statusTitle = code.isEmpty ? 'Denegada' : 'Denegada ($code)';
       case PaymentResult.pending:
         statusColor = Colors.orange;
         statusIcon = Icons.hourglass_top;
@@ -44,80 +52,127 @@ class SaleDetailTicket extends StatelessWidget {
         statusTitle = 'VENTA ANULADA';
     }
 
+    final date =
+        '${_two(operation.date.day)}/${_two(operation.date.month)}/${operation.date.year}';
+    final time =
+        '${_two(operation.date.hour)}:${_two(operation.date.minute)}:${_two(operation.date.second)}';
+    final rows = <String>[
+      'Cód. establecimiento: ${defaults.establishmentCode}',
+      'Cupón: ${defaults.couponNumber}',
+      'Lote: ${defaults.batchNumber}',
+      'Terminal: ${ReceiptFormatter.terminalId}',
+      'Tarjeta: ${ReceiptFormatter.maskPan(operation.cardNumber)}',
+      'Autorización: ${defaults.authorizationCode}',
+      'Op: ${operation.id}',
+      'Producto: ${operation.productLabel}',
+      'Importe: ${formatAmount(operation.amount)}',
+      'Moneda: ${defaults.currency}',
+      'Cuotas: ${defaults.installments}',
+      'Plan: ${defaults.installmentPlan}',
+      if (operation.result == PaymentResult.voided)
+        'Cargo original: ${defaults.originalChargeNumber}',
+      if (operation.result != PaymentResult.declined &&
+          operation.userMessage != null &&
+          operation.userMessage!.trim().isNotEmpty)
+        'Mensaje: ${operation.userMessage!.trim()}',
+    ];
+    final declineReason = operation.result == PaymentResult.declined
+        ? operation.userMessage?.trim() ?? ''
+        : '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(date, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    defaults.issuerName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    ReceiptFormatter.operationTypeLabel(operation.result),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            Text(time, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 28),
+        Center(
+          child: Text(
+            defaults.establishmentName,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        Center(
+          child: Text(
+            defaults.establishmentAddress,
+            textAlign: TextAlign.center,
+          ),
+        ),
+        Center(
+          child: Text(defaults.establishmentCuit, textAlign: TextAlign.center),
+        ),
+        const SizedBox(height: 32),
+        for (final row in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              row,
+              textAlign: TextAlign.left,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        const SizedBox(height: 32),
         Center(
           child: Column(
             children: [
-              Icon(statusIcon, color: statusColor, size: 64),
-              const SizedBox(height: 12),
+              Icon(statusIcon, color: statusColor, size: 40),
+              const SizedBox(height: 8),
               Text(
                 statusTitle,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: statusColor,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${operation.productLabel} — ${formatAmount(operation.amount)}',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+              if (declineReason.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(declineReason, textAlign: TextAlign.center),
+              ],
+            ],
+          ),
+        ),
+        if (operation.result != PaymentResult.declined) ...[
+          const SizedBox(height: 40),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text('Firma: '),
+              Expanded(
+                child: Text(
+                  '.' * 80,
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
                 ),
               ),
             ],
           ),
-        ),
-        const Divider(height: 40, thickness: 1),
-        _buildTicketRow('ID Operación:', operation.id),
-        _buildTicketRow(
-          'Fecha:',
-          '${operation.date.day}/${operation.date.month}/${operation.date.year}',
-        ),
-        _buildTicketRow(
-          'Hora:',
-          '${operation.date.hour.toString().padLeft(2, '0')}:${operation.date.minute.toString().padLeft(2, '0')} hs',
-        ),
-        _buildTicketRow('Tarjeta (PAN):', operation.cardNumber),
-        if (operation.userMessage != null &&
-            operation.userMessage!.isNotEmpty) ...[
-          const Divider(height: 24, thickness: 1),
-          _buildTicketRow('Mensaje:', operation.userMessage!),
         ],
-        const Divider(height: 40, thickness: 1),
-        const Center(
-          child: Text(
-            'GAS Terminal - Sistema de Distribución',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildTicketRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
+  static String _two(int n) => n.toString().padLeft(2, '0');
 }

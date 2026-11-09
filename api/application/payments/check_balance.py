@@ -26,6 +26,7 @@ from domain.exceptions import (
 )
 from domain.product import list_products, processor_product_code
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.user_repository import UserRepository
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,14 +55,17 @@ class CheckBalance:
         self,
         installations: InstallationRepository,
         gateway: PaymentGateway,
+        users: UserRepository,
     ) -> None:
         self._installations = installations
         self._gateway = gateway
+        self._users = users
 
     def execute(
         self,
         *,
         installation_id: str,
+        user_id: int,
         card_number: str,
         expiration_date: str | None = None,
     ) -> CheckBalanceResult:
@@ -77,6 +81,15 @@ class CheckBalance:
         if not terminal_id:
             raise MissingTerminalId()
 
+        merchant = self._users.get_merchant(user_id)
+        if (
+            merchant is None
+            or not merchant.code.isascii()
+            or not merchant.code.isalnum()
+            or len(merchant.code) > 15
+        ):
+            raise MissingTerminalId("Comercio no configurado para el procesador")
+
         requests = [
             (
                 info,
@@ -84,6 +97,7 @@ class CheckBalance:
                     product_code=processor_product_code(info.code),
                     card_number=pan,
                     terminal_id=terminal_id[:8].ljust(8),
+                    merchant_code=merchant.code,
                     stan=f"{secrets.randbelow(1_000_000):06d}",
                     expiration_date=exp,
                 ),

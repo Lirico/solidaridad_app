@@ -44,6 +44,7 @@ def check_balance(
     try:
         result = use_case.execute(
             installation_id=current_user.installation_id,
+            user_id=current_user.user_id,
             card_number=body.card_number,
             expiration_date=body.expiration_date,
         )

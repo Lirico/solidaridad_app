@@ -114,6 +114,7 @@ def _build(
     MagicMock,
 ]:
     session = MagicMock()
+    session.scalar.return_value.code = "012502"
     transactions = MagicMock()
     jobs = MagicMock()
     alerts = MagicMock()
@@ -165,6 +166,7 @@ def test_run_once_commits_claim_before_sending_reversal() -> None:
     assert request.card_number == "4111111111111111"
     assert request.expiration_date == "2912"
     assert request.terminal_id == "05000001"
+    assert request.merchant_code == "012502"
     assert request.original_stan == "000123"
     assert request.original_ticket == "00000042"
     assert request.reversal_stan == "900123"
@@ -243,6 +245,24 @@ def test_run_once_marks_missing_recovery_data_for_manual_review() -> None:
     assert session.commit.call_count == 2
 
 
+def test_reversal_without_configured_merchant_requires_manual_review() -> None:
+    worker, session, _, jobs, _, gateway = _build()
+    session.scalar.return_value = None
+    assert worker.run_once() is True
+    gateway.reverse.assert_not_called()
+    assert (
+        jobs.finalize_claim.call_args.kwargs["target"]
+        is ProcessorJobState.MANUAL_REVIEW
+    )
+
+
+def test_reversal_loads_merchant_from_the_sale_account() -> None:
+    worker, session, _, _, _, gateway = _build()
+    session.scalar.return_value.code = "654321"
+    assert worker.run_once() is True
+    assert gateway.reverse.call_args.args[0].merchant_code == "654321"
+
+
 def test_manual_review_opens_a_sanitized_durable_alert(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -288,9 +308,7 @@ def test_run_once_returns_false_without_due_work() -> None:
 
 
 def test_worker_does_not_claim_new_work_after_shutdown_is_requested() -> None:
-    worker, session, transactions, jobs, _, gateway = _build(
-        should_stop=lambda: True
-    )
+    worker, session, transactions, jobs, _, gateway = _build(should_stop=lambda: True)
 
     assert worker.run_once() is False
 

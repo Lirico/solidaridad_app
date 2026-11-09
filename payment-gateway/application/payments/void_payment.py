@@ -43,6 +43,7 @@ class VoidPayment:
             amount_minor=command.amount_minor,
             card_number=pan,
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
+            merchant_code=command.merchant_code,
             stan=stan.zfill(6),
             original_ticket=original,
             void_ticket=void_ticket,

@@ -2,20 +2,13 @@
 
 from typing import Annotated
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from pydantic.types import StringConstraints
 
 InstallationId = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=8),
 ]
-
-
-class RegisterRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
-    installation_id: InstallationId
 
 
 class LoginRequest(BaseModel):
@@ -29,11 +22,27 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class MerchantResponse(BaseModel):
+    code: str
+    name: str
+    address: str
+    city: str
+    tax_id: str
+
+
 class AuthTokenResponse(BaseModel):
     name: str
     email: str
     token: str
     must_change_password: bool
+
+
+class LoginTokenResponse(AuthTokenResponse):
+    merchant: MerchantResponse
+
+
+class CurrentMerchantResponse(BaseModel):
+    merchant: MerchantResponse
 
 
 class MessageResponse(BaseModel):

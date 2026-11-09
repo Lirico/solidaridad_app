@@ -79,7 +79,9 @@ La distinción 503 / 502 es parte del contrato: la API traduce 503 a `FAILED`
 
 `presentation` → `application` (`AuthorizePayment` / `VoidPayment` + `IsoProcessor`) → `domain` ← `infrastructure/iso`
 
-El mensaje 0200 incluye **DE41** (terminal); el procesador resuelve comercio desde `terminales` (no se envía DE42).
+Los mensajes incluyen **DE41** (terminal) y **DE42** (comercio, ASCII de 15
+caracteres con espacios a la derecha). La API proporciona el comercio; para
+Verifone, el procesador valida la relación entre terminal y comercio.
 
 ## Fuera de alcance (por ahora)
 

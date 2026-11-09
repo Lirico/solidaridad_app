@@ -63,6 +63,7 @@ def balance(
         product_code=body.product_code,
         card_number=body.card_number,
         terminal_id=body.terminal_id,
+        merchant_code=body.merchant_code,
         stan=body.stan,
         expiration_date=body.expiration_date,
     )

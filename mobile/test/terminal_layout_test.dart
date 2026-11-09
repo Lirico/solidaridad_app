@@ -10,13 +10,15 @@ import 'package:solidaridad_app/features/auth/data/auth_repository.dart';
 import 'package:solidaridad_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:solidaridad_app/features/auth/presentation/screens/change_password_screen.dart';
 import 'package:solidaridad_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:solidaridad_app/features/history/presentation/widgets/sale_detail_ticket.dart';
 import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
+import 'package:solidaridad_app/features/sales/domain/receipt_defaults.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_cubit.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_state.dart';
 import 'package:solidaridad_app/features/sales/presentation/screens/sale_processing_screen.dart';
-import 'package:solidaridad_app/features/sales/presentation/widgets/sale_review_content.dart';
 import 'package:solidaridad_app/features/sales/presentation/widgets/sale_status_content.dart';
+import 'package:solidaridad_app/features/sales/presentation/widgets/waiting_for_card_content.dart';
 
 /// Cubit de test que permite fijar un estado sin pasar por la red.
 class _FixedSalesCubit extends SalesCubit {
@@ -45,18 +47,6 @@ Widget _terminalScaffold({required String title, required Widget card}) {
     body: AppSheetPanel(
       child: Padding(padding: const EdgeInsets.all(24), child: card),
     ),
-  );
-}
-
-SalesReviewing _reviewState() {
-  return const SalesReviewing(
-    productCode: 'GARRAFA_10',
-    productLabel: 'Garrafa 10 kg',
-    amount: 10.0,
-    cardNumber: '1234 5678 9012 3456',
-    cvv: '123',
-    expirationDate: '1229',
-    history: [],
   );
 }
 
@@ -89,19 +79,6 @@ void main() {
     },
   );
 
-  testWidgets('Confirmar Operación no desborda en 360x720', (tester) async {
-    await pumpAtTerminalSize(
-      tester,
-      _terminalScaffold(
-        title: 'Confirmar Operación',
-        card: SaleReviewContent(state: _reviewState(), onConfirm: () {}),
-      ),
-    );
-
-    expect(tester.takeException(), isNull);
-    expect(find.text('CONFIRMAR COBRO'), findsOneWidget);
-  });
-
   testWidgets('Procesando Transacción no desborda en 360x720', (tester) async {
     final salesCubit = _FixedSalesCubit()
       ..force(
@@ -133,7 +110,9 @@ void main() {
     expect(find.text('Procesando Transacción...'), findsOneWidget);
   });
 
-  testWidgets('Resultado de la Descarga no desborda en 360x720', (tester) async {
+  testWidgets('Resultado de la Descarga no desborda en 360x720', (
+    tester,
+  ) async {
     await pumpAtTerminalSize(
       tester,
       _terminalScaffold(
@@ -201,6 +180,80 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('CONFIRMAR CAMBIO'), findsOneWidget);
   });
+
+  testWidgets('Esperando tarjeta no desborda la fila Cambiar en 360x720', (
+    tester,
+  ) async {
+    await pumpAtTerminalSize(
+      tester,
+      Scaffold(
+        backgroundColor: AppColors.primaryOrange,
+        appBar: const AppHeader(title: 'Nueva Operación'),
+        bottomNavigationBar: const AppBottomNavBar(),
+        body: AppSheetPanel(
+          child: WaitingForCardContent(onChangePaymentMode: () {}),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Cambiar'), findsOneWidget);
+    expect(find.text('Acercar, insertar o deslizar'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Detalle de comprobante no desborda un mensaje largo en 360x720',
+    (tester) async {
+      await pumpAtTerminalSize(
+        tester,
+        Scaffold(
+          backgroundColor: AppColors.primaryOrange,
+          appBar: const AppHeader(title: 'Detalle de Comprobante'),
+          bottomNavigationBar: const AppBottomNavBar(),
+          body: AppSheetPanel(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: SaleDetailTicket(
+                  defaults: const ReceiptDefaults(
+                    issuerName: 'Solidaridad',
+                    establishmentName: 'Gas Austral',
+                    establishmentAddress: 'Av. San Martín 100, Ushuaia',
+                    establishmentCuit: '30-00000000-0',
+                    establishmentCode: '00000001',
+                    couponNumber: '00000001',
+                    batchNumber: '000001',
+                    authorizationCode: 'MOCK01',
+                    currency: 'ARS',
+                    installments: '1',
+                    installmentPlan: 'Contado',
+                    originalChargeNumber: '00000000',
+                  ),
+                  operation: OperationModel(
+                    id: 'OP-260716-00000007',
+                    productCode: 'GARRAFA_10',
+                    productLabel: 'Garrafa 10 kg',
+                    amount: 10,
+                    cardNumber: '**** **** **** 3456',
+                    result: PaymentResult.declined,
+                    date: DateTime(2026, 9, 2),
+                    userMessage:
+                        'No fue posible confirmar el resultado. Verifique la '
+                        'operación con casa central ante un posible cobro '
+                        'duplicado.',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('casa central'), findsOneWidget);
+    },
+  );
 
   testWidgets('Login: logo SOLIDARIDAD agrandado no desborda en 360x720', (
     tester,

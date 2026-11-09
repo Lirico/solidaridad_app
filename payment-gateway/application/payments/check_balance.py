@@ -29,6 +29,7 @@ class CheckBalance:
             product_code=command.product_code,
             card_number=pan,
             terminal_id=command.terminal_id.strip()[:8].ljust(8),
+            merchant_code=command.merchant_code,
             stan=stan.zfill(6),
             expiration_date=command.expiration_date,
         )

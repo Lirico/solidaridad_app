@@ -36,6 +36,8 @@ from domain.exceptions import (
     VoidOperationNotFound,
 )
 from domain.money import AMOUNT_EXPONENT
+from domain.transaction import Transaction
+from domain.transaction_status import TransactionStatus
 from domain.void_operation import VoidOperation, VoidOperationStatus
 from presentation.dependencies import (
     CurrentUser,
@@ -53,6 +55,7 @@ from presentation.schemas.transactions import (
     BatchCloseResponse,
     CreateTransactionRequest,
     PublicTransactionResponse,
+    ReceiptData,
     TransactionItemResponse,
     TransactionListResponse,
     TransactionResponse,
@@ -61,6 +64,15 @@ from presentation.schemas.transactions import (
 )
 
 router = APIRouter()
+
+
+def _receipt(transaction: Transaction) -> ReceiptData | None:
+    if transaction.status is not TransactionStatus.APPROVED:
+        return None
+    return ReceiptData(
+        coupon_number=transaction.processor_ticket,
+        authorization_code=transaction.auth_id,
+    )
 
 
 def _void_response(
@@ -132,6 +144,8 @@ def list_transactions(
             status=t.status.value,
             user_message=t.user_message or "",
             created_at=t.created_at,
+            response_code=t.processor_response_code,
+            receipt=_receipt(t),
         )
         for t in result.transactions
     ]
@@ -182,6 +196,8 @@ def get_transaction(
         poll_after_seconds=public_status.poll_after_seconds,
         may_start_new_sale=public_status.may_start_new_sale,
         created_at=result.transaction.created_at,
+        response_code=result.transaction.processor_response_code,
+        receipt=_receipt(result.transaction),
     )
     if public_status.poll_after_seconds is not None:
         return JSONResponse(
@@ -275,6 +291,8 @@ def create_transaction(
         poll_after_seconds=public_status.poll_after_seconds,
         may_start_new_sale=public_status.may_start_new_sale,
         created_at=result.transaction.created_at,
+        response_code=result.transaction.processor_response_code,
+        receipt=_receipt(result.transaction),
     )
     if result.http_status == CreateTransactionHttpStatus.ACCEPTED:
         return JSONResponse(
@@ -333,6 +351,8 @@ def close_batch(
             status=t.status.value,
             user_message=t.user_message or "",
             created_at=t.created_at,
+            response_code=t.processor_response_code,
+            receipt=_receipt(t),
         )
         for t in result.transactions
     ]

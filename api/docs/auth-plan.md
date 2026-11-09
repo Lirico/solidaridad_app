@@ -1,5 +1,11 @@
 # Plan: autenticación (login, register, change-password)
 
+# Nota de vigencia
+
+El registro descrito en este plan es histórico: se eliminó
+`POST /v1/auth/register`. Las cuentas se crean manualmente en la base con
+comercio obligatorio; ver `api/README.md` y `docs/alcance.md`.
+
 Plan top-down para implementar auth en la API FastAPI, alineado al contrato que ya consume el client Flutter en `mobile/`.
 
 ## 1. Objetivo

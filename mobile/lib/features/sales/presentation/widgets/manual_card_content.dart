@@ -6,7 +6,7 @@ class ManualCardContent extends StatelessWidget {
   final TextEditingController cardNumberController;
   final TextEditingController expiryController;
   final TextEditingController cvvController;
-  final VoidCallback onContinue;
+  final VoidCallback? onContinue;
 
   const ManualCardContent({
     super.key,
@@ -48,7 +48,7 @@ class ManualCardContent extends StatelessWidget {
               ),
             ),
             child: const Text(
-              'CONTINUAR',
+              'COBRAR',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),

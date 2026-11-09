@@ -10,6 +10,7 @@ services:
       - --collation-server=utf8_general_ci
       - --sql-mode=NO_ENGINE_SUBSTITUTION
     environment:
+      TZ: ${AUTH_TIMEZONE:-America/Argentina/Buenos_Aires}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-localroot}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-kigsolidario2}
       MYSQL_USER: ${MYSQL_USER:-kigadmin2}
@@ -45,9 +46,8 @@ services:
     restart: unless-stopped
     environment:
       # El autorizador legacy bloquea ventas entre 23:00 y 23:29 según la hora
-      # del proceso. UTC deja el entorno local reproducible independientemente
-      # de la zona horaria de la estación de desarrollo.
-      TZ: ${AUTH_TIMEZONE:-Etc/UTC}
+      # del proceso. Autorizador y MySQL comparten la hora operativa argentina.
+      TZ: ${AUTH_TIMEZONE:-America/Argentina/Buenos_Aires}
     depends_on:
       mysql:
         condition: service_healthy

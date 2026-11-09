@@ -87,6 +87,7 @@ def _build(
     gateway_result: VoidResult | None = None,
 ) -> tuple[VoidTransaction, MagicMock, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
+    session.scalar.return_value.code = "012502"
     transactions = MagicMock()
     operations = MagicMock()
     gateway = MagicMock()
@@ -129,6 +130,22 @@ def _execute(use_case: VoidTransaction) -> object:
     )
 
 
+def test_void_without_configured_merchant_is_rejected() -> None:
+    use_case, session, _, operations, gateway = _build()
+    session.scalar.return_value = None
+    with pytest.raises(TransactionNotVoidable, match="comercio válido"):
+        _execute(use_case)
+    operations.create_pending.assert_not_called()
+    gateway.void.assert_not_called()
+
+
+def test_void_loads_merchant_from_the_sale_account() -> None:
+    use_case, session, _, _, gateway = _build()
+    session.scalar.return_value.code = "654321"
+    _execute(use_case)
+    assert gateway.void.call_args.args[0].merchant_code == "654321"
+
+
 def test_void_approves_and_persists_identifiers_before_gateway() -> None:
     use_case, session, transactions, operations, gateway = _build()
 
@@ -141,6 +158,7 @@ def test_void_approves_and_persists_identifiers_before_gateway() -> None:
     gateway.void.assert_called_once()
     request = gateway.void.call_args.args[0]
     assert request.stan == request.void_ticket == "123456"
+    assert request.merchant_code == "012502"
     transactions.apply_void_result.assert_called_once()
     assert transactions.apply_void_result.call_args.kwargs["user_message"] == (
         "Anulación aprobada"

@@ -20,6 +20,7 @@ def _cmd(**overrides: object) -> AuthorizeCommand:
         "amount_minor": 150050,
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
+        "merchant_code": "012502",
         "stan": "123456",
         "ticket_number": "00000042",
     }

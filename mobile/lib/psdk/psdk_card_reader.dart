@@ -68,12 +68,16 @@ class PsdkCardReader {
   /// `Future`, para no encadenar dos `tearDown`.
   Future<void>? _releaseInFlight;
 
-  /// Espera hasta que el PaymentSDK emita el evento `sdiReady`.
+  /// Espera hasta que el PaymentSDK emita `sdiReady`.
   ///
   /// `initialize()` es asíncrono: retorna de inmediato con `sdiReady=false` y
-  /// el SDK recién queda listo cuando llega `handleStatus` con SUCCESS. Este
-  /// método escucha [PsdkBridge.statusEvents] hasta que eso ocurra o se agote
-  /// [timeoutSec].
+  /// el SDK recién queda listo cuando llega `handleStatus` con el manager de
+  /// SDI. Este método escucha [PsdkBridge.statusEvents] hasta que eso ocurra
+  /// o se agote [timeoutSec].
+  ///
+  /// `success` solo no alcanza. Un callback puede decir SUCCESS cuando
+  /// `sdiManager` todavía es null, o llegar tarde de un SDK ya apagado. En
+  /// ambos casos `readMsr` y `printHtml` fallan con `PSDK_NOT_READY`.
   ///
   /// Para evitar una race condition (el evento `sdiReady` puede haber llegado
   /// antes de suscribirnos al stream), primero se consulta el estado actual con

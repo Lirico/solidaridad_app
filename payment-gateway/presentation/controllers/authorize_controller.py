@@ -66,6 +66,7 @@ def authorize(
         amount_minor=body.amount_minor,
         card_number=body.card_number,
         terminal_id=body.terminal_id,
+        merchant_code=body.merchant_code,
         stan=body.stan,
         ticket_number=body.ticket_number,
         expiration_date=body.expiration_date,

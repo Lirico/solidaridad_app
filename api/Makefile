@@ -1,9 +1,10 @@
-.PHONY: install run run-recovery-worker integ-stub integ-test integ-test-processor db-up db-down db-logs db-reset migrate migrate-new db-seed \
+.PHONY: install run run-once run-recovery-worker integ-stub integ-test integ-test-processor db-up db-down db-logs db-reset e2e-db-up e2e-db-down e2e-db-reset migrate migrate-new db-seed \
 	dev lint lint-fix typecheck test test-cov check
 
 HOST ?= 0.0.0.0
 API_BASE_URL ?= http://127.0.0.1:8000
 INTEGRATION_GATEWAY_CONTROL_URL ?= http://127.0.0.1:8011
+E2E_COMPOSE := docker compose --project-name solidaridad-e2e -f docker-compose.e2e.yml
 
 install:
 	uv sync
@@ -21,6 +22,18 @@ db-reset:
 	docker compose --env-file .env down -v
 	docker compose --env-file .env up -d --wait
 
+# Dedicated, disposable PostgreSQL instance for the real local E2E gate.
+# It never shares a container or volume with the normal development database.
+e2e-db-up:
+	$(E2E_COMPOSE) up -d --wait
+
+e2e-db-down:
+	$(E2E_COMPOSE) down
+
+e2e-db-reset:
+	$(E2E_COMPOSE) down -v
+	$(E2E_COMPOSE) up -d --wait
+
 migrate:
 	uv run alembic upgrade head
 
@@ -32,6 +45,9 @@ db-seed:
 
 run:
 	uv run uvicorn main:app --host $(HOST) --port 8000 --reload
+
+run-once:
+	uv run uvicorn main:app --host $(HOST) --port 8000
 
 # Controlled rollout only: one process, without reload spawning another worker.
 run-recovery-worker:

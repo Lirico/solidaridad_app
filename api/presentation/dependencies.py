@@ -3,6 +3,7 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -11,7 +12,6 @@ from sqlalchemy.orm import Session
 
 from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
-from application.auth.register_user import RegisterUser
 from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
 from application.payments.close_batch import CloseBatch
@@ -54,18 +54,6 @@ def get_token_service(
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> TokenService:
     return TokenService(settings)
-
-
-def get_register_user(
-    db: Annotated[Session, Depends(get_db)],
-    tokens: Annotated[TokenService, Depends(get_token_service)],
-) -> RegisterUser:
-    return RegisterUser(
-        session=db,
-        users=UserRepository(db),
-        installations=InstallationRepository(db),
-        tokens=tokens,
-    )
 
 
 def get_login_user(
@@ -136,6 +124,7 @@ def get_close_batch(
 def get_create_transaction(
     db: Annotated[Session, Depends(get_db)],
     gateway: Annotated[HttpPaymentGateway, Depends(get_payment_gateway)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> CreateTransaction:
     return CreateTransaction(
         session=db,
@@ -144,6 +133,7 @@ def get_create_transaction(
         gateway=gateway,
         configs=PaymentProcessingConfigRepository(db),
         jobs=ProcessorJobRepository(db),
+        business_timezone=ZoneInfo(settings.business_timezone),
     )
 
 
@@ -166,6 +156,7 @@ def get_check_balance(
     return CheckBalance(
         installations=InstallationRepository(db),
         gateway=gateway,
+        users=UserRepository(db),
     )
 
 

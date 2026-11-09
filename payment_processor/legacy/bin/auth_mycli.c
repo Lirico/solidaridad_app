@@ -317,39 +317,48 @@ int valida_terminal(MYSQL* con, struct iso8583* iso)
     if (num_rows != 0)
     {
         row = mysql_fetch_row(result);
-        if (strcmp(row[0], "V") == 0 && row[3] != NULL && row[3][0] != '\0')
+        if (strcmp(row[0], "V") == 0)
         {
             if(strcmp(row[1], "Ingenico") == 0)
             {
                 printf("valida_terminal() Terminal Type: %s\n", row[1]);
                 iso->flag_ingenico = 1;
+
+                memset(iso->merchid_42, '\0', 16);
+                sprintf(iso->merchid_42, "%s", row[3]);
+
+                memset(iso->currcode_49, '\0', 4);
+                sprintf(iso->currcode_49, "%s", row[2]);
             }
-            else if(strcmp(row[1], "VeriFone") == 0)
+
+            if(strcmp(row[1], "VeriFone") == 0)
             {
                 printf("valida_terminal() Terminal Type: %s\n", row[1]);
                 iso->flag_ingenico = 0;
             }
-            else if(strcmp(row[1], "IVR") == 0)
+
+            if(strcmp(row[1], "IVR") == 0)
             {
                 printf("valida_terminal() Terminal Type: %s\n", row[1]);
                 iso->flag_ingenico = 2;
             }
 
-            /* Comercio siempre desde terminales (solo DE41). */
-            memset(iso->merchid_42, '\0', 16);
-            sprintf(iso->merchid_42, "%s", row[3]);
-
-            /* Producto/DE49: solo Ingenico lo toma de terminales.cod_moneda.
-             * VeriFone/IVR conservan el DE49 enviado en el mensaje. */
-            if (iso->flag_ingenico == 1
-                && row[2] != NULL
-                && row[2][0] != '\0')
+            if ( valida_terminal_comercio(con, iso) == TRANS_OK )
             {
-                memset(iso->currcode_49, '\0', 4);
-                sprintf(iso->currcode_49, "%s", row[2]);
-            }
+                ret = TRANS_OK;
+                if(strcmp(row[1], "IVR") == 0)
+                {
+                    ret = TRANS_OK;
+                }
 
-            ret = TRANS_OK;
+            } else {
+                ret = TERMINAL_UNK;
+
+                if(strcmp(row[1], "IVR") == 0)
+                {
+                    ret = TRANS_OK;
+                }
+            }
         } else {
             ret = TERMINAL_UNK;
         }

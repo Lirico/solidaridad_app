@@ -1,6 +1,8 @@
-from datetime import UTC, datetime
+from collections.abc import Callable
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, call
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -26,6 +28,17 @@ from domain.processor_job import ProcessorJobState
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
+
+
+@pytest.fixture(autouse=True)
+def configured_merchant(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    merchant = SimpleNamespace(code="012502")
+    monkeypatch.setattr(
+        "application.payments.create_transaction.UserRepository",
+        lambda _session: SimpleNamespace(get_merchant=lambda _user_id: merchant),
+    )
 
 
 def _tx(**overrides: object) -> Transaction:
@@ -63,6 +76,8 @@ def _build(
     max_authorization_attempts: int = 1,
     processing_timeout_seconds: int = 3,
     monotonic: MagicMock | None = None,
+    now: Callable[[], datetime] | None = None,
+    business_timezone: ZoneInfo | None = None,
 ) -> tuple[CreateTransaction, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
@@ -109,7 +124,7 @@ def _build(
     transactions.start_authorization_retry.side_effect = iter(
         range(2, max_authorization_attempts + 1)
     )
-    now = datetime.now(UTC)
+    config_now = datetime.now(UTC)
     configs.get_default.return_value = PaymentProcessingConfig(
         id=1,
         config_name="default",
@@ -124,8 +139,8 @@ def _build(
         jitter_percentage=0,
         processing_timeout_seconds=processing_timeout_seconds,
         worker_poll_interval_seconds=Decimal("1"),
-        created_at=now,
-        updated_at=now,
+        created_at=config_now,
+        updated_at=config_now,
     )
 
     use_case = CreateTransaction(
@@ -138,6 +153,12 @@ def _build(
         sleep=sleeper,
         monotonic=monotonic or MagicMock(return_value=0.0),
         random_value=lambda: 0.5,
+        **({"now": now} if now is not None else {}),
+        **(
+            {"business_timezone": business_timezone}
+            if business_timezone is not None
+            else {}
+        ),
     )
     return use_case, transactions, installations, gateway
 
@@ -157,9 +178,11 @@ def test_create_approves() -> None:
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
     auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.merchant_code == "012502"
     assert auth_req.ticket_number == "00000001"
     transactions.create_pending.assert_called_once()
     create_kwargs = transactions.create_pending.call_args.kwargs
+    assert "merchant_code" not in create_kwargs
     assert create_kwargs["processor_ticket"] == "00000001"
     assert create_kwargs["card_number"] == "4111111111111111"
     assert create_kwargs["expiration_date"] is None
@@ -167,6 +190,24 @@ def test_create_approves() -> None:
     transactions.update_result.assert_called_once()
     update_kwargs = transactions.update_result.call_args.kwargs
     assert update_kwargs["authorization_outcome"] == AuthorizationOutcome.APPROVED
+
+
+def test_business_date_uses_argentina_timezone() -> None:
+    use_case, transactions, _, _ = _build(
+        now=lambda: datetime(2026, 11, 10, 0, 30, tzinfo=UTC),
+        business_timezone=ZoneInfo("America/Argentina/Buenos_Aires"),
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="argentina-date",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    transactions.next_transaction_number.assert_called_once_with(date(2026, 11, 9))
 
 
 def test_missing_idempotency_key() -> None:

@@ -112,9 +112,9 @@ vencimiento `YYMM`. La app no envía `entry_mode` ni Track 2. Ver
 
 | Nro | Módulo | Action | Inputs | Expected Output | Actual Output | Test Result | Test Comments |
 |-----|--------|--------|--------|-----------------|---------------|-------------|---------------|
-| 111 | Captura | Lectura por banda normaliza vencimiento | Pasar tarjeta por MSR en `WaitingForCardScreen` | `showReview` recibe PAN y vencimiento `YYMM`; no conserva la pista. | No probado | Pendiente | Verificar en `sale_waiting_for_card_screen.dart`. La banda no contiene CVV. |
-| 112 | Captura | Ingreso manual normaliza vencimiento | Completar formulario manual en `SaleManualCardScreen` | `showReview` recibe PAN y convierte `MM/YY` a `YYMM`. | No probado | Pendiente | Verificar en `sale_manual_card_screen.dart`. |
-| 113 | Captura | `registerSale` usa contrato reducido | Confirmar venta en `SaleReviewScreen` | `POST /v1/transactions` incluye PAN y vencimiento; no incluye modo de captura ni pista. | No probado | Pendiente | Verificar en `sales_repository.dart`. |
+| 111 | Captura | Banda cobra sin confirmación | Pasar tarjeta por MSR en `WaitingForCardScreen` | `prepareSaleFromMsr` recibe PAN/vencimiento `YYMM`, envía una vez y abre procesamiento sin conservar la pista. | Automatizado | Pass | `mobile/test/sale_direct_charge_test.dart`; la banda no contiene CVV. |
+| 112 | Captura | Manual cobra sin confirmación ni doble envío | Completar `SaleManualCardScreen` y tocar COBRAR dos veces | Convierte `MM/YY` a `YYMM`, genera una clave, envía una vez y abre procesamiento. | Automatizado | Pass | `mobile/test/sale_direct_charge_test.dart`. |
+| 113 | Captura | `registerSale` usa contrato reducido | Iniciar venta desde cualquier medio implementado | `POST /v1/transactions` incluye PAN y vencimiento; no incluye modo de captura ni pista. | No probado | Pendiente | Verificar en `sales_repository.dart`. |
 
 ---
 
@@ -126,6 +126,5 @@ vencimiento `YYMM`. La app no envía `entry_mode` ni Track 2. Ver
 | Mobile | 33 | 20 | 1 | 0 | 2 | 10 |
 | POC Verifone | 7 | 7 | 0 | 0 | 0 | 0 |
 | Bridge PSDK (Rama 1) | 18 | 1 | 0 | 0 | 0 | 17 |
-| Captura de tarjeta | 3 | 0 | 0 | 0 | 0 | 3 |
-| **Total** | **62** | **28** | **1** | **0** | **2** | **31** |
-
+| Captura de tarjeta | 3 | 2 | 0 | 0 | 0 | 1 |
+| **Total** | **62** | **30** | **1** | **0** | **2** | **29** |

@@ -1,7 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/sale_model.dart';
+
 import '../../../../psdk/msr_card_data.dart';
 import '../../data/sales_repository.dart';
+import '../../domain/receipt_formatter.dart';
+import '../../domain/sale_model.dart';
 import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
@@ -65,7 +67,11 @@ class SalesCubit extends Cubit<SalesState> {
     );
   }
 
-  void showReview({
+  /// Prepara un cobro manual y genera su clave de idempotencia una sola vez.
+  ///
+  /// La UI envía inmediatamente este estado con [sendIsoMessage]; no existe
+  /// una pantalla intermedia de confirmación.
+  void prepareSale({
     required String productCode,
     required String productLabel,
     required double amount,
@@ -74,7 +80,7 @@ class SalesCubit extends Cubit<SalesState> {
     required String expirationDate,
   }) {
     emit(
-      SalesReviewing(
+      SalesReady(
         productCode: productCode,
         productLabel: productLabel,
         amount: amount,
@@ -87,14 +93,13 @@ class SalesCubit extends Cubit<SalesState> {
     );
   }
 
-  /// Prepara la pantalla de revisión a partir de una lectura de banda
-  /// magnética (MSR), sin pasar por el ingreso manual.
+  /// Prepara un cobro a partir de una lectura de banda magnética (MSR).
   ///
   /// La banda magnética no contiene CVV. La lectura completa los mismos datos
   /// que el ingreso manual y el vencimiento ya está en formato YYMM.
-  void showReviewFromMsr(MsrCardData data) {
+  void prepareSaleFromMsr(MsrCardData data) {
     emit(
-      SalesReviewing(
+      SalesReady(
         productCode: state.productCode,
         productLabel: state.productLabel,
         amount: state.amount,
@@ -404,6 +409,7 @@ class SalesCubit extends Cubit<SalesState> {
         errorCode: paymentResult != PaymentResult.approved
             ? response.errorCode
             : null,
+        responseCode: response.responseCode,
       ),
     );
   }
@@ -416,9 +422,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String cardNumber,
   }) {
     final normalizedCard = cardNumber.replaceAll(' ', '');
-    final hiddenCard = normalizedCard.length >= 4
-        ? '•••• ${normalizedCard.substring(normalizedCard.length - 4)}'
-        : '•••• 4321';
     return OperationModel(
       id: response.operationNumber.isNotEmpty
           ? response.operationNumber
@@ -426,7 +429,7 @@ class SalesCubit extends Cubit<SalesState> {
       productCode: productCode,
       productLabel: productLabel,
       amount: amount,
-      cardNumber: hiddenCard,
+      cardNumber: ReceiptFormatter.maskPan(normalizedCard),
       result: _paymentResultFromResponse(response),
       authorizationStatus: response.authorizationStatus,
       pendingReason: response.pendingReason,
@@ -434,6 +437,7 @@ class SalesCubit extends Cubit<SalesState> {
       mayStartNewSale: response.mayStartNewSale,
       date: _now(),
       userMessage: response.message,
+      responseCode: response.responseCode,
     );
   }
 
@@ -473,7 +477,7 @@ class SalesCubit extends Cubit<SalesState> {
 
   /// Cierra el handoff visible de una operación bajo revisión sin descartarla.
   /// La operación se conserva para una consulta manual posterior y la próxima
-  /// venta vuelve a generar su propia clave en [showReview].
+  /// venta vuelve a generar su propia clave en [prepareSale].
   bool startNewSaleAfterReview() {
     final current = state;
     if (current is! SalesAwaitingAuthorization ||
@@ -537,6 +541,7 @@ class SalesCubit extends Cubit<SalesState> {
           result: mappedResult,
           date: op.date,
           userMessage: result.message,
+          responseCode: op.responseCode,
         );
       }
       return op;

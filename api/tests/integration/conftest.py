@@ -7,6 +7,8 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from pwdlib import PasswordHash
+from sqlalchemy import create_engine, text
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,26 +66,63 @@ def gateway(gateway_control_url: str) -> Generator[httpx.Client, None, None]:
 
 
 @pytest.fixture
-def make_operator(api: httpx.Client) -> Callable[[], Operator]:
-    def _make() -> Operator:
+def make_operator(api: httpx.Client) -> Callable[..., Operator]:
+    def _make(
+        *, installation_id: str | None = None, merchant_code: str | None = None
+    ) -> Operator:
         unique = uuid4().hex
         password = "integration-password-123"
-        installation_id = f"I{unique[:7]}"
+        terminal = installation_id or f"I{unique[:7]}"
+        database_url = os.environ.get("INTEGRATION_DATABASE_URL")
+        if not database_url:
+            pytest.fail(
+                "Set INTEGRATION_DATABASE_URL to the dedicated integration database"
+            )
+        email = f"integration-{unique}@example.com"
+        engine = create_engine(database_url)
+        try:
+            with engine.begin() as connection:
+                code = merchant_code or unique[:15]
+                connection.execute(
+                    text(
+                        "INSERT INTO merchants (code, name, address, city, tax_id) "
+                        "VALUES (:code, 'Test', 'Test', 'Test', 'Test') "
+                        "ON CONFLICT (code) DO NOTHING"
+                    ),
+                    {"code": code},
+                )
+                merchant_id = connection.scalar(
+                    text("SELECT id FROM merchants WHERE code = :code"), {"code": code}
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO users (merchant_id, name, email, password_hash, "
+                        "must_change_password) VALUES (:merchant_id, "
+                        "'Integration Operator', "
+                        ":email, :password_hash, false)"
+                    ),
+                    {
+                        "merchant_id": merchant_id,
+                        "email": email,
+                        "password_hash": PasswordHash.recommended().hash(password),
+                    },
+                )
+        finally:
+            engine.dispose()
         response = api.post(
-            "/v1/auth/register",
+            "/v1/auth/login",
             json={
-                "name": "Integration Operator",
-                "email": f"integration-{unique}@example.com",
+                "username": email,
                 "password": password,
-                "installation_id": installation_id,
+                "installation_id": terminal,
             },
         )
-        assert response.status_code == 201, response.text
+        assert response.status_code == 200, response.text
         return Operator(
             token=response.json()["token"],
             email=response.json()["email"],
             password=password,
-            installation_id=installation_id,
+            installation_id=terminal,
         )
 
     return _make

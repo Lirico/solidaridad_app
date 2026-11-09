@@ -1,6 +1,7 @@
 """Build payment ISO messages from domain commands."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from config.settings import Settings
 from domain.authorization import AuthorizeCommand, VoidCommand
@@ -13,13 +14,22 @@ _VOID_PROCESSING_CODE = "020000"
 _BALANCE_PROCESSING_CODE = "310000"
 
 
+def _message_moment(settings: Settings, now: datetime | None) -> datetime:
+    timezone = ZoneInfo(settings.iso_timezone)
+    if now is None:
+        return datetime.now(timezone)
+    if now.tzinfo is None:
+        return now
+    return now.astimezone(timezone)
+
+
 def build_purchase_request(
     command: AuthorizeCommand,
     settings: Settings,
     *,
     now: datetime | None = None,
 ) -> IsoMessage:
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
 
     # El autorizador legacy consume este flujo como ingreso manual: PAN en DE2,
     # vencimiento en DE14 y DE22 fijo desde la configuración. La lectura de
@@ -37,10 +47,11 @@ def build_purchase_request(
         nii_24=_pad_digits(settings.iso_nii, 4),
         poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
         termid_41=command.terminal_id[:8].ljust(8),
+        merchid_42=command.merchant_code.ljust(15),
         currcode_49=product_code_de49(command.product_code),
         field_62=_numeric_ticket(command.ticket_number),
     )
-    bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 41, 49, 62]
+    bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 41, 42, 49, 62]
     if command.expiration_date:
         iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
         bits.append(14)
@@ -59,7 +70,7 @@ def build_balance_request(
     El autorizador (auth_thread.c) solo exige DE3/DE24/DE41 presentes y lee el
     producto desde DE49 para calcular el saldo; el saldo vuelve en DE4.
     """
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
 
     iso = IsoMessage(
         tpdu=settings.iso_tpdu,
@@ -73,9 +84,10 @@ def build_balance_request(
         nii_24=_pad_digits(settings.iso_nii, 4),
         poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
         termid_41=command.terminal_id[:8].ljust(8),
+        merchid_42=command.merchant_code.ljust(15),
         currcode_49=product_code_de49(command.product_code),
     )
-    bits = [2, 3, 11, 12, 13, 22, 24, 25, 41, 49]
+    bits = [2, 3, 11, 12, 13, 22, 24, 25, 41, 42, 49]
     if command.expiration_date:
         iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
         bits.append(14)
@@ -93,7 +105,7 @@ def build_void_request(
 
     El autorizador lee el importe de anulación desde DE60 (no DE4).
     """
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
     amount = f"{command.amount_minor:012d}"
     original_ticket = _numeric_ticket(command.original_ticket)
 
@@ -111,11 +123,12 @@ def build_void_request(
         poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
         retrefnum_37=original_ticket.zfill(12),
         termid_41=command.terminal_id[:8].ljust(8),
+        merchid_42=command.merchant_code.ljust(15),
         currcode_49=product_code_de49(command.product_code),
         field_60=amount,
         field_62=_numeric_ticket(command.void_ticket),
     )
-    bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 37, 41, 49, 60, 62]
+    bits = [2, 3, 4, 11, 12, 13, 22, 24, 25, 37, 41, 42, 49, 60, 62]
     if command.expiration_date:
         iso.dateexpire_14 = _pad_digits(command.expiration_date, 4)
         bits.append(14)
@@ -136,7 +149,7 @@ def build_reversal_request(
     on the command as the stable orchestration identifier; the characterized
     wire contract has no separate data element where it can be sent safely.
     """
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
 
     iso = IsoMessage(
         tpdu=settings.iso_tpdu,
@@ -152,10 +165,11 @@ def build_reversal_request(
         nii_24=_pad_digits(settings.iso_nii, 4),
         poscondcode_25=_pad_digits(settings.iso_pos_condition_code, 2),
         termid_41=command.terminal_id[:8].ljust(8),
+        merchid_42=command.merchant_code.ljust(15),
         currcode_49=product_code_de49(command.product_code),
         field_62=_numeric_ticket(command.original_ticket),
     )
-    set_present(iso, 2, 3, 4, 11, 12, 13, 14, 22, 24, 25, 41, 49, 62)
+    set_present(iso, 2, 3, 4, 11, 12, 13, 14, 22, 24, 25, 41, 42, 49, 62)
     return iso
 
 

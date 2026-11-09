@@ -57,7 +57,7 @@ void main() {
   );
 
   void openReview(SalesCubit cubit) {
-    cubit.showReview(
+    cubit.prepareSale(
       productCode: 'GARRAFA_10',
       productLabel: 'Garrafa 10 kg',
       amount: 4,
@@ -189,7 +189,7 @@ void main() {
         productLabel: 'Garrafa 10 kg',
         amount: 4,
       );
-      cubit.showReview(
+      cubit.prepareSale(
         productCode: 'GARRAFA_10',
         productLabel: 'Garrafa 10 kg',
         amount: 4,

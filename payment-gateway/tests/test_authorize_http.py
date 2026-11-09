@@ -26,6 +26,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
         "amount_minor": 150050,
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
+        "merchant_code": "012502",
         "stan": "123456",
         "ticket_number": "00000042",
     }
@@ -39,12 +40,22 @@ def _void_payload(**overrides: Any) -> dict[str, Any]:
         "amount_minor": 150050,
         "card_number": "4111111111111111",
         "terminal_id": "TERM0001",
+        "merchant_code": "012502",
         "stan": "654321",
         "original_ticket": "00000042",
         "void_ticket": "654321",
     }
     body.update(overrides)
     return body
+
+
+def test_sale_requires_a_valid_merchant_code() -> None:
+    for code in ("", "1234567890123456", "á", "with space"):
+        response = client.post("/v1/authorize", json=_payload(merchant_code=code))
+        assert response.status_code == 400
+    payload = _payload()
+    del payload["merchant_code"]
+    assert client.post("/v1/authorize", json=payload).status_code == 400
 
 
 def test_authorize_http_approved_mock() -> None:

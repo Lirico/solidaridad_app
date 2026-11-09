@@ -143,6 +143,39 @@ curl http://127.0.0.1:8001/ping
 
 Ambos deben responder `{"status":"ok"}`.
 
+### Gate E2E local, sin stubs
+
+Para ejecutar la verificación repetible completa contra el autorizador local:
+
+```bash
+make e2e-test
+```
+
+El comando levanta una PostgreSQL **dedicada para E2E** en `127.0.0.1:5435`,
+borra y recrea su volumen en cada corrida, aplica migraciones y el seed local
+de API. También recrea exclusivamente el volumen MySQL local del procesador e
+instala las tarjetas de integración versionadas. Después inicia temporalmente
+la API y el gateway con `ISO_TRANSPORT=tcp`, ejecuta las pruebas y los detiene.
+El recorrido probado es API → gateway HTTP → ISO8583 TCP → `authkig` → MySQL;
+no se inicia ni se usa el gateway stub.
+
+El gate necesita libres los puertos `8000`, `8001`, `4452` y `5435`. Conserva
+los contenedores de PostgreSQL E2E y del procesador para inspección, pero sus
+datos se reconstruyen al volver a ejecutar el comando. Para detener la base
+E2E manualmente: `make e2e-db-down`.
+
+Para verificar todos los paquetes y finalizar con los gates de integración
+controlada y E2E real:
+
+```bash
+make test-all
+```
+
+Primero corre los checks de catálogo, API y gateway (lint, tipos, unitarios y
+cobertura), luego `make integ-test` contra el gateway stub para cubrir
+timeouts, reintentos y respuestas ambiguas, y finaliza con `make e2e-test`
+contra el procesador real.
+
 ### OpenAPI y documentación interactiva
 
 FastAPI publica Swagger UI y el esquema OpenAPI de ambos servicios:

@@ -48,6 +48,15 @@ impresión de ticket.
 
 - App Android en Flutter, orientada a operación de venta en terminal.
 - Login de usuario y cambio de contraseña.
+- El alta de cuentas es manual en la base de datos, con comercio asignado;
+  no existe registro público.
+- El comercio pertenece obligatoriamente a la cuenta: login entrega sus datos actuales y
+  `GET /v1/me/merchant` permite refrescarlos. Los datos se administran
+  manualmente en la API y no se guardan como instantánea en cada venta. La
+  actualización de la app para consumirlos queda pendiente.
+- La API envía el código de comercio asociado a la cuenta al gateway para
+  ventas y consultas de saldo. El gateway lo transmite en ISO DE42; las
+  anulaciones y reversos consultan el comercio asociado a la cuenta de la venta.
 - Identificador de terminal (`installation_id` / terminal id, 8 caracteres)
   configurado en el dispositivo; el operador no lo inventa por operación.
 - Pantalla inicial simple orientada a la venta.
@@ -56,8 +65,8 @@ impresión de ticket.
   - ingreso de cantidad/importe según contrato vigente;
   - **lectura de banda** como flujo principal;
   - **ingreso manual** como fallback;
-  - confirmación previa antes de enviar;
-  - envío al backend;
+  - validación de la captura y envío directo al backend, sin pantalla
+    intermedia de confirmación, para todos los medios de pago implementados;
   - visualización de resultado (aprobada / rechazada / error de
     comunicación o procesamiento).
 - Mensajes de error comprensibles a partir de la respuesta del backend/procesador.
@@ -130,12 +139,14 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - Autenticación, sesión por token, cambio de contraseña.
 - Validación de usuario habilitado (según política de altas).
 - **Provisión de usuarios centralizada**: los usuarios (empleados) son dados
-  de alta únicamente por la empresa; no se usa el registro desde la app. El
-  endpoint `POST /v1/auth/register` se mantiene como utilidad para que la
-  empresa registre usuarios vía Postman/central.
+  de alta únicamente por la empresa en la base de datos, con comercio asignado;
+  no existe endpoint de registro público.
 - Terminal origen: el `installation_id` del login es el terminal id que se
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).
+- La zona horaria operativa es `America/Argentina/Buenos_Aires`: determina el
+  día de negocio de la numeración diaria y los campos locales DE12/DE13 de los
+  mensajes ISO. Los timestamps persistidos y los tokens continúan en UTC.
 - Endpoint de anulación de venta aprobada:
   `POST /v1/transactions/{transaction_number}/void`, con reingreso de tarjeta e
   `Idempotency-Key`. Ante un resultado ambiguo, la intención de anular se
@@ -165,6 +176,8 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 ### 2.3 Gateway de pagos / mensajería ISO
 
 - Construcción y envío del mensaje ISO de venta al procesador.
+- DE12/DE13 se generan en la zona horaria operativa argentina, configurable por
+  ambiente, y deben permanecer alineados con el autorizador y su cierre forzado.
 - Construcción y envío del mensaje ISO de anulación (`0200` / `020000`).
 - Parseo de respuesta e interpretación de aprobación / rechazo / error.
 - Timeouts y errores de comunicación.
@@ -213,6 +226,7 @@ App Flutter (Verifone)
 | Captura principal | Lectura de banda en Verifone. |
 | Captura fallback | Ingreso manual. |
 | Contrato de captura | Ambos flujos envían PAN y vencimiento (`YYMM`) a la API. La banda es un mecanismo de autocompletar esos datos; `entry_mode` y Track 2 no forman parte del contrato HTTP ni del mensaje ISO. |
+| Confirmación de venta | No hay pantalla intermedia: una captura válida por banda o ingreso manual inicia el cobro y abre **Procesando Transacción**. Los medios futuros deben conservar el mismo comportamiento. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
 | Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |

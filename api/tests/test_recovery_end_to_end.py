@@ -11,6 +11,8 @@ from decimal import Decimal
 from threading import Barrier, Lock, Thread
 from uuid import UUID, uuid4
 
+import pytest
+
 from application.payments.create_transaction import CreateTransaction
 from application.payments.get_transaction_status import GetTransactionStatus
 from application.payments.ports import (
@@ -34,6 +36,22 @@ from domain.processor_job import (
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
+
+
+@pytest.fixture(autouse=True)
+def configured_merchant(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    merchant = SimpleNamespace(code="012502")
+    monkeypatch.setattr(
+        "application.payments.create_transaction.UserRepository",
+        lambda _session: SimpleNamespace(get_merchant=lambda _user_id: merchant),
+    )
+    monkeypatch.setattr(
+        "application.payments.reversal_job_worker.UserRepository",
+        lambda _session: SimpleNamespace(get_merchant=lambda _user_id: merchant),
+    )
+
 
 NOW = datetime(2026, 10, 15, 12, tzinfo=UTC)
 WORKER_NOW = datetime(2030, 1, 1, tzinfo=UTC)
@@ -409,9 +427,7 @@ class _Harness:
             expiration_date="2912",
         )
 
-    def worker(
-        self, worker_id: str, now: datetime = WORKER_NOW
-    ) -> ReversalJobWorker:
+    def worker(self, worker_id: str, now: datetime = WORKER_NOW) -> ReversalJobWorker:
         return ReversalJobWorker(
             worker_id=worker_id,
             session=self.session,  # type: ignore[arg-type]
@@ -556,8 +572,7 @@ def test_end_to_end_worker_crash_quarantines_job_and_prevents_a_second_send() ->
 
     assert monitor.run_once() is True
     assert (
-        next(iter(harness.jobs.rows.values())).state
-        is ProcessorJobState.MANUAL_REVIEW
+        next(iter(harness.jobs.rows.values())).state is ProcessorJobState.MANUAL_REVIEW
     )
     assert harness.alerts.opened == {(claimed.id, "PROCESSING_TIMEOUT")}
     assert (

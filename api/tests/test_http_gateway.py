@@ -20,6 +20,7 @@ def _request() -> AuthorizeRequest:
         amount_minor=150,
         card_number="4111111111111111",
         terminal_id="05000001",
+        merchant_code="012502",
         stan="000001",
         ticket_number="00000001",
         idempotency_key="payment-key-1",
@@ -205,6 +206,7 @@ def _reverse_request() -> ReverseRequest:
         card_number="4111111111111111",
         expiration_date="2912",
         terminal_id="05000001",
+        merchant_code="012502",
         original_stan="000001",
         original_ticket="00000001",
         reversal_stan="000002",
@@ -220,6 +222,7 @@ def test_reverse_posts_exact_payload_and_maps_confirmed() -> None:
             "card_number": "4111111111111111",
             "expiration_date": "2912",
             "terminal_id": "05000001",
+            "merchant_code": "012502",
             "original_stan": "000001",
             "original_ticket": "00000001",
             "reversal_stan": "000002",
@@ -375,6 +378,7 @@ def test_void_approved() -> None:
             amount_minor=150,
             card_number="4111111111111111",
             terminal_id="05000001",
+            merchant_code="012502",
             stan="000002",
             original_ticket="00000001",
             void_ticket="000002",
@@ -389,6 +393,7 @@ def _balance_request() -> BalanceRequest:
         product_code="993",
         card_number="4111111111111111",
         terminal_id="05000001",
+        merchant_code="012502",
         stan="000003",
         expiration_date="2912",
     )
@@ -422,8 +427,7 @@ def test_balance_declined() -> None:
         )
 
     assert (
-        _gateway(handler).balance(_balance_request()).outcome
-        == GatewayOutcome.DECLINED
+        _gateway(handler).balance(_balance_request()).outcome == GatewayOutcome.DECLINED
     )
 
 
@@ -432,8 +436,7 @@ def test_balance_connect_error_is_failed() -> None:
         raise httpx.ConnectError("boom", request=request)
 
     assert (
-        _gateway(handler).balance(_balance_request()).outcome
-        == GatewayOutcome.FAILED
+        _gateway(handler).balance(_balance_request()).outcome == GatewayOutcome.FAILED
     )
 
 
@@ -442,8 +445,7 @@ def test_balance_503_is_failed() -> None:
         return httpx.Response(503, json={"message": "down"})
 
     assert (
-        _gateway(handler).balance(_balance_request()).outcome
-        == GatewayOutcome.FAILED
+        _gateway(handler).balance(_balance_request()).outcome == GatewayOutcome.FAILED
     )
 
 
@@ -452,6 +454,5 @@ def test_balance_502_is_unknown() -> None:
         return httpx.Response(502, json={"message": "ambiguous"})
 
     assert (
-        _gateway(handler).balance(_balance_request()).outcome
-        == GatewayOutcome.UNKNOWN
+        _gateway(handler).balance(_balance_request()).outcome == GatewayOutcome.UNKNOWN
     )

@@ -6,7 +6,6 @@ from presentation.schemas.auth import (
     ErrorMessage,
     LoginRequest,
     MessageResponse,
-    RegisterRequest,
 )
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "ErrorMessage",
     "LoginRequest",
     "MessageResponse",
-    "RegisterRequest",
 ]

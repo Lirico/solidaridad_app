@@ -87,6 +87,7 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
           result: salesState.result,
           date: DateTime.now(),
           userMessage: salesState.errorMessage,
+          responseCode: salesState.responseCode,
         );
         Navigator.pushReplacementNamed(
           context,

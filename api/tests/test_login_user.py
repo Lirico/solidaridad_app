@@ -6,7 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.auth.login_user import LoginUser
-from domain.exceptions import InvalidCredentials
+from domain.exceptions import InvalidCredentials, MerchantNotConfigured
+from domain.merchant import Merchant
 from domain.user import User
 
 
@@ -39,6 +40,9 @@ def _build_use_case(
     existing = user if user is not None else _user()
 
     users.get_by_email.return_value = existing
+    users.get_merchant.return_value = Merchant(
+        "001", "Comercio", "Calle", "Ciudad", "30"
+    )
     hasher.verify.return_value = True
     tokens.create_access_token.return_value = "jwt-token"
 
@@ -68,6 +72,7 @@ def test_login_user_success() -> None:
     assert result.email == "ada@example.com"
     assert result.token == "jwt-token"
     assert result.must_change_password is True
+    assert result.merchant.code == "001"
 
     users.get_by_email.assert_called_once_with("ada@example.com")
     installations.upsert.assert_called_once_with("inst-1")
@@ -89,6 +94,17 @@ def test_login_user_rejects_unknown_email() -> None:
             installation_id="inst-1",
         )
 
+    installations.upsert.assert_not_called()
+    tokens.create_access_token.assert_not_called()
+
+
+def test_login_requires_a_merchant_before_issuing_token() -> None:
+    use_case, users, installations, tokens, _hasher, _ = _build_use_case()
+    users.get_merchant.return_value = None
+    with pytest.raises(MerchantNotConfigured):
+        use_case.execute(
+            username="ada@example.com", password="password1", installation_id="inst-1"
+        )
     installations.upsert.assert_not_called()
     tokens.create_access_token.assert_not_called()
 

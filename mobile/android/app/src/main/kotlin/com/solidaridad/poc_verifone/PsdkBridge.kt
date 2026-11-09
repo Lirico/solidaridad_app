@@ -6,6 +6,7 @@ import android.os.Looper
 import android.util.Log
 import com.verifone.sdi.payment_sdk.CommerceListenerAdapter
 import com.verifone.sdi.payment_sdk.PaymentSdk
+import com.verifone.sdi.payment_sdk.SdiDisconnectCallback
 import com.verifone.sdi.payment_sdk.SdiManager
 import com.verifone.sdi.payment_sdk.SdiResultCode
 import com.verifone.sdi.payment_sdk.SdiTlv
@@ -58,24 +59,67 @@ class PsdkBridge(private val appContext: Context) :
     private var lastStatus: Map<String, Any?>? = null
     private var initialized = false
     private var eventSink: EventChannel.EventSink? = null
-    private var readCancelled = false
 
+    // All lifecycle state is owned by the main thread. SDK callbacks only post data.
+    private enum class SessionState { IDLE, INITIALIZING, READY, CLOSING, FAILED }
+    private var sessionState = SessionState.IDLE
+    private val teardownWaiters = mutableListOf<MethodChannel.Result>()
+    private val abortWorker = Executors.newSingleThreadExecutor()
+    @Volatile private var readPending = false
+    private var readOwner: String? = null
+    @Volatile private var msrReading = false
+    @Volatile private var readCancelled = false
 
-    private val commerceListener = object : CommerceListenerAdapter() {
+    private var generation = 0
+    private fun listenerFor(attempt: Int) = object : CommerceListenerAdapter() {
         override fun handleStatus(status: Status) {
-            val payload = statusToMap(status)
-            lastStatus = payload
-            val ok = status.status == StatusCode.SUCCESS
-            if (ok) {
-                sdiManager = paymentSdk?.sdiManager
-                initialized = sdiManager != null
-                Log.i(TAG, "PaymentSDK init OK; SDI ready=$initialized")
-            } else {
-                sdiManager = null
-                initialized = false
-                Log.w(TAG, "PaymentSDK status not SUCCESS: ${status.message} (${status.status})")
+            val type = status.type
+            val code = status.status
+            val message = status.message
+            val sessionId = status.sessionId
+            mainHandler.post {
+                if (attempt != generation) return@post
+                when {
+                    type == Status.STATUS_INITIALIZED && sessionState == SessionState.INITIALIZING -> {
+                        sdiManager = if (code == StatusCode.SUCCESS) paymentSdk?.sdiManager else null
+                        initialized = sdiManager != null && code == StatusCode.SUCCESS
+                        sessionState = if (initialized) SessionState.READY else SessionState.FAILED
+                        if (initialized) {
+                            sdiManager?.setDisconnectCallback(object : SdiDisconnectCallback() {
+                                override fun disconnectCallback() {
+                                    mainHandler.post {
+                                        if (attempt == generation && sessionState == SessionState.READY) {
+                                            initialized = false
+                                            sdiManager = null
+                                            sessionState = SessionState.FAILED
+                                            val disconnected = mapOf("type" to "disconnected", "sdiReady" to false)
+                                            lastStatus = disconnected
+                                            emit(disconnected)
+                                        }
+                                    }
+                                }
+                            })
+                        }
+                    }
+                    type == Status.STATUS_TEARDOWN && sessionState == SessionState.CLOSING -> {
+                        sdiManager = null
+                        initialized = false
+                        sessionState = if (code == StatusCode.SUCCESS) SessionState.IDLE else SessionState.FAILED
+                        val waiters = teardownWaiters.toList()
+                        teardownWaiters.clear()
+                        waiters.forEach {
+                            if (code == StatusCode.SUCCESS) it.success(mapOf("ok" to true))
+                            else it.error("PSDK_TEARDOWN_FAILED", message, code)
+                        }
+                    }
+                    else -> return@post
+                }
+                val payload = mapOf("type" to type, "status" to code, "message" to message,
+                    "sessionId" to sessionId, "success" to (code == StatusCode.SUCCESS),
+                    "sdiReady" to initialized)
+                lastStatus = payload
+                emit(payload)
             }
-            emit(payload)
         }
     }
 
@@ -87,9 +131,9 @@ class PsdkBridge(private val appContext: Context) :
             "getDeviceInfo" -> result.success(getDeviceInfo())
             "readMsr" -> {
                 val timeoutSec = (call.argument<Int>("timeoutSec") ?: 30).coerceIn(1, 128)
-                readMsr(timeoutSec, result)
+                readMsr(timeoutSec, call.argument<String>("owner"), result)
             }
-            "cancelReadMsr" -> cancelReadMsr(result)
+            "cancelReadMsr" -> cancelReadMsr(call.argument<String>("owner"), result)
             "printHtml" -> {
 
                 val html = call.argument<String>("html")
@@ -114,52 +158,62 @@ class PsdkBridge(private val appContext: Context) :
     }
 
     private fun initialize(result: MethodChannel.Result) {
+        if (sessionState == SessionState.READY || sessionState == SessionState.INITIALIZING) {
+            result.success(mapOf("ok" to true, "alreadyInitialized" to true, "sdiReady" to initialized))
+            return
+        }
+        if (sessionState != SessionState.IDLE) {
+            result.error("PSDK_INVALID_STATE", "SDK requires a completed teardown", null)
+            return
+        }
         try {
-            if (paymentSdk != null) {
-                result.success(
-                    mapOf(
-                        "ok" to initialized,
-                        "alreadyInitialized" to true,
-                        "sdiReady" to (sdiManager != null),
-                        "message" to "SDK already created; waiting for / using last status",
-                    ),
-                )
-                return
-            }
-            Log.d(TAG, "Creating PaymentSdk 4.1.0-sdi…")
-            paymentSdk = PaymentSdk.create(appContext)
-            paymentSdk?.initialize(commerceListener)
-            result.success(
-                mapOf(
-                    "ok" to true,
-                    "alreadyInitialized" to false,
-                    "sdiReady" to false,
-                    "message" to "initialize() called; listen to events for SUCCESS",
-                ),
-            )
+            if (paymentSdk == null) paymentSdk = PaymentSdk.create(appContext)
+            sessionState = SessionState.INITIALIZING
+            lastStatus = null
+            paymentSdk!!.initialize(listenerFor(++generation))
+            result.success(mapOf("ok" to true, "alreadyInitialized" to false, "sdiReady" to false))
         } catch (e: Exception) {
-            Log.e(TAG, "initialize failed", e)
+            sessionState = SessionState.FAILED
             result.error("PSDK_INIT_FAILED", e.message, e.javaClass.name)
         }
     }
 
     private fun tearDown(result: MethodChannel.Result) {
-        try {
-            paymentSdk?.tearDown()
-            paymentSdk = null
-            sdiManager = null
-            initialized = false
-            lastStatus = mapOf(
-                "type" to "tearDown",
-                "status" to StatusCode.SUCCESS,
-                "message" to "torn down",
-                "sdiReady" to false,
-            )
-            emit(lastStatus!!)
+        if (sessionState == SessionState.IDLE) {
             result.success(mapOf("ok" to true))
-        } catch (e: Exception) {
-            Log.e(TAG, "tearDown failed", e)
-            result.error("PSDK_TEARDOWN_FAILED", e.message, e.javaClass.name)
+            return
+        }
+        teardownWaiters.add(result)
+        if (sessionState == SessionState.CLOSING) return
+        sessionState = SessionState.CLOSING
+        initialized = false
+        sdiManager = null
+        // Run after in-flight operations; never destroy a manager in use.
+        worker.execute {
+            mainHandler.post {
+                try {
+                    paymentSdk?.tearDown()
+                } catch (e: Exception) {
+                    sessionState = SessionState.FAILED
+                    val waiters = teardownWaiters.toList()
+                    teardownWaiters.clear()
+                    waiters.forEach { it.error("PSDK_TEARDOWN_FAILED", e.message, e.javaClass.name) }
+                }
+            }
+        }
+    }
+
+    private fun invalidateIfDisconnected(code: SdiResultCode) {
+        if (code != SdiResultCode.ERR_NOT_CONNECTED) return
+        mainHandler.post {
+            if (sessionState == SessionState.READY) {
+                sessionState = SessionState.FAILED
+                initialized = false
+                sdiManager = null
+                val status = mapOf("type" to "disconnected", "sdiReady" to false)
+                lastStatus = status
+                emit(status)
+            }
         }
     }
 
@@ -201,42 +255,61 @@ class PsdkBridge(private val appContext: Context) :
         }
     }
 
-    /**
-     * Blocks on a worker thread until swipe or timeout.
-     * Returns MSR response fields plus txn tags (often clearer when VCL obfuscates the direct fields).
-     */
-    /**
-     * Cancela una lectura MSR en curso.
-     *
-     * El SDK de Verifone no expone una cancelación síncrona de `msr.read`, así
-     * que esto marca un flag que el worker de [readMsr] consulta al terminar:
-     * si la lectura fue cancelada, no se postea el resultado al canal (evitando
-     * que Dart navegue o toque el contexto desmontado). Debe llamarse antes de
-     * [tearDown] para no apagar el SDK con la lectura todavía activa.
-     */
-    private fun cancelReadMsr(result: MethodChannel.Result) {
+    // Abort travels on a separate thread because the command worker may block in read().
+    private fun cancelReadMsr(owner: String?, result: MethodChannel.Result) {
+        if (!readPending || owner == null || owner != readOwner) {
+            result.success(mapOf("ok" to true, "cancelled" to false))
+            return
+        }
         readCancelled = true
-        Log.i(TAG, "MSR read cancellation requested")
-        result.success(mapOf("ok" to true, "cancelled" to true))
+        val sdi = sdiManager
+        abortWorker.execute {
+            try { if (msrReading) sdi?.system?.abort() } catch (e: Exception) {
+                Log.w(TAG, "MSR abort failed", e)
+            }
+        }
+        // Do not acknowledge cancellation until the worker has actually returned.
+        worker.execute { mainHandler.post { result.success(mapOf("ok" to true, "cancelled" to true)) } }
     }
 
-    private fun readMsr(timeoutSec: Int, result: MethodChannel.Result) {
+    private fun readMsr(timeoutSec: Int, owner: String?, result: MethodChannel.Result) {
         val sdi = sdiManager
         if (sdi == null) {
             result.error("PSDK_NOT_READY", "SDI not ready; call initialize and wait for sdiReady", null)
             return
         }
 
+        if (owner == null) {
+            result.error("PSDK_BAD_ARGS", "owner is required", null)
+            return
+        }
+        if (readPending) {
+            result.error("PSDK_BUSY", "A card read is already pending", null)
+            return
+        }
         readCancelled = false
+        readOwner = owner
+        readPending = true
         worker.execute {
             try {
                 Log.i(TAG, "MSR read starting (timeoutSec=$timeoutSec). Swipe the card.")
                 val vclDiag = readVclDiagnostics(sdi)
 
-                val response = sdi.msr.read(timeoutSec.toByte())
-                val code = response.result
                 if (readCancelled) {
-                    Log.i(TAG, "MSR read cancelled; discarding result")
+                    mainHandler.post { result.success(mapOf("ok" to false, "cancelled" to true)) }
+                    return@execute
+                }
+                msrReading = true
+                if (readCancelled) {
+                    msrReading = false
+                    mainHandler.post { result.success(mapOf("ok" to false, "cancelled" to true)) }
+                    return@execute
+                }
+                val response = try { sdi.msr.read(timeoutSec.toByte()) } finally { msrReading = false }
+                val code = response.result
+                invalidateIfDisconnected(code)
+                if (readCancelled) {
+                    mainHandler.post { result.success(mapOf("ok" to false, "cancelled" to true)) }
                     return@execute
                 }
 
@@ -300,6 +373,8 @@ class PsdkBridge(private val appContext: Context) :
                 mainHandler.post {
                     result.error("PSDK_MSR_FAILED", e.message, e.javaClass.name)
                 }
+            } finally {
+                readPending = false
             }
         }
     }
@@ -319,6 +394,7 @@ class PsdkBridge(private val appContext: Context) :
             try {
                 Log.i(TAG, "printHTML starting (landscape=$landscape, chars=${html.length})")
                 val code = sdi.printer.printHTML(html, landscape)
+                invalidateIfDisconnected(code)
                 val payload = mapOf(
                     "ok" to (code == SdiResultCode.OK),
                     "result" to code.name,
@@ -405,17 +481,6 @@ class PsdkBridge(private val appContext: Context) :
                 "message" to (e.message ?: e.javaClass.name),
             )
         }
-    }
-
-    private fun statusToMap(status: Status): Map<String, Any?> {
-        return mapOf(
-            "type" to status.type,
-            "status" to status.status,
-            "message" to status.message,
-            "sessionId" to status.sessionId,
-            "success" to (status.status == StatusCode.SUCCESS),
-            "sdiReady" to (paymentSdk?.sdiManager != null && status.status == StatusCode.SUCCESS),
-        )
     }
 
     private fun emit(payload: Map<String, Any?>) {

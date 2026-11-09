@@ -30,6 +30,7 @@ from persistence.repositories.payment_processing_config_repository import (
 from persistence.repositories.processor_job_repository import ProcessorJobRepository
 from persistence.repositories.recovery_alert_repository import RecoveryAlertRepository
 from persistence.repositories.transaction_repository import TransactionRepository
+from persistence.repositories.user_repository import UserRepository
 
 
 class ReversalJobWorker:
@@ -168,8 +169,8 @@ class ReversalJobWorker:
             raise
         return claimed
 
-    @staticmethod
     def _reverse_request(
+        self,
         claimed: ProcessorJob,
         transaction: Transaction | None,
     ) -> ReverseRequest | None:
@@ -182,12 +183,21 @@ class ReversalJobWorker:
             or claimed.reversal_stan is None
         ):
             return None
+        merchant = UserRepository(self._session).get_merchant(transaction.user_id)
+        if (
+            merchant is None
+            or not merchant.code.isascii()
+            or not merchant.code.isalnum()
+            or len(merchant.code) > 15
+        ):
+            return None
         return ReverseRequest(
             product_code=transaction.processor_product_code,
             amount_minor=transaction.amount_minor,
             card_number=transaction.card_number,
             expiration_date=transaction.expiration_date,
             terminal_id=transaction.terminal_id[:8].ljust(8),
+            merchant_code=merchant.code,
             original_stan=claimed.original_stan,
             original_ticket=claimed.original_ticket,
             reversal_stan=claimed.reversal_stan,

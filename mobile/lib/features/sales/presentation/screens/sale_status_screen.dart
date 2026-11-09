@@ -42,8 +42,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
       _operation = args;
       // El comercio recibe un comprobante tanto de una aprobación como de una
       // verificación manual; el segundo nunca afirma un resultado financiero.
-      if (args.result == PaymentResult.approved ||
-          args.result == PaymentResult.underReview) {
+      if (_printsTicket(args.result)) {
         _printTicket();
       }
     }
@@ -54,6 +53,12 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     final token = authState is AuthSuccess ? authState.user!.token : '';
     context.read<SalesCubit>().sendIsoMessage(token: token);
     Navigator.pushNamed(context, AppRoutes.saleProcessing);
+  }
+
+  bool _printsTicket(PaymentResult result) {
+    return result == PaymentResult.approved ||
+        result == PaymentResult.underReview ||
+        result == PaymentResult.declined;
   }
 
   Future<void> _printTicket() async {
@@ -170,11 +175,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             operation: operation,
             printStatus: _printStatus,
             printMessage: _printMessage,
-            onRetryPrint:
-                result == PaymentResult.approved ||
-                    result == PaymentResult.underReview
-                ? _printTicket
-                : null,
+            onRetryPrint: _printsTicket(result) ? _printTicket : null,
             onRetry: result == PaymentResult.connectionError
                 ? () => _retrySale(context)
                 : null,

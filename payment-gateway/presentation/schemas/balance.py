@@ -8,6 +8,7 @@ class BalanceRequest(BaseModel):
     product_code: ProcessorCode
     card_number: str = Field(min_length=13, max_length=19)
     terminal_id: str = Field(min_length=1, max_length=8)
+    merchant_code: str = Field(min_length=1, max_length=15, pattern=r"^[0-9A-Za-z]+$")
     stan: str = Field(min_length=1, max_length=6)
     expiration_date: str | None = Field(default=None, max_length=4)
 

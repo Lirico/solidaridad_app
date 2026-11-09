@@ -60,6 +60,7 @@ ISO_PORT=4452
 | Variable | Purpose | Local example |
 |----------|---------|---------------|
 | `APP_ENV` | Environment | `local` |
+| `ISO_TIMEZONE` | Zona IANA usada en DE12/DE13 | `America/Argentina/Buenos_Aires` |
 | `ISO_TRANSPORT` | `mock` or `tcp` | `mock` |
 | `ISO_HOST` | authkig host | `127.0.0.1` |
 | `ISO_PORT` | authkig port | `4452` |

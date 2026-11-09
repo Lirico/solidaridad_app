@@ -8,7 +8,6 @@ import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_cubit.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_state.dart';
-import 'package:solidaridad_app/features/sales/presentation/widgets/sale_review_content.dart';
 import 'package:solidaridad_app/features/sales/presentation/widgets/sale_status_content.dart';
 
 class MockSalesRepository extends Mock implements SalesRepository {}
@@ -39,8 +38,8 @@ void main() {
 
   tearDown(() => cubit.close());
 
-  void openReview() {
-    cubit.showReview(
+  void prepareSale() {
+    cubit.prepareSale(
       productCode: 'GARRAFA_10',
       productLabel: 'Garrafa 10 kg',
       amount: 4,
@@ -65,7 +64,7 @@ void main() {
   }
 
   test('un segundo envío en curso no registra otra venta', () async {
-    openReview();
+    prepareSale();
     final key = cubit.state.idempotencyKey;
     expect(key, isNotEmpty);
 
@@ -104,7 +103,7 @@ void main() {
   });
 
   test('el reintento por error de red reutiliza la misma clave', () async {
-    openReview();
+    prepareSale();
     final key = cubit.state.idempotencyKey;
     stubRegisterSale(_connectionError);
 
@@ -141,35 +140,6 @@ void main() {
         idempotencyKey: key,
       ),
     ).called(2);
-  });
-
-  testWidgets('CONFIRMAR COBRO está deshabilitado mientras se envía', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SaleReviewContent(
-            state: const SalesProcessing(
-              productCode: 'GARRAFA_10',
-              productLabel: 'Garrafa 10 kg',
-              amount: 4,
-              cardNumber: '6063007014007403',
-              cvv: '878',
-              expirationDate: '1228',
-              history: [],
-              idempotencyKey: 'key-1',
-            ),
-            onConfirm: () {},
-          ),
-        ),
-      ),
-    );
-
-    final button = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, 'CONFIRMAR COBRO'),
-    );
-    expect(button.onPressed, isNull);
   });
 
   testWidgets('REINTENTAR solo aparece en error de conexión', (tester) async {

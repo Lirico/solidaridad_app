@@ -21,6 +21,7 @@ def _command(**overrides: object) -> ReverseCommand:
         "card_number": "4111111111111111",
         "expiration_date": "3012",
         "terminal_id": "TERM0001",
+        "merchant_code": "012502",
         "original_stan": "123456",
         "original_ticket": "00000042",
         "reversal_stan": "654321",
@@ -40,6 +41,7 @@ def test_reverse_normalizes_and_executes_once() -> None:
     result = ReversePayment(processor).execute(
         _command(
             terminal_id=" T1 ",
+            merchant_code="012502",
             original_stan="7",
             original_ticket="ticket-42",
             reversal_stan="8",
@@ -54,6 +56,7 @@ def test_reverse_normalizes_and_executes_once() -> None:
             card_number="4111111111111111",
             expiration_date="3012",
             terminal_id="T1      ",
+            merchant_code="012502",
             original_stan="000007",
             original_ticket="42",
             reversal_stan="000008",

@@ -80,4 +80,48 @@ void main() {
 
     expect(cubit.state, isA<SalesSessionExpired>());
   });
+
+  test(
+    'conserva la venta aprobada y la marca en revisión tras void ambiguo',
+    () async {
+      const transactionNumber = 'OP-1';
+      when(
+        () => repository.fetchHistory(
+          token: any(named: 'token'),
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+        ),
+      ).thenAnswer(
+        (_) async => [
+          OperationModel(
+            id: transactionNumber,
+            productCode: 'GARRAFA_10',
+            productLabel: 'Garrafa 10 kg',
+            amount: 1,
+            cardNumber: '•••• 1111',
+            result: PaymentResult.approved,
+            date: DateTime(2026, 10, 22),
+          ),
+        ],
+      );
+      when(
+        () => repository.voidTransaction(
+          token: any(named: 'token'),
+          transactionNumber: any(named: 'transactionNumber'),
+          cardNumber: any(named: 'cardNumber'),
+          expirationDate: any(named: 'expirationDate'),
+        ),
+      ).thenAnswer((_) async => const VoidResult.underReview());
+
+      await cubit.loadHistory(token: 'token');
+      final result = await cubit.voidSale(
+        token: 'token',
+        transactionNumber: transactionNumber,
+        cardNumber: '4111111111111111',
+      );
+
+      expect(result.isUnderReview, isTrue);
+      expect(cubit.state.history.single.result, PaymentResult.underReview);
+    },
+  );
 }

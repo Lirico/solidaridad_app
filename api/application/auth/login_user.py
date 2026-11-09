@@ -6,7 +6,8 @@ from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 
 from application.auth.token_service import TokenService
-from domain.exceptions import InvalidCredentials
+from domain.exceptions import InvalidCredentials, MerchantNotConfigured
+from domain.merchant import Merchant
 from persistence.repositories.installation_repository import InstallationRepository
 from persistence.repositories.user_repository import UserRepository
 
@@ -19,6 +20,7 @@ class LoginResult:
     email: str
     token: str
     must_change_password: bool
+    merchant: Merchant
 
 
 class LoginUser:
@@ -50,6 +52,10 @@ class LoginUser:
         if user is None or not self._hasher.verify(password, user.password_hash):
             raise InvalidCredentials()
 
+        merchant = self._users.get_merchant(user.id)
+        if merchant is None:
+            raise MerchantNotConfigured()
+
         self._installations.upsert(normalized_installation_id)
         self._session.commit()
 
@@ -63,4 +69,5 @@ class LoginUser:
             email=user.email,
             token=token,
             must_change_password=user.must_change_password,
+            merchant=merchant,
         )

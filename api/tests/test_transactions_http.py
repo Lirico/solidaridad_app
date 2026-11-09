@@ -13,6 +13,10 @@ from application.payments.get_transaction_status import (
     GetTransactionStatus,
     GetTransactionStatusResult,
 )
+from application.payments.get_void_operation import (
+    GetVoidOperation,
+    GetVoidOperationResult,
+)
 from application.payments.list_transactions import (
     ListTransactions,
     ListTransactionsResult,
@@ -33,10 +37,16 @@ from domain.exceptions import (
     IdempotencyConflict,
     InvalidCardNumber,
     TransactionNotFound,
+    VoidOperationNotFound,
 )
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
+from domain.void_operation import (
+    VoidOperation,
+    VoidOperationOutcome,
+    VoidOperationStatus,
+)
 from main import app
 from presentation.dependencies import (
     CurrentUser,
@@ -45,6 +55,7 @@ from presentation.dependencies import (
     get_current_user,
     get_list_transactions,
     get_transaction_status,
+    get_void_operation,
     get_void_transaction,
 )
 
@@ -64,6 +75,7 @@ def _tx(**overrides: object) -> Transaction:
         status=TransactionStatus.APPROVED,
         card_last4="1111",
         stan="000001",
+        processor_ticket="00000001",
         auth_id="A1",
         retrieval_reference="R1",
         processor_response_code="00",
@@ -75,6 +87,26 @@ def _tx(**overrides: object) -> Transaction:
     )
     base.update(overrides)
     return Transaction(**base)  # type: ignore[arg-type]
+
+
+def _void_operation(**overrides: object) -> VoidOperation:
+    base = dict(
+        id=2,
+        transaction_id=1,
+        idempotency_key="void-1",
+        request_fingerprint="fp",
+        stan="123456",
+        void_ticket="123456",
+        original_ticket="00000001",
+        outcome=VoidOperationOutcome.APPROVED,
+        status=VoidOperationStatus.VOIDED,
+        processor_response_code="00",
+        user_message="Anulación aprobada",
+        created_at=datetime(2026, 7, 16, 19, 1, tzinfo=UTC),
+        updated_at=datetime(2026, 7, 16, 19, 1, tzinfo=UTC),
+    )
+    base.update(overrides)
+    return VoidOperation(**base)  # type: ignore[arg-type]
 
 
 def _override(use_case: MagicMock) -> None:
@@ -163,11 +195,45 @@ def test_create_transaction_201() -> None:
     assert data["transaction_number"] == "OP-260716-00000001"
     assert data["status"] == "APPROVED"
     assert data["user_message"] == "Pago aprobado"
+    assert data["response_code"] == "00"
+    assert data["receipt"] == {
+        "coupon_number": "00000001",
+        "authorization_code": "A1",
+    }
     assert "card_number" not in data
     assert "cvv" not in data
     assert "expiration_date" not in data
     assert "4111111111111111" not in response.text
     assert "3012" not in response.text
+
+
+def test_create_transaction_declined_returns_response_code() -> None:
+    use_case = MagicMock(spec=CreateTransaction)
+    use_case.execute.return_value = CreateTransactionResult(
+        transaction=_tx(
+            status=TransactionStatus.DECLINED,
+            processor_response_code="05",
+            user_message="Transacción denegada",
+            auth_id=None,
+        ),
+        http_status=CreateTransactionHttpStatus.CREATED,
+    )
+    _override(use_case)
+    try:
+        response = client.post(
+            "/v1/transactions",
+            json=_payload(),
+            headers={"Idempotency-Key": "k1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "DECLINED"
+    assert data["user_message"] == "Transacción denegada"
+    assert data["response_code"] == "05"
+    assert data["receipt"] is None
 
 
 def test_create_transaction_202_pending() -> None:
@@ -194,6 +260,26 @@ def test_create_transaction_202_pending() -> None:
     assert response.json()["reason"] == "PROCESSING"
     assert response.json()["poll_after_seconds"] == 2
     assert response.json()["may_start_new_sale"] is False
+    assert response.json()["receipt"] is None
+
+
+def test_create_transaction_replay_returns_200() -> None:
+    use_case = MagicMock(spec=CreateTransaction)
+    use_case.execute.return_value = CreateTransactionResult(
+        transaction=_tx(),
+        http_status=CreateTransactionHttpStatus.OK,
+    )
+    _override(use_case)
+    try:
+        response = client.post(
+            "/v1/transactions",
+            json=_payload(),
+            headers={"Idempotency-Key": "k1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 200
 
 
 def test_create_transaction_requires_auth() -> None:
@@ -237,7 +323,6 @@ def test_create_transaction_accepts_empty_cvv() -> None:
     use_case.execute.assert_called_once()
     kwargs = use_case.execute.call_args.kwargs
     assert kwargs["cvv"] == ""
-
 
 
 def test_create_transaction_domain_400() -> None:
@@ -324,6 +409,11 @@ def test_list_transactions_200() -> None:
     assert item["card_last4"] == "1111"
     assert item["status"] == "APPROVED"
     assert item["user_message"] == "Pago aprobado"
+    assert item["response_code"] == "00"
+    assert item["receipt"] == {
+        "coupon_number": "00000001",
+        "authorization_code": "A1",
+    }
 
 
 def test_list_transactions_empty() -> None:
@@ -397,6 +487,8 @@ def test_get_transaction_processing_returns_202_with_polling_instructions() -> N
         "poll_after_seconds": 2,
         "may_start_new_sale": False,
         "created_at": "2026-07-16T19:00:00Z",
+        "response_code": "00",
+        "receipt": None,
     }
     use_case.execute.assert_called_once_with(
         terminal_id="inst-1",
@@ -454,7 +546,28 @@ def test_get_transaction_hides_processor_job_details_for_final_status() -> None:
     assert data["poll_after_seconds"] is None
     assert data["may_start_new_sale"] is True
     assert "processor_job" not in response.text
+    assert data["receipt"] == {
+        "coupon_number": "00000001",
+        "authorization_code": "A1",
+    }
     assert "READY" not in response.text
+
+
+def test_historical_receipt_does_not_invent_missing_identifiers() -> None:
+    use_case = MagicMock(spec=ListTransactions)
+    use_case.execute.return_value = ListTransactionsResult(
+        transactions=[_tx(processor_ticket=None, auth_id=None)], total=1
+    )
+    _override_list(use_case)
+    try:
+        response = client.get("/v1/transactions")
+    finally:
+        _clear()
+
+    assert response.json()["items"][0]["receipt"] == {
+        "coupon_number": None,
+        "authorization_code": None,
+    }
 
 
 def test_get_transaction_hides_transactions_from_other_terminals() -> None:
@@ -508,6 +621,7 @@ def test_void_transaction_200() -> None:
             status=TransactionStatus.VOIDED,
             user_message="Anulación aprobada",
         ),
+        void_operation=_void_operation(),
         http_status=VoidTransactionHttpStatus.OK,
         user_message="Anulación aprobada",
     )
@@ -531,6 +645,85 @@ def test_void_transaction_200() -> None:
     assert data["status"] == "VOIDED"
     assert data["user_message"] == "Anulación aprobada"
     use_case.execute.assert_called_once()
+
+
+def test_void_transaction_200_under_review() -> None:
+    use_case = MagicMock(spec=VoidTransaction)
+    operation = _void_operation(
+        outcome=VoidOperationOutcome.INDETERMINATE,
+        status=VoidOperationStatus.UNDER_REVIEW,
+        processor_response_code=None,
+        user_message="Verifique con casa central",
+    )
+    use_case.execute.return_value = VoidTransactionResult(
+        transaction=_tx(),
+        void_operation=operation,
+        http_status=VoidTransactionHttpStatus.OK,
+        user_message=operation.user_message,
+    )
+    app.dependency_overrides[get_void_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.post(
+            "/v1/transactions/OP-260716-00000001/void",
+            json={"card_number": "4111111111111111"},
+            headers={"Idempotency-Key": "void-1"},
+        )
+    finally:
+        _clear()
+    assert response.status_code == 200
+    assert response.json()["status"] == "FAILED"
+    assert response.json()["reason"] == "UNDER_REVIEW"
+    assert response.json()["may_start_new_void"] is False
+
+
+def test_get_void_operation_is_terminal_scoped() -> None:
+    use_case = MagicMock(spec=GetVoidOperation)
+    operation = _void_operation(
+        outcome=VoidOperationOutcome.INDETERMINATE,
+        status=VoidOperationStatus.UNDER_REVIEW,
+    )
+    use_case.execute.return_value = GetVoidOperationResult(
+        transaction=_tx(),
+        void_operation=operation,
+    )
+    app.dependency_overrides[get_void_operation] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.get("/v1/transactions/OP-260716-00000001/void")
+    finally:
+        _clear()
+    assert response.status_code == 200
+    assert response.json()["status"] == "FAILED"
+    assert response.json()["reason"] == "UNDER_REVIEW"
+    use_case.execute.assert_called_once_with(
+        terminal_id="inst-1",
+        transaction_number="OP-260716-00000001",
+    )
+
+
+def test_get_void_operation_404() -> None:
+    use_case = MagicMock(spec=GetVoidOperation)
+    use_case.execute.side_effect = VoidOperationNotFound()
+    app.dependency_overrides[get_void_operation] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="demo@solidaridad.local",
+        installation_id="inst-1",
+    )
+    try:
+        response = client.get("/v1/transactions/OP-260716-00000001/void")
+    finally:
+        _clear()
+    assert response.status_code == 404
 
 
 def test_void_transaction_404() -> None:

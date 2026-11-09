@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from config import get_settings
 from persistence.database import SessionLocal
-from persistence.models import Installation, User
+from persistence.models import Installation, Merchant, User
 
 
 class DemoUser(TypedDict):
@@ -40,6 +40,7 @@ DEMO_USERS: list[DemoUser] = [
 
 DEMO_INSTALLATION_ID = "05000001"
 DEMO_INSTALLATION_PLATFORM = "local"
+DEMO_MERCHANT_CODE = "012502"
 
 password_hasher = PasswordHash.recommended()
 
@@ -55,6 +56,19 @@ def seed() -> None:
         sys.exit(1)
 
     with SessionLocal() as session:
+        merchant = session.scalar(
+            select(Merchant).where(Merchant.code == DEMO_MERCHANT_CODE)
+        )
+        if merchant is None:
+            merchant = Merchant(
+                code=DEMO_MERCHANT_CODE,
+                name="COMERCIO DEMO",
+                address="DOMICILIO DEMO",
+                city="LOCALIDAD DEMO",
+                tax_id="CUIT DEMO",
+            )
+            session.add(merchant)
+            session.flush()
         for demo in DEMO_USERS:
             email = demo["email"].lower()
             existing = session.scalar(select(User).where(User.email == email))
@@ -65,10 +79,13 @@ def seed() -> None:
                         email=email,
                         password_hash=password_hasher.hash(demo["password"]),
                         must_change_password=demo["must_change_password"],
+                        merchant_id=merchant.id,
                     )
                 )
                 print(f"Created user {email}")
             else:
+                if existing.merchant_id is None:
+                    existing.merchant_id = merchant.id
                 print(f"User {email} already exists — skipped")
 
         installation = session.scalar(

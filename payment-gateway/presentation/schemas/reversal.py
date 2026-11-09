@@ -17,6 +17,7 @@ class ReverseRequest(BaseModel):
     )
     expiration_date: str = Field(min_length=4, max_length=4, pattern=r"^\d{4}$")
     terminal_id: str = Field(min_length=1, max_length=8)
+    merchant_code: str = Field(min_length=1, max_length=15, pattern=r"^[0-9A-Za-z]+$")
     original_stan: str = Field(min_length=1, max_length=6, pattern=r"^\d+$")
     original_ticket: str = Field(min_length=1, max_length=24)
     reversal_stan: str = Field(min_length=1, max_length=6, pattern=r"^\d+$")

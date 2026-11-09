@@ -1,17 +1,20 @@
 from persistence.models.base import Base
 from persistence.models.batch_close import BatchClose
 from persistence.models.installation import Installation
+from persistence.models.merchant import Merchant
 from persistence.models.payment_processing_config import PaymentProcessingConfig
 from persistence.models.processor_job import ProcessorJob
 from persistence.models.recovery_alert import RecoveryAlert
 from persistence.models.transaction import Transaction, TransactionNumberCounter
 from persistence.models.transaction_status_event import TransactionStatusEvent
 from persistence.models.user import User
+from persistence.models.void_operation import VoidOperation, VoidOperationAlert
 
 __all__ = [
     "Base",
     "BatchClose",
     "Installation",
+    "Merchant",
     "PaymentProcessingConfig",
     "ProcessorJob",
     "RecoveryAlert",
@@ -19,4 +22,6 @@ __all__ = [
     "TransactionNumberCounter",
     "TransactionStatusEvent",
     "User",
+    "VoidOperation",
+    "VoidOperationAlert",
 ]

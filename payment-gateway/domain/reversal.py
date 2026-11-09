@@ -20,6 +20,7 @@ class ReverseCommand:
     card_number: str
     expiration_date: str
     terminal_id: str
+    merchant_code: str
     original_stan: str
     original_ticket: str
     reversal_stan: str

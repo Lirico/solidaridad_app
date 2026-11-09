@@ -1,5 +1,40 @@
 # Bitácora de cambios excepcionales al procesador legacy
 
+## 2026-11-06 — Restauración exacta del código inicial
+
+- **Cambio solicitado:** eliminar las diferencias restantes de
+  `legacy/bin/auth_mycli.c` respecto del primer commit `e94bbee`, incluyendo
+  las comprobaciones añadidas para comercio vacío y producto Ingenico vacío.
+  El contenido de `payment_processor/legacy/` queda idéntico a ese commit.
+- **Validación:** authkig compilado con MySQL aislado; venta, saldo, anulación
+  y reverso Verifone con comercio correcto `00`; comercio incorrecto `89`.
+  En consultas de saldo, Verifone con comercio NULL rechazó `89`, IVR con
+  comercio NULL respondió `00` e Ingenico con producto vacío terminó en error
+  `96` en el gateway. El schema local no admite NULL en `cod_moneda`.
+- **Compatibilidad:** se mantiene el comportamiento original de Ingenico e IVR;
+  estos casos no se comprobaron en hardware ni en la base de producción. API y
+  gateway siguen enviando DE42. No se desplegó ni modificó el procesador activo.
+
+## 2026-11-05 — Restauración explícita de la validación de comercio
+
+- **Cambio solicitado:** revertir la modificación de `24b20b2` que ignoraba
+  DE42 y reemplazaba el comercio de Verifone por el obtenido de DE41.
+- **Alcance:** `legacy/bin/auth_mycli.c`, únicamente `valida_terminal()`;
+  se restaura la validación terminal/comercio, manteniendo la resolución
+  original para Ingenico y la excepción de IVR, y se preserva DE49 para
+  Verifone/IVR según `96ed7c2`.
+- **Reproducción y validación:** contra authkig compilado y MySQL aislados,
+  una venta con comercio `012502` y terminal `05000001` aprobó (`00`); la misma
+  terminal VeriFone con `999999` rechazó (`89`). Saldo, anulación y reverso
+  con el comercio correcto respondieron `00`. El flujo completo API → gateway →
+  procesador aislado también verificó venta, anulación y rechazo de saldo con
+  comercio incorrecto. Evidencia reproducible de ISO:
+  `payment-gateway/tests/manual/check_merchant_iso.py`. Ingenico e IVR
+  conservan la lógica original, pero no se probaron físicamente.
+- **Compatibilidad:** los mensajes Verifone ahora deben incluir DE42; API y
+  gateway se actualizan juntos. No se modificó el procesador en ejecución del
+  usuario ni se probó hardware físico.
+
 `payment_processor/legacy/` no se modifica para adaptar contratos de la app,
 API o gateway. Solo se aceptan correcciones de bugs explícitos, reproducibles y
 acotados del procesador.

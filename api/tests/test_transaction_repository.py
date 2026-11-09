@@ -142,10 +142,11 @@ def _batch_close_session(
     row: MagicMock,
     *,
     open_recovery_job: int | None,
+    open_void_operation: int | None = None,
 ) -> MagicMock:
     session = MagicMock()
     session.scalars.return_value.all.return_value = [row]
-    session.scalar.side_effect = [None, open_recovery_job, None]
+    session.scalar.side_effect = [None, open_recovery_job, open_void_operation, None]
     return session
 
 
@@ -270,6 +271,34 @@ def test_close_batch_allows_confirmed_transaction_without_open_recovery(
     assert result == (expected_close, [expected_transaction])
     assert row.batch_close_id is not None
     session.add.assert_called_once()
+
+
+def test_close_batch_blocks_pending_or_reviewed_void_operation() -> None:
+    row = _current_batch_row(
+        status=TransactionStatus.APPROVED,
+        authorization_outcome=AuthorizationOutcome.APPROVED,
+    )
+    session = _batch_close_session(
+        row,
+        open_recovery_job=None,
+        open_void_operation=14,
+    )
+
+    result = TransactionRepository(session).close_current_batch(
+        terminal_id="05000001",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+    )
+
+    assert result == "in_flight"
+    void_query = session.scalar.call_args_list[2].args[0]
+    void_sql = str(
+        void_query.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "UNDER_REVIEW" in void_sql
 
 
 def test_get_by_idempotency_none() -> None:
@@ -428,8 +457,7 @@ def test_records_authorization_retry_and_sanitized_attempt_outcome() -> None:
         event
         for event in added
         if isinstance(event, TransactionStatusEvent)
-        and event.event_type
-        == TransactionStatusEventType.AUTHORIZATION_ATTEMPT.value
+        and event.event_type == TransactionStatusEventType.AUTHORIZATION_ATTEMPT.value
     ]
     assert len(events) == 1
     assert events[0].attempt_number == 2

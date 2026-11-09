@@ -28,6 +28,17 @@ from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 
 
+@pytest.fixture(autouse=True)
+def configured_merchant(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    merchant = SimpleNamespace(code="012502")
+    monkeypatch.setattr(
+        "application.payments.create_transaction.UserRepository",
+        lambda _session: SimpleNamespace(get_merchant=lambda _user_id: merchant),
+    )
+
+
 def _tx(**overrides: object) -> Transaction:
     base = dict(
         id=1,
@@ -157,9 +168,11 @@ def test_create_approves() -> None:
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_called_once()
     auth_req = gateway.authorize.call_args.args[0]
+    assert auth_req.merchant_code == "012502"
     assert auth_req.ticket_number == "00000001"
     transactions.create_pending.assert_called_once()
     create_kwargs = transactions.create_pending.call_args.kwargs
+    assert "merchant_code" not in create_kwargs
     assert create_kwargs["processor_ticket"] == "00000001"
     assert create_kwargs["card_number"] == "4111111111111111"
     assert create_kwargs["expiration_date"] is None
@@ -292,7 +305,7 @@ def test_pending_replay_uses_the_current_manual_review_projection() -> None:
     assert result.public_status.may_start_new_sale is True
 
 
-def test_replay_approved_returns_201_without_gateway() -> None:
+def test_replay_approved_returns_200_without_gateway() -> None:
     from application.payments.create_transaction import _fingerprint
 
     fp = _fingerprint(
@@ -312,7 +325,7 @@ def test_replay_approved_returns_201_without_gateway() -> None:
         card_number="4111111111111111",
         cvv="123",
     )
-    assert result.http_status == CreateTransactionHttpStatus.CREATED
+    assert result.http_status == CreateTransactionHttpStatus.OK
     assert result.transaction.status == TransactionStatus.APPROVED
     gateway.authorize.assert_not_called()
     transactions.record_idempotent_hit.assert_called_once_with(
@@ -725,6 +738,7 @@ def test_integrity_error_replays_existing() -> None:
         cvv="123",
     )
     assert result.transaction.status == TransactionStatus.APPROVED
+    assert result.http_status == CreateTransactionHttpStatus.OK
     gateway.authorize.assert_not_called()
 
 

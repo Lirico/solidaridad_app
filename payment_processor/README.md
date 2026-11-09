@@ -26,12 +26,21 @@ Desde la raíz del monorepo: `make processor-up` / `make up`.
 
 ## Terminales (DE41)
 
-Si la terminal está vigente (`situacion = 'V'`) y tiene `cod_comercio` no vacío:
+Si la terminal está vigente (`situacion = 'V'`):
 
-- **Comercio** (`merchid_42`): siempre se completa desde `terminales` vía DE41. No exige que DE42 del mensaje coincida con la DB. Sin `cod_comercio` → terminal desconocida / mal configurada.
+- **Comercio** (`merchid_42`): Verifone utiliza DE42 y valida que corresponda
+  a la terminal; Ingenico lo obtiene de `terminales` y IVR conserva la excepción
+  original de esa validación. IVR puede pasarla incluso sin comercio
+  configurado; Verifone requiere que el comercio recibido corresponda a la
+  terminal.
 - **Producto** (`currcode_49` / DE49): no es moneda ISO; es el código de producto (`sgas_productos.cod_moneda`, p.ej. `993`–`997`).
   - **Ingenico**: sobrescribe DE49 con `terminales.cod_moneda`.
   - **VeriFone / IVR**: conserva el DE49 enviado en el mensaje (producto elegido en la terminal).
+
+El código legacy corresponde exactamente al primer commit (`e94bbee`). En el
+schema local `cod_moneda` no admite NULL, pero sí vacío: en la prueba aislada,
+una consulta de saldo Ingenico con producto vacío terminó como error `96` en el
+gateway. La base de producción no fue inspeccionada.
 
 ## Schema y seed
 
@@ -64,6 +73,9 @@ compartida.
 | `6063007014990003` | Rechazada; producto sin cuenta asignada |
 | `6063007014990099` | Rechazada; tarjeta inexistente |
 | `6063007014990004` | Consulta de saldo; `100` unidades disponibles para `993` |
+| `6063007014990005` | Aprobada; replay idempotente de la venta |
+| `6063007014990006` | Aprobada; anulación posterior |
+| `6063007014990007` | Aprobada; cierre administrativo de lote posterior |
 
 Para regenerar desde desa (VPN + credenciales en `.env`):
 

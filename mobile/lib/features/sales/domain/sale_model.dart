@@ -32,6 +32,7 @@ class OperationModel {
   final bool mayStartNewSale;
   final DateTime date;
   final String? userMessage;
+  final String? responseCode;
 
   const OperationModel({
     required this.id,
@@ -42,6 +43,7 @@ class OperationModel {
     required this.result,
     required this.date,
     this.userMessage,
+    this.responseCode,
     SaleAuthorizationStatus? authorizationStatus,
     this.pendingReason,
     this.pollAfterSeconds,
@@ -80,6 +82,7 @@ class OperationModel {
           DateTime.now(),
 
       userMessage: json['user_message'] as String?,
+      responseCode: json['response_code'] as String?,
       pendingReason: _parsePendingReason(json['reason'] as String?),
       pollAfterSeconds: json['poll_after_seconds'] as int?,
       mayStartNewSale: json['may_start_new_sale'] as bool? ?? true,
@@ -158,6 +161,7 @@ class VoidResult {
   final bool isVoided;
   final bool isDeclined;
   final bool isUnknown;
+  final bool isUnderReview;
   final bool connectionError;
   final bool sessionExpired;
   final String message;
@@ -166,6 +170,7 @@ class VoidResult {
     required this.isVoided,
     required this.isDeclined,
     required this.isUnknown,
+    this.isUnderReview = false,
     required this.connectionError,
     required this.sessionExpired,
     required this.message,
@@ -175,6 +180,7 @@ class VoidResult {
     : isVoided = true,
       isDeclined = false,
       isUnknown = false,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = false;
 
@@ -182,6 +188,7 @@ class VoidResult {
     : isVoided = false,
       isDeclined = true,
       isUnknown = false,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = false;
 
@@ -189,6 +196,7 @@ class VoidResult {
     : isVoided = false,
       isDeclined = false,
       isUnknown = true,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = false;
 
@@ -197,6 +205,7 @@ class VoidResult {
   }) : isVoided = false,
        isDeclined = false,
        isUnknown = false,
+       isUnderReview = false,
        connectionError = true,
        sessionExpired = false;
 
@@ -204,9 +213,19 @@ class VoidResult {
     : isVoided = false,
       isDeclined = false,
       isUnknown = false,
+      isUnderReview = false,
       connectionError = false,
       sessionExpired = true,
       message = 'Su sesión ha expirado. Vuelva a iniciar sesión.';
+
+  const VoidResult.underReview({
+    this.message = 'La anulación está en verificación con casa central.',
+  }) : isVoided = false,
+       isDeclined = false,
+       isUnknown = false,
+       isUnderReview = true,
+       connectionError = false,
+       sessionExpired = false;
 }
 
 class SaleResponse {
@@ -214,6 +233,7 @@ class SaleResponse {
   final String operationNumber;
   final String message;
   final String errorCode;
+  final String? responseCode;
   final bool connectionError;
   final bool sessionExpired;
   final SaleAuthorizationStatus authorizationStatus;
@@ -226,6 +246,7 @@ class SaleResponse {
     required this.operationNumber,
     required this.message,
     required this.errorCode,
+    this.responseCode,
     this.connectionError = false,
     this.sessionExpired = false,
     SaleAuthorizationStatus? authorizationStatus,

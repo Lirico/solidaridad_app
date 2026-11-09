@@ -5,14 +5,6 @@ class DomainError(Exception):
     """Base class for expected domain failures."""
 
 
-class EmailAlreadyExists(DomainError):
-    """Raised when registering with an email that is already taken."""
-
-    def __init__(self, email: str) -> None:
-        self.email = email
-        super().__init__("El email ya está registrado")
-
-
 class WeakPassword(DomainError):
     """Raised when a password does not meet the policy."""
 
@@ -31,6 +23,13 @@ class InvalidCredentials(DomainError):
         message: str = "Credenciales inválidas",
     ) -> None:
         super().__init__(message)
+
+
+class MerchantNotConfigured(DomainError):
+    """The account cannot operate until a merchant is assigned."""
+
+    def __init__(self) -> None:
+        super().__init__("La cuenta no tiene un comercio configurado")
 
 
 class InvalidCurrentPassword(DomainError):
@@ -126,6 +125,13 @@ class TransactionBatchClosed(DomainError):
         self,
         message: str = "No se pueden anular transacciones de un lote cerrado",
     ) -> None:
+        super().__init__(message)
+
+
+class VoidOperationNotFound(DomainError):
+    """Raised when a transaction has no recorded void operation."""
+
+    def __init__(self, message: str = "No hay una anulación para consultar") -> None:
         super().__init__(message)
 
 

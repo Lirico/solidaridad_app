@@ -15,11 +15,13 @@ from domain.transaction_status_event import (
     TransactionStatusActorType,
     TransactionStatusEventType,
 )
+from domain.void_operation import VoidOperationStatus
 from persistence.models.batch_close import BatchClose as BatchCloseModel
 from persistence.models.processor_job import ProcessorJob as ProcessorJobModel
 from persistence.models.transaction import Transaction as TransactionModel
 from persistence.models.transaction import TransactionNumberCounter
 from persistence.models.transaction_status_event import TransactionStatusEvent
+from persistence.models.void_operation import VoidOperation as VoidOperationModel
 
 
 def ticket_from_transaction_number(transaction_number: str) -> str:
@@ -415,6 +417,22 @@ class TransactionRepository:
             .limit(1)
         )
         if open_recovery_job is not None:
+            return "in_flight"
+
+        open_void_operation = self._session.scalar(
+            select(VoidOperationModel.id)
+            .where(
+                VoidOperationModel.transaction_id.in_([row.id for row in current]),
+                VoidOperationModel.status.in_(
+                    (
+                        VoidOperationStatus.PENDING.value,
+                        VoidOperationStatus.UNDER_REVIEW.value,
+                    )
+                ),
+            )
+            .limit(1)
+        )
+        if open_void_operation is not None:
             return "in_flight"
 
         installation_id = current[0].installation_id

@@ -43,7 +43,7 @@ API pública del sistema. Endpoints accesibles desde la app mobile y herramienta
 | 018 | API | Cambio de contraseña con misma contraseña | `POST /v1/auth/change-password` — `current_password: "Nueva4567!"`, `new_password: "Nueva4567!"` + Bearer token | Código 400. Mensaje: "La nueva contraseña debe ser distinta a la actual" | `{"message":"La nueva contraseña debe ser distinta a la actual"}` — 400 Bad Request | Pass | |
 | 019 | API | Obtener catálogo de productos | `GET /v1/products` | Código 200. Lista de productos de gas activos (ej: `GARRAFA_10`, `GARRAFA_15`, etc.) con `code` y `label` | `[{"code":"GARRAFA_10","label":"Garrafa 10 kg"},{"code":"GARRAFA_15","label":"Garrafa 15 kg"},{"code":"GARRAFA_30","label":"Garrafa 30 kg"},{"code":"TUBO_45","label":"Tubo 45 kg"},{"code":"GRANEL","label":"Granel"}]` — 200 OK | Pass | Endpoint público, 5 productos activos |
 | 020 | API | Health check / Ping | `GET /ping` | Código 200. `{"status": "ok"}` | `{"status":"ok"}` — 200 OK | Pass | Endpoint en `/ping` (no `/v1/ping`) |
-| 021 | API | Registrar venta exitosa | `POST /v1/transactions` — `product: "GARRAFA_10"`, `amount: "1500.00"`, `card_number: "6063007014007403"`, `cvv: "123"`, `expiration_date: "1228"` + Header `Idempotency-Key: "test-002"` + Bearer token | Código 201. Devuelve `status: "approved"`, `transaction_number`, `user_message`, `created_at` | `{"transaction_number":"OP-260730-0003","status":"FAILED","user_message":"No se pudo procesar el pago. Intente nuevamente.","created_at":"2026-07-30T19:50:57.447291Z"}` — 201 Created | Pass | La API crea la transacción correctamente. Status `FAILED` porque el gateway/procesador no están corriendo. La API delega correctamente. |
+| 021 | API | Registrar venta exitosa | `POST /v1/transactions` — `product: "GARRAFA_10"`, `amount: "1500.00"`, `card_number: "6063007014007403"`, `cvv: "123"`, `expiration_date: "1228"` + Header `Idempotency-Key: "test-002"` + Bearer token | Código 201 para una venta terminal recién creada; 202 si queda `PENDING`; 200 si es replay idempotente. Devuelve `status`, `transaction_number`, `user_message`, `created_at` | `{"transaction_number":"OP-260730-0003","status":"FAILED","user_message":"No se pudo procesar el pago. Intente nuevamente.","created_at":"2026-07-30T19:50:57.447291Z"}` — 201 Created | Pass | `FAILED` indica un fallo técnico clasificado y persistido; `202` queda reservado para `PENDING`. |
 | 022 | API | Registrar venta con CVV inválido (> 4 dígitos) | `POST /v1/transactions` — `cvv: "12345"` (5 dígitos) + Idempotency-Key + Bearer token | Código 400. Error de validación: CVV inválido | `{"message":"cvv: String should have at most 4 characters"}` — 400 Bad Request | Pass | |
 | 023 | API | Registrar venta con CVV inválido (< 3 dígitos) | `POST /v1/transactions` — `cvv: "12"` (2 dígitos) + Idempotency-Key + Bearer token | Código 400. Error de validación: CVV inválido | `{"message":"cvv: String should have at least 3 characters"}` — 400 Bad Request | Pass | |
 | 024 | API | Registrar venta con número de tarjeta inválido | `POST /v1/transactions` — `card_number: "1234"` (muy corto) + Idempotency-Key + Bearer token | Código 400. Mensaje: "Número de tarjeta inválido" | `{"message":"card_number: String should have at least 13 characters"}` — 400 Bad Request | Pass | |
@@ -65,7 +65,7 @@ API pública del sistema. Endpoints accesibles desde la app mobile y herramienta
 | 040 | API | Obtener detalle de transacción | `GET /v1/transactions/{id}` + Bearer token | Código 200. Detalle completo: `transaction_number`, `product`, `amount`, `card_last4`, `status`, `user_message`, `created_at` | `{"detail":"Not Found"}` — 404 Not Found | N/A | **El endpoint no existe.** Solo están implementados `GET /v1/transactions` (listado) y `POST /v1/transactions` (crear). Ver hallazgo #9. |
 | 041 | API | Obtener detalle de transacción inexistente | `GET /v1/transactions/999999` + Bearer token | Código 404. Error: "Transaction not found" | `{"detail":"Not Found"}` — 404 Not Found | N/A | El endpoint no existe. Ver hallazgo #9. |
 | 042 | API | Obtener detalle de transacción sin token | `GET /v1/transactions/{id}` — sin header `Authorization` | Código 401. Error: "Not authenticated" | `{"detail":"Not Found"}` — 404 Not Found | N/A | El endpoint no existe. Ver hallazgo #9. |
-| 056 | API | Registrar venta capturada por banda | `POST /v1/transactions` — PAN y vencimiento `YYMM` + Idempotency-Key + Bearer token | Código 201. La API propaga solo los datos de tarjeta requeridos al gateway. | `{"transaction_number":"OP-...","status":"...","user_message":"...","created_at":"..."}` — 201 Created | Pass | No hay modo de entrada ni pista en el contrato HTTP. |
+| 056 | API | Registrar venta capturada por banda | `POST /v1/transactions` — PAN y vencimiento `YYMM` + Idempotency-Key + Bearer token | Código 201 para venta terminal nueva, 202 si queda `PENDING`, 200 en replay. La API propaga solo los datos de tarjeta requeridos al gateway. | `{"transaction_number":"OP-...","status":"...","user_message":"...","created_at":"..."}` — 201 Created | Pass | No hay modo de entrada ni pista en el contrato HTTP. |
 
 ---
 
@@ -101,10 +101,15 @@ terminal `PENDING` con el worker desactivado.
 
 ### Procesador local con fixtures SQL
 
-`make integ-test-processor` resetea el volumen Docker local de MySQL del
-procesador y carga `payment_processor/utils/demo/integration_fixtures.sql`
-antes de correr `api/tests/integration/test_local_processor_http_integration.py`.
-El gate verifica por HTTP que una tarjeta con saldo sea aprobada, y que las
-tarjetas sin saldo, sin producto y ausente sean rechazadas. Las tarjetas y sus
-resultados esperados están versionados en `payment_processor/README.md`; los
-casos de red permanecen en la suite de gateway controlado.
+`make e2e-test` recrea las dos bases locales del gate: la PostgreSQL dedicada
+de E2E y el volumen Docker MySQL del procesador. Carga
+`payment_processor/utils/demo/integration_fixtures.sql`, levanta la API y el
+gateway con ISO/TCP y luego corre
+`api/tests/integration/test_local_processor_http_integration.py`. El gate
+verifica por HTTP health, autenticación y cambio de clave, acceso protegido,
+datos de comercio, catálogo, validaciones, idempotencia, consulta/listado de
+ventas, anulación y cierre de lote. Contra el procesador verifica además que
+una tarjeta con saldo sea aprobada, y que las tarjetas sin saldo, sin producto
+y ausente sean rechazadas, junto con una consulta de saldo. Las tarjetas y sus
+resultados esperados están versionados en `payment_processor/README.md`; este
+comando no usa stubs.

@@ -1,7 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/sale_model.dart';
+
 import '../../../../psdk/msr_card_data.dart';
 import '../../data/sales_repository.dart';
+import '../../domain/receipt_formatter.dart';
+import '../../domain/sale_model.dart';
 import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
@@ -404,6 +406,7 @@ class SalesCubit extends Cubit<SalesState> {
         errorCode: paymentResult != PaymentResult.approved
             ? response.errorCode
             : null,
+        responseCode: response.responseCode,
       ),
     );
   }
@@ -416,9 +419,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String cardNumber,
   }) {
     final normalizedCard = cardNumber.replaceAll(' ', '');
-    final hiddenCard = normalizedCard.length >= 4
-        ? '•••• ${normalizedCard.substring(normalizedCard.length - 4)}'
-        : '•••• 4321';
     return OperationModel(
       id: response.operationNumber.isNotEmpty
           ? response.operationNumber
@@ -426,7 +426,7 @@ class SalesCubit extends Cubit<SalesState> {
       productCode: productCode,
       productLabel: productLabel,
       amount: amount,
-      cardNumber: hiddenCard,
+      cardNumber: ReceiptFormatter.maskPan(normalizedCard),
       result: _paymentResultFromResponse(response),
       authorizationStatus: response.authorizationStatus,
       pendingReason: response.pendingReason,
@@ -434,6 +434,7 @@ class SalesCubit extends Cubit<SalesState> {
       mayStartNewSale: response.mayStartNewSale,
       date: _now(),
       userMessage: response.message,
+      responseCode: response.responseCode,
     );
   }
 
@@ -515,13 +516,15 @@ class SalesCubit extends Cubit<SalesState> {
 
     // La API deja la venta original en APPROVED cuando la anulación es
     // rechazada o falla: solo reflejamos en el historial los casos que
-    // cambian el estado real (VOIDED) o quedan ambiguos (UNKNOWN).
-    if (!result.isVoided && !result.isUnknown) {
+    // cambian el estado real (VOIDED) o requieren verificación (UNDER_REVIEW).
+    if (!result.isVoided && !result.isUnderReview && !result.isUnknown) {
       return result;
     }
 
     final PaymentResult mappedResult = result.isVoided
         ? PaymentResult.voided
+        : result.isUnderReview
+        ? PaymentResult.underReview
         : PaymentResult.connectionError;
 
     final updatedHistory = state.history.map((op) {
@@ -535,6 +538,7 @@ class SalesCubit extends Cubit<SalesState> {
           result: mappedResult,
           date: op.date,
           userMessage: result.message,
+          responseCode: op.responseCode,
         );
       }
       return op;

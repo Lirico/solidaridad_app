@@ -38,6 +38,11 @@ class VoidResultScreen extends StatelessWidget {
       statusIcon = Icons.help_outline;
       statusTitle = 'No se pudo confirmar';
       statusSubtitle = result.message;
+    } else if (result.isUnderReview) {
+      statusColor = const Color(0xFFE67E22);
+      statusIcon = Icons.manage_search;
+      statusTitle = 'Anulación en verificación';
+      statusSubtitle = result.message;
     } else {
       statusColor = const Color(0xFFFF8C00);
       statusIcon = Icons.wifi_off_outlined;
@@ -57,7 +62,9 @@ class VoidResultScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: SaleStatusContent(
-            result: PaymentResult.voided,
+            result: result.isUnderReview
+                ? PaymentResult.underReview
+                : PaymentResult.voided,
             statusColor: statusColor,
             statusIcon: statusIcon,
             statusTitle: statusTitle,

@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from application.auth.login_user import LoginResult, LoginUser
-from domain.exceptions import InvalidCredentials
+from domain.exceptions import InvalidCredentials, MerchantNotConfigured
+from domain.merchant import Merchant
 from main import app
 from presentation.dependencies import get_login_user
 
@@ -27,6 +28,9 @@ def test_login_returns_200_and_token_shape() -> None:
         email="ada@example.com",
         token="jwt-token",
         must_change_password=True,
+        merchant=Merchant(
+            code="014114", name="GAS", address="Alem", city="Ushuaia", tax_id="30-1"
+        ),
     )
     _override_login_user(use_case)
 
@@ -48,6 +52,13 @@ def test_login_returns_200_and_token_shape() -> None:
         "email": "ada@example.com",
         "token": "jwt-token",
         "must_change_password": True,
+        "merchant": {
+            "code": "014114",
+            "name": "GAS",
+            "address": "Alem",
+            "city": "Ushuaia",
+            "tax_id": "30-1",
+        },
     }
     use_case.execute.assert_called_once_with(
         username="ada@example.com",
@@ -75,6 +86,25 @@ def test_login_returns_401_on_invalid_credentials() -> None:
 
     assert response.status_code == 401
     assert response.json() == {"message": "Credenciales inválidas"}
+
+
+def test_login_rejects_account_without_merchant() -> None:
+    use_case = MagicMock(spec=LoginUser)
+    use_case.execute.side_effect = MerchantNotConfigured()
+    _override_login_user(use_case)
+    try:
+        response = client.post(
+            "/v1/auth/login",
+            json={
+                "username": "ada@example.com",
+                "password": "password1",
+                "installation_id": "inst-1",
+            },
+        )
+    finally:
+        _clear_overrides()
+    assert response.status_code == 403
+    assert "token" not in response.json()
 
 
 def test_login_returns_400_when_installation_id_missing() -> None:

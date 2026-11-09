@@ -152,11 +152,20 @@ class SalesRepository {
       if (response.statusCode == 200) {
         final String status = (responseData['status'] as String? ?? '')
             .toUpperCase();
+        final String reason = (responseData['reason'] as String? ?? '')
+            .toUpperCase();
         final String message =
             responseData['user_message'] as String? ?? 'Operación procesada';
 
         if (status == 'VOIDED') {
           return VoidResult.voided(message: message);
+        }
+        if ((status == 'FAILED' && reason == 'UNDER_REVIEW') ||
+            status == 'UNDER_REVIEW') {
+          return VoidResult.underReview(message: message);
+        }
+        if (status == 'FAILED') {
+          return VoidResult.connectionFailure(message: message);
         }
         if (status == 'UNKNOWN') {
           return VoidResult.unknown(message: message);
@@ -379,6 +388,7 @@ class SalesRepository {
       errorCode: authorizationStatus == SaleAuthorizationStatus.approved
           ? '00'
           : rawStatus,
+      responseCode: data['response_code'] as String?,
       authorizationStatus: authorizationStatus,
       pendingReason: pendingReason,
       pollAfterSeconds: data['poll_after_seconds'] as int?,

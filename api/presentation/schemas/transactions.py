@@ -18,7 +18,6 @@ class CreateTransactionRequest(BaseModel):
     expiration_date: str | None = Field(default=None, max_length=4)
 
 
-
 class VoidTransactionRequest(BaseModel):
     card_number: str = Field(min_length=13, max_length=19)
     cvv: str | None = Field(default=None, min_length=3, max_length=4)
@@ -32,12 +31,30 @@ class TransactionResponse(BaseModel):
     created_at: datetime
 
 
+class VoidOperationResponse(BaseModel):
+    transaction_number: str
+    status: str
+    reason: str | None
+    user_message: str
+    may_start_new_void: bool
+    created_at: datetime
+
+
+class ReceiptData(BaseModel):
+    """Identifiers printed on an approved transaction receipt."""
+
+    coupon_number: str | None
+    authorization_code: str | None
+
+
 class PublicTransactionResponse(TransactionResponse):
     """Terminal-facing authorization status and next-action instructions."""
 
     reason: str | None
     poll_after_seconds: int | None
     may_start_new_sale: bool
+    response_code: str | None = None
+    receipt: ReceiptData | None = None
 
 
 class TransactionItemResponse(BaseModel):
@@ -50,6 +67,8 @@ class TransactionItemResponse(BaseModel):
     status: str
     user_message: str
     created_at: datetime
+    response_code: str | None = None
+    receipt: ReceiptData | None = None
 
 
 class TransactionListResponse(BaseModel):

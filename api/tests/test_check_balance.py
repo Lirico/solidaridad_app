@@ -1,4 +1,5 @@
 from threading import Barrier
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -7,6 +8,12 @@ from application.payments.check_balance import CheckBalance
 from application.payments.ports import BalanceResult, GatewayOutcome
 from domain.exceptions import InvalidCardNumber, MissingTerminalId
 from persistence.repositories.installation_repository import InstallationRepository
+
+
+def _users() -> MagicMock:
+    users = MagicMock()
+    users.get_merchant.return_value = SimpleNamespace(code="012502")
+    return users
 
 
 def _installation_repo() -> MagicMock:
@@ -43,8 +50,10 @@ def test_check_balance_returns_all_products() -> None:
         "996": _approved(40000),
         "997": _approved(50000),
     }
-    uc = CheckBalance(_installation_repo(), _gateway(outcomes))
-    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    uc = CheckBalance(_installation_repo(), _gateway(outcomes), _users())
+    result = uc.execute(
+        user_id=1, installation_id="05000001", card_number="4111111111111111"
+    )
     assert result.status == "APPROVED"
     assert len(result.balances) == 5
     assert result.balances[0].product == "GARRAFA_10"
@@ -68,9 +77,11 @@ def test_check_balance_dispatches_all_products_concurrently() -> None:
         return outcomes[request.product_code]  # type: ignore[attr-defined]
 
     gateway.balance.side_effect = balance
-    uc = CheckBalance(_installation_repo(), gateway)
+    uc = CheckBalance(_installation_repo(), gateway, _users())
 
-    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    result = uc.execute(
+        user_id=1, installation_id="05000001", card_number="4111111111111111"
+    )
 
     assert result.status == "APPROVED"
     assert len(result.balances) == 5
@@ -84,8 +95,10 @@ def test_check_balance_product_without_saldo_is_zero() -> None:
         "996": _approved(40000),
         "997": _approved(50000),
     }
-    uc = CheckBalance(_installation_repo(), _gateway(outcomes))
-    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    uc = CheckBalance(_installation_repo(), _gateway(outcomes), _users())
+    result = uc.execute(
+        user_id=1, installation_id="05000001", card_number="4111111111111111"
+    )
     assert result.status == "APPROVED"
     assert len(result.balances) == 5
     by_product = {b.product: b.available_balance_minor for b in result.balances}
@@ -97,10 +110,12 @@ def test_check_balance_card_invalid_returns_declined() -> None:
         code: BalanceResult(outcome=GatewayOutcome.DECLINED, response_code="14")
         for code in ("993", "994", "995", "996", "997")
     }
-    uc = CheckBalance(_installation_repo(), _gateway(outcomes))
-    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    uc = CheckBalance(_installation_repo(), _gateway(outcomes), _users())
+    result = uc.execute(
+        user_id=1, installation_id="05000001", card_number="4111111111111111"
+    )
     assert result.status == "DECLINED"
-    assert result.user_message == "Tarjeta inválida"
+    assert result.user_message == "Titular desconocido / suspendido"
     assert result.balances == []
 
 
@@ -109,8 +124,10 @@ def test_check_balance_gateway_error_returns_failed() -> None:
         code: BalanceResult(outcome=GatewayOutcome.FAILED, response_code="96")
         for code in ("993", "994", "995", "996", "997")
     }
-    uc = CheckBalance(_installation_repo(), _gateway(outcomes))
-    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    uc = CheckBalance(_installation_repo(), _gateway(outcomes), _users())
+    result = uc.execute(
+        user_id=1, installation_id="05000001", card_number="4111111111111111"
+    )
     assert result.status == "FAILED"
     assert result.balances == []
 
@@ -126,9 +143,11 @@ def test_check_balance_any_terminal_gateway_failure_returns_failed(
         "996": _approved(40000),
         "997": _approved(50000),
     }
-    uc = CheckBalance(_installation_repo(), _gateway(outcomes))
+    uc = CheckBalance(_installation_repo(), _gateway(outcomes), _users())
 
-    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    result = uc.execute(
+        user_id=1, installation_id="05000001", card_number="4111111111111111"
+    )
 
     assert result.status == "FAILED"
     assert result.balances == []
@@ -149,23 +168,29 @@ def test_check_balance_gateway_exception_returns_failed() -> None:
         return outcomes[request.product_code]  # type: ignore[attr-defined]
 
     gateway.balance.side_effect = balance
-    uc = CheckBalance(_installation_repo(), gateway)
+    uc = CheckBalance(_installation_repo(), gateway, _users())
 
-    result = uc.execute(installation_id="05000001", card_number="4111111111111111")
+    result = uc.execute(
+        user_id=1, installation_id="05000001", card_number="4111111111111111"
+    )
 
     assert result.status == "FAILED"
     assert result.balances == []
 
 
 def test_check_balance_rejects_invalid_pan() -> None:
-    uc = CheckBalance(_installation_repo(), _gateway({}))
+    uc = CheckBalance(_installation_repo(), _gateway({}), _users())
     with pytest.raises(InvalidCardNumber):
-        uc.execute(installation_id="05000001", card_number="606300101400740X")
+        uc.execute(
+            user_id=1, installation_id="05000001", card_number="606300101400740X"
+        )
 
 
 def test_check_balance_rejects_missing_terminal() -> None:
     repo = MagicMock(spec=InstallationRepository)
     repo.get_by_installation_id.return_value = None
-    uc = CheckBalance(repo, _gateway({}))
+    uc = CheckBalance(repo, _gateway({}), _users())
     with pytest.raises(MissingTerminalId):
-        uc.execute(installation_id="05000001", card_number="4111111111111111")
+        uc.execute(
+            user_id=1, installation_id="05000001", card_number="4111111111111111"
+        )

@@ -76,7 +76,7 @@ idempotente.
 {
   "transaction_number": "OP-260716-00000042",
   "status": "APPROVED",
-  "user_message": "Pago aprobado",
+  "user_message": "Aprobada",
   "created_at": "2026-07-16T19:00:00Z"
 }
 ```

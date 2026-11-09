@@ -3,7 +3,9 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from domain.merchant import Merchant
 from domain.user import User
+from persistence.models.merchant import Merchant as MerchantModel
 from persistence.models.user import User as UserModel
 
 
@@ -35,23 +37,21 @@ class UserRepository:
             return None
         return _to_domain(row)
 
-    def create(
-        self,
-        *,
-        name: str,
-        email: str,
-        password_hash: str,
-        must_change_password: bool = False,
-    ) -> User:
-        row = UserModel(
-            name=name,
-            email=email,
-            password_hash=password_hash,
-            must_change_password=must_change_password,
+    def get_merchant(self, user_id: int) -> Merchant | None:
+        row = self._session.scalar(
+            select(MerchantModel)
+            .join(UserModel, UserModel.merchant_id == MerchantModel.id)
+            .where(UserModel.id == user_id)
         )
-        self._session.add(row)
-        self._session.flush()
-        return _to_domain(row)
+        if row is None:
+            return None
+        return Merchant(
+            code=row.code,
+            name=row.name,
+            address=row.address,
+            city=row.city,
+            tax_id=row.tax_id,
+        )
 
     def update_password(
         self,

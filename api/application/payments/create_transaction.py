@@ -57,10 +57,12 @@ from persistence.repositories.transaction_repository import (
     TransactionRepository,
     ticket_from_transaction_number,
 )
+from persistence.repositories.user_repository import UserRepository
 
 
 class CreateTransactionHttpStatus(IntEnum):
     CREATED = 201
+    OK = 200
     ACCEPTED = 202
 
 
@@ -145,10 +147,7 @@ class CreateTransaction:
 
         parsed_product = parse_product(product)
         money: Money = parse_amount(amount)
-        if (
-            requires_integer_quantity(parsed_product)
-            and money.amount_minor % 100 != 0
-        ):
+        if requires_integer_quantity(parsed_product) and money.amount_minor % 100 != 0:
             raise InvalidAmount("La cantidad debe ser un número entero")
         pan = _validate_pan(card_number)
         exp = expiration_date.strip() if expiration_date else None
@@ -183,6 +182,15 @@ class CreateTransaction:
         terminal_id = installation.installation_id.strip()
         if not terminal_id:
             raise MissingTerminalId()
+
+        merchant = UserRepository(self._session).get_merchant(user_id)
+        if (
+            merchant is None
+            or not merchant.code.isascii()
+            or not merchant.code.isalnum()
+            or len(merchant.code) > 15
+        ):
+            raise MissingTerminalId("Comercio no configurado para el procesador")
 
         business_date = datetime.now(UTC).date()
         transaction_number = self._transactions.next_transaction_number(business_date)
@@ -224,6 +232,7 @@ class CreateTransaction:
             amount_minor=money.amount_minor,
             card_number=pan,
             terminal_id=terminal_id[:8].ljust(8),
+            merchant_code=merchant.code,
             stan=stan,
             ticket_number=processor_ticket,
             idempotency_key=key,
@@ -242,7 +251,7 @@ class CreateTransaction:
         except Exception:
             self._session.rollback()
             raise
-        return self._result(final)
+        return self._result(final, created=True)
 
     def _authorize_with_safe_retries(
         self,
@@ -298,11 +307,11 @@ class CreateTransaction:
             processor_response_code=existing.processor_response_code,
         )
         self._session.commit()
-        if existing.status == TransactionStatus.PENDING:
-            return self._result(existing)
         return self._result(existing)
 
-    def _result(self, transaction: Transaction) -> CreateTransactionResult:
+    def _result(
+        self, transaction: Transaction, *, created: bool = False
+    ) -> CreateTransactionResult:
         reverse_job = self._jobs.get_by_transaction(
             transaction_id=transaction.id,
             operation_type=ProcessorOperationType.REVERSE,
@@ -312,7 +321,11 @@ class CreateTransaction:
             http_status=(
                 CreateTransactionHttpStatus.ACCEPTED
                 if transaction.status == TransactionStatus.PENDING
-                else CreateTransactionHttpStatus.CREATED
+                else (
+                    CreateTransactionHttpStatus.CREATED
+                    if created
+                    else CreateTransactionHttpStatus.OK
+                )
             ),
             public_status=project_public_transaction_status(transaction, reverse_job),
         )

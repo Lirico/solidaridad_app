@@ -23,6 +23,7 @@ def test_recorded_reversal_frames_match_the_legacy_wire_contract() -> None:
         capture
         for capture in fixture["captures"]
         if capture["name"].startswith("reversal_")
+        and capture["name"] != "reversal_existing_void"
     ]
 
     assert len(reversals) == 4
@@ -74,3 +75,22 @@ def test_early_reversal_does_not_neutralize_a_later_sale() -> None:
     assert reversal["safe_outcome"] == "OUT_OF_CONTRACT"
     assert later_sale["response_code"] == "00"
     assert later_sale["database_rows_after"] == {"0200": 1, "0400": 1}
+
+
+def test_void_reversal_is_acknowledged_but_does_not_compensate_the_void() -> None:
+    captures = _captures()
+    reversal = captures["reversal_existing_void"]
+    request = unpack_iso(bytes.fromhex(reversal["request_hex"]))
+    response = unpack_iso(bytes.fromhex(reversal["response_hex"]))
+
+    assert request.mtype == "0400"
+    assert request.procode_3 == "020000"
+    assert response.mtype == "0410"
+    assert response.respcode_39 == reversal["response_code"] == "00"
+    assert reversal["safe_outcome"] == "ACKNOWLEDGED_NOT_COMPENSATED"
+    assert reversal["void_rows_after"][0] == {
+        "message_type": "0200",
+        "processing_code": "020000",
+        "voids_ticket": "890004",
+        "expiration": "NULL",
+    }

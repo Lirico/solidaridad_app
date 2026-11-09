@@ -38,7 +38,7 @@ def test_health_cors_and_error_shape(api: httpx.Client) -> None:
     assert set(invalid.json()) == {"message"}
 
 
-def test_auth_register_login_change_password_and_rejections(
+def test_auth_login_change_password_and_rejections(
     api: httpx.Client, make_operator: object
 ) -> None:
     make = make_operator
@@ -63,7 +63,7 @@ def test_auth_register_login_change_password_and_rejections(
             "installation_id": operator.installation_id,
         },
     )
-    assert duplicate.status_code == 409
+    assert duplicate.status_code == 404
     wrong_login = api.post(
         "/v1/auth/login",
         json={
@@ -197,7 +197,7 @@ def test_sale_approved_replay_and_public_history(
     assert {"reason", "poll_after_seconds"}.issubset(created)
 
     replay = _sale(api, operator.headers, sale_payload, key)
-    assert replay.status_code == 201
+    assert replay.status_code == 200
     assert replay.json()["transaction_number"] == created["transaction_number"]
     assert len(gateway_requests(gateway, "authorize")) == 1
 
@@ -366,7 +366,7 @@ def test_same_idempotency_key_is_safe_under_concurrent_requests(
                 lambda _: _sale(api, operator.headers, sale_payload, key), range(2)
             )
         )
-    assert {response.status_code for response in responses} <= {201, 202}
+    assert {response.status_code for response in responses} <= {200, 201, 202}
     assert len(gateway_requests(gateway, "authorize")) == 1
 
 
@@ -413,7 +413,7 @@ def test_void_approved_declined_and_card_mismatch(
         json={"card_number": sale_payload["card_number"], "expiration_date": "2912"},
     )
     assert declined.status_code == 200
-    assert declined.json()["status"] == "APPROVED"
+    assert declined.json()["status"] == "DECLINED"
 
     voided = api.post(
         target,

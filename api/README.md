@@ -45,6 +45,54 @@ Endpoints:
 
 Instalación/terminal de ejemplo: `05000001`
 
+### Configuración manual del comercio
+
+Un administrador carga `merchants` y asigna
+`users.merchant_id` al comercio correspondiente. `code` debe coincidir con el
+código de comercio del procesador asociado a la terminal; se conserva como
+texto, incluidos los ceros iniciales. La asociación es obligatoria. Durante la
+transición, login y `GET /v1/me/merchant` responden 403 si aún falta. El endpoint
+consulta el comercio de la cuenta autenticada en cada solicitud.
+
+```sql
+INSERT INTO merchants (code, name, address, city, tax_id)
+VALUES ('CODIGO', 'NOMBRE', 'DOMICILIO', 'LOCALIDAD', 'CUIT');
+
+UPDATE users SET merchant_id = (SELECT id FROM merchants WHERE code = 'CODIGO')
+WHERE email = 'cuenta@ejemplo.com';
+```
+
+No existe un endpoint de registro público. El alta se realiza directamente en
+la base y debe incluir `merchant_id` y un hash de contraseña compatible con la
+API. Para generar el hash sin escribir la contraseña en el comando:
+
+```bash
+uv run python -c 'from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass("Contraseña inicial: ")))'
+```
+
+Usar el hash obtenido en una conexión administrativa segura:
+
+```sql
+INSERT INTO users (merchant_id, name, email, password_hash, must_change_password)
+SELECT id, 'NOMBRE', 'cuenta@ejemplo.com', 'HASH_GENERADO', true
+FROM merchants WHERE code = 'CODIGO';
+```
+
+El seed local crea un comercio de demostración con datos ficticios y lo asigna
+a las cuentas demo.
+
+Para una base con cuentas existentes, aplicar primero
+`uv run alembic upgrade 20261105_0014`, cargar y asociar comercios, y después
+`make migrate`. La migración `20261105_0015` rechaza cuentas sin asociación;
+no inventa un comercio para ellas. Una base nueva puede migrarse normalmente.
+
+La API envía el código en DE42 mediante el gateway. Para anulaciones y reversos
+consulta el comercio asociado a la cuenta que hizo la venta; se asume que esa
+asociación y su código permanecen estables. Si falta un comercio válido, la
+anulación se rechaza y el reverso pasa a revisión manual. La validación de la
+relación cuenta-terminal dentro de la API sigue pendiente; el procesador
+verifica terminal y comercio para Verifone.
+
 Re-ejecutar seed es seguro (idempotente):
 
 ```bash
@@ -124,8 +172,9 @@ already running API over HTTP. It does not use FastAPI `TestClient` or
 dependency overrides. The API must use an isolated database migrated to `head`
 and its `PAYMENT_GATEWAY_URL` must point to the controlled integration stub.
 
-The gate does not create or wipe the database: point the API at a dedicated,
-disposable integration database before starting it. In separate terminals,
+The gate does not create or wipe the database; it inserts test merchants and
+operators directly. Set `INTEGRATION_DATABASE_URL` to the same dedicated,
+disposable database used by the API, never to a production database. In separate terminals,
 from `api/`:
 
 ```bash
@@ -138,7 +187,8 @@ DATABASE_URL=postgresql+psycopg://... PAYMENT_GATEWAY_URL=http://127.0.0.1:8011 
   make run HOST=127.0.0.1
 
 # 3. In a third terminal, execute the gate.
-make integ-test API_BASE_URL=http://127.0.0.1:8000 \
+INTEGRATION_DATABASE_URL=postgresql+psycopg://... \
+  make integ-test API_BASE_URL=http://127.0.0.1:8000 \
   INTEGRATION_GATEWAY_CONTROL_URL=http://127.0.0.1:8011
 ```
 
@@ -151,19 +201,21 @@ or its `__test__` endpoints in an environment that handles real payment data.
 
 El gate controlado anterior sigue siendo el que cubre timeouts, reintentos y
 respuestas ambiguas. Para comprobar el recorrido real API → gateway TCP →
-autorizador C, iniciar API y gateway con la configuración local normal
-(`PAYMENT_GATEWAY_URL=http://127.0.0.1:8001`, `ISO_TRANSPORT=tcp`) y ejecutar
-desde la raíz del monorepo:
+autorizador C de manera repetible, ejecutar desde la raíz del monorepo:
 
 ```bash
-make integ-test-processor
+make e2e-test
 ```
 
-El comando **borra el volumen local de MySQL del procesador**, carga tarjetas
-con saldo, sin saldo, sin producto y ausente, y corre únicamente
-`tests/integration/test_local_processor_http_integration.py`. La API debe
-estar migrada y levantada antes de invocarlo; el target no modifica su base de
-datos.
+El comando usa una PostgreSQL dedicada y descartable en el puerto `5435`; la
+resetea, migra y carga antes de iniciar la API. También **borra el volumen
+local de MySQL del procesador**, instala las tarjetas E2E con saldo, sin saldo,
+sin producto y ausente, inicia el gateway con `ISO_TRANSPORT=tcp` y corre
+únicamente `tests/integration/test_local_processor_http_integration.py`.
+No usa el gateway stub ni comparte datos con la PostgreSQL de desarrollo.
+
+`make integ-test-processor` se conserva para ejecutar sólo ese módulo contra
+una API/gateway ya levantados; el invocador debe preparar la base de API.
 
 ## Architecture
 

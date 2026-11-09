@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    restart: "no"
+    environment:
+      POSTGRES_USER: solidaridad_e2e
+      POSTGRES_PASSWORD: solidaridad_e2e
+      POSTGRES_DB: solidaridad_e2e
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - solidaridad_e2e_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solidaridad_e2e -d solidaridad_e2e"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+volumes:
+  solidaridad_e2e_pgdata:

@@ -9,19 +9,23 @@ import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../../psdk/psdk_card_reader.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/waiting_for_card_content.dart';
 
 class WaitingForCardScreen extends StatefulWidget {
-  const WaitingForCardScreen({super.key});
+  final PsdkCardReader? reader;
+
+  const WaitingForCardScreen({super.key, this.reader});
 
   @override
   State<WaitingForCardScreen> createState() => _WaitingForCardScreenState();
 }
 
 class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
-  final PsdkCardReader _reader = PsdkCardReader();
+  late final PsdkCardReader _reader;
   bool _reading = false;
   String? _errorMessage;
   bool _disposed = false;
@@ -29,6 +33,7 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
   @override
   void initState() {
     super.initState();
+    _reader = widget.reader ?? PsdkCardReader();
     _startReading();
   }
 
@@ -42,7 +47,7 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
     super.dispose();
   }
 
-  /// Dispara la lectura de banda y navega a la revisión de venta.
+  /// Dispara la lectura de banda y envía la venta sin confirmación intermedia.
   ///
   /// Todo el ciclo delicado del PSDK (initialize, espera de `sdiReady` con
   /// guard de race-condition, `readMsr`, parseo y limpieza) vive en
@@ -60,9 +65,12 @@ class _WaitingForCardScreenState extends State<WaitingForCardScreen> {
 
       switch (result) {
         case CardReadSuccess(:final data):
-          // Guardar los datos en el cubit y navegar a la revisión.
-          context.read<SalesCubit>().showReviewFromMsr(data);
-          Navigator.pushNamed(context, AppRoutes.saleReview);
+          final cubit = context.read<SalesCubit>();
+          cubit.prepareSaleFromMsr(data);
+          final authState = context.read<AuthCubit>().state;
+          final token = authState is AuthSuccess ? authState.user!.token : '';
+          cubit.sendIsoMessage(token: token);
+          Navigator.pushNamed(context, AppRoutes.saleProcessing);
         case CardReadFailure(:final message):
           _showError(message);
       }

@@ -11,7 +11,7 @@ sealed class SalesState {
   final String expirationDate;
   final List<OperationModel> history;
 
-  /// Identificador de la operación. Se genera al abrir la revisión y se
+  /// Identificador de la operación. Se genera al preparar el cobro y se
   /// reutiliza en el envío y en el reintento de red.
   final String idempotencyKey;
 
@@ -64,8 +64,8 @@ class SalesProductSelected extends SalesState {
   }) : super(cardNumber: '', cvv: '', expirationDate: '');
 }
 
-class SalesReviewing extends SalesState {
-  const SalesReviewing({
+class SalesReady extends SalesState {
+  const SalesReady({
     required super.productCode,
     required super.productLabel,
     required super.amount,

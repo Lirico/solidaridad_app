@@ -34,7 +34,7 @@ const _loadUnexpectedMessage = 'Ocurrió un error inesperado. Reintente.';
 /// In production, consider using the `uuid` package for guaranteed uniqueness.
 /// This implementation combines a timestamp with random digits.
 ///
-/// La venta genera la clave una sola vez (al abrir la revisión) y la reenvía
+/// La venta genera la clave una sola vez (al preparar el cobro) y la reenvía
 /// en cada intento. La anulación sigue generando una clave por request.
 String generateIdempotencyKey() {
   final timestamp = DateTime.now().microsecondsSinceEpoch;

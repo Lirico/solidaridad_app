@@ -17,7 +17,6 @@ import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_cubit.dart';
 import 'package:solidaridad_app/features/sales/presentation/cubit/sales_state.dart';
 import 'package:solidaridad_app/features/sales/presentation/screens/sale_processing_screen.dart';
-import 'package:solidaridad_app/features/sales/presentation/widgets/sale_review_content.dart';
 import 'package:solidaridad_app/features/sales/presentation/widgets/sale_status_content.dart';
 import 'package:solidaridad_app/features/sales/presentation/widgets/waiting_for_card_content.dart';
 
@@ -51,18 +50,6 @@ Widget _terminalScaffold({required String title, required Widget card}) {
   );
 }
 
-SalesReviewing _reviewState() {
-  return const SalesReviewing(
-    productCode: 'GARRAFA_10',
-    productLabel: 'Garrafa 10 kg',
-    amount: 10.0,
-    cardNumber: '1234 5678 9012 3456',
-    cvv: '123',
-    expirationDate: '1229',
-    history: [],
-  );
-}
-
 OperationModel _operation() {
   return OperationModel(
     id: 'OP-001',
@@ -91,19 +78,6 @@ void main() {
       expect(find.text('Historial de Ventas'), findsOneWidget);
     },
   );
-
-  testWidgets('Confirmar Operación no desborda en 360x720', (tester) async {
-    await pumpAtTerminalSize(
-      tester,
-      _terminalScaffold(
-        title: 'Confirmar Operación',
-        card: SaleReviewContent(state: _reviewState(), onConfirm: () {}),
-      ),
-    );
-
-    expect(tester.takeException(), isNull);
-    expect(find.text('CONFIRMAR COBRO'), findsOneWidget);
-  });
 
   testWidgets('Procesando Transacción no desborda en 360x720', (tester) async {
     final salesCubit = _FixedSalesCubit()

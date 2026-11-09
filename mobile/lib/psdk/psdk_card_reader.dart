@@ -206,7 +206,7 @@ class PsdkCardReader {
       );
     } finally {
       // La pantalla navega recién cuando este Future completa, así que el SDK
-      // ya está apagado antes de la revisión y de la impresión.
+      // ya está apagado antes de enviar el cobro y de la impresión.
       await _release();
     }
   }

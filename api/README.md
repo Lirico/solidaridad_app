@@ -128,6 +128,7 @@ Copy `.env.example` → `.env` (`.env` is gitignored).
 | Variable | Purpose | Local example |
 |----------|---------|---------------|
 | `APP_ENV` | Environment | `local` |
+| `BUSINESS_TIMEZONE` | Zona IANA para numeración diaria de operaciones | `America/Argentina/Buenos_Aires` |
 | `POSTGRES_USER` | Compose DB user | `solidaridad` |
 | `POSTGRES_PASSWORD` | Compose DB password | `solidaridad` |
 | `POSTGRES_DB` | Compose DB name | `solidaridad` |

@@ -144,6 +144,9 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - Terminal origen: el `installation_id` del login es el terminal id que se
   envía al procesador; la **alta/vigencia de terminal** la valida el procesador.
 - Endpoint de registro de venta (contrato actual: `POST /v1/transactions`).
+- La zona horaria operativa es `America/Argentina/Buenos_Aires`: determina el
+  día de negocio de la numeración diaria y los campos locales DE12/DE13 de los
+  mensajes ISO. Los timestamps persistidos y los tokens continúan en UTC.
 - Endpoint de anulación de venta aprobada:
   `POST /v1/transactions/{transaction_number}/void`, con reingreso de tarjeta e
   `Idempotency-Key`. Ante un resultado ambiguo, la intención de anular se
@@ -173,6 +176,8 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 ### 2.3 Gateway de pagos / mensajería ISO
 
 - Construcción y envío del mensaje ISO de venta al procesador.
+- DE12/DE13 se generan en la zona horaria operativa argentina, configurable por
+  ambiente, y deben permanecer alineados con el autorizador y su cierre forzado.
 - Construcción y envío del mensaje ISO de anulación (`0200` / `020000`).
 - Parseo de respuesta e interpretación de aprobación / rechazo / error.
 - Timeouts y errores de comunicación.

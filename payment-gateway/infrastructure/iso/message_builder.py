@@ -1,6 +1,7 @@
 """Build payment ISO messages from domain commands."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from config.settings import Settings
 from domain.authorization import AuthorizeCommand, VoidCommand
@@ -13,13 +14,22 @@ _VOID_PROCESSING_CODE = "020000"
 _BALANCE_PROCESSING_CODE = "310000"
 
 
+def _message_moment(settings: Settings, now: datetime | None) -> datetime:
+    timezone = ZoneInfo(settings.iso_timezone)
+    if now is None:
+        return datetime.now(timezone)
+    if now.tzinfo is None:
+        return now
+    return now.astimezone(timezone)
+
+
 def build_purchase_request(
     command: AuthorizeCommand,
     settings: Settings,
     *,
     now: datetime | None = None,
 ) -> IsoMessage:
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
 
     # El autorizador legacy consume este flujo como ingreso manual: PAN en DE2,
     # vencimiento en DE14 y DE22 fijo desde la configuración. La lectura de
@@ -60,7 +70,7 @@ def build_balance_request(
     El autorizador (auth_thread.c) solo exige DE3/DE24/DE41 presentes y lee el
     producto desde DE49 para calcular el saldo; el saldo vuelve en DE4.
     """
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
 
     iso = IsoMessage(
         tpdu=settings.iso_tpdu,
@@ -95,7 +105,7 @@ def build_void_request(
 
     El autorizador lee el importe de anulación desde DE60 (no DE4).
     """
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
     amount = f"{command.amount_minor:012d}"
     original_ticket = _numeric_ticket(command.original_ticket)
 
@@ -139,7 +149,7 @@ def build_reversal_request(
     on the command as the stable orchestration identifier; the characterized
     wire contract has no separate data element where it can be sent safely.
     """
-    moment = now or datetime.now()
+    moment = _message_moment(settings, now)
 
     iso = IsoMessage(
         tpdu=settings.iso_tpdu,

@@ -6,7 +6,6 @@ import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
-import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 import '../cubit/sales_state.dart';
@@ -19,25 +18,8 @@ class SaleProcessingScreen extends StatefulWidget {
 }
 
 class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
-  SalesCubit? _salesCubit;
   bool _reviewHandoffStarted = false;
   bool _unconfirmedHandoffStarted = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _salesCubit ??= context.read<SalesCubit>();
-  }
-
-  @override
-  void dispose() {
-    // La autorización continúa durablemente en la API, pero no dejamos un
-    // timer de UI vivo después de abandonar esta pantalla.
-    if (!_reviewHandoffStarted) {
-      _salesCubit?.cancelPendingSalePolling();
-    }
-    super.dispose();
-  }
 
   String _maskCardNumber(String cardNumber) {
     if (cardNumber.length < 4) return cardNumber;
@@ -158,115 +140,113 @@ class _SaleProcessingScreenState extends State<SaleProcessingScreen> {
     final double amount = salesState.amount;
     final String cardNumber = salesState.cardNumber;
 
-    return Scaffold(
-      backgroundColor: AppColors.primaryOrange,
-      appBar: const AppHeader(
-        title: 'Procesando Transacción',
-        actions: [UserMenuButton(), SizedBox(width: 8)],
-      ),
-      // Durante el procesamiento no se permite volver ni iniciar otra acción.
-      bottomNavigationBar: const AppBottomNavBar(
-        enabled: false,
-        hideBack: true,
-      ),
-      body: AppSheetPanel(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(32, 20, 32, 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Spinner animado grande
-              const SizedBox(
-                width: 80,
-                height: 80,
-                child: CircularProgressIndicator(
-                  strokeWidth: 5,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AppColors.primaryOrange,
+    return PopScope<void>(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: AppColors.primaryOrange,
+        appBar: const AppHeader(title: 'Procesando Transacción'),
+        // Durante el procesamiento no se permite volver ni iniciar otra acción.
+        bottomNavigationBar: const AppBottomNavBar(
+          enabled: false,
+          hideBack: true,
+        ),
+        body: AppSheetPanel(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 20, 32, 20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Spinner animado grande
+                const SizedBox(
+                  width: 80,
+                  height: 80,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primaryOrange,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // Monto grande y visible
-              Text(
-                _formatAmount(amount),
-                style: const TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryOrange,
+                // Monto grande y visible
+                Text(
+                  _formatAmount(amount),
+                  style: const TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryOrange,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                productLabel,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey,
+                const SizedBox(height: 4),
+                Text(
+                  productLabel,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // Datos de la tarjeta
-              if (cardNumber.isNotEmpty) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.credit_card, color: Colors.grey, size: 20),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          _maskCardNumber(cardNumber),
-                          maxLines: 1,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                // Datos de la tarjeta
+                if (cardNumber.isNotEmpty) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.credit_card,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _maskCardNumber(cardNumber),
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Línea divisoria decorativa
+                Container(height: 1, width: 60, color: Colors.grey.shade300),
                 const SizedBox(height: 16),
+
+                // Mensaje de advertencia
+                const Text(
+                  'Procesando Transacción...',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  salesState is SalesAwaitingAuthorization
+                      ? salesState.message
+                      : 'Estamos autorizando el pago.\n'
+                            'Por favor, no cierre la aplicación.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                    height: 1.5,
+                  ),
+                ),
               ],
-
-              // Línea divisoria decorativa
-              Container(height: 1, width: 60, color: Colors.grey.shade300),
-              const SizedBox(height: 16),
-
-              // Mensaje de advertencia
-              const Text(
-                'Procesando Transacción...',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                salesState is SalesAwaitingAuthorization
-                    ? salesState.message
-                    : 'Estamos autorizando el pago.\n'
-                          'Por favor, no cierre la aplicación.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () =>
-                    context.read<SalesCubit>().leaveUnconfirmedSale(),
-                child: const Text('Dejar de esperar'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

@@ -108,6 +108,49 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Procesando Transacción...'), findsOneWidget);
+    expect(find.text('Dejar de esperar'), findsNothing);
+    expect(find.byIcon(Icons.person_outline), findsNothing);
+    final popScope = find.byWidgetPredicate(
+      (widget) => widget is PopScope<void>,
+    );
+    expect(popScope, findsOneWidget);
+    expect(tester.widget<PopScope<void>>(popScope).canPop, isFalse);
+  });
+
+  testWidgets('el mensaje pendiente entra e indica consultar el historial', (
+    tester,
+  ) async {
+    await pumpAtTerminalSize(
+      tester,
+      _terminalScaffold(
+        title: 'Resultado de la Descarga',
+        card: SaleStatusContent(
+          result: PaymentResult.pending,
+          statusColor: Colors.orange,
+          statusIcon: Icons.hourglass_top,
+          statusTitle: 'Transacción en Proceso',
+          statusSubtitle: SalesCubit.unconfirmedSaleMessage,
+          operation: OperationModel(
+            id: 'OP-001',
+            productCode: 'GARRAFA_10',
+            productLabel: 'Garrafa 10 kg',
+            amount: 10,
+            cardNumber: '**** **** **** 3456',
+            result: PaymentResult.pending,
+            date: DateTime(2026, 11, 10),
+          ),
+          finalizeLabel: 'NUEVA VENTA',
+          onFinalize: () {},
+        ),
+      ),
+    );
+
+    expect(
+      find.textContaining('consultar su resultado en el historial'),
+      findsOneWidget,
+    );
+    expect(find.text('NUEVA VENTA'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Resultado de la Descarga no desborda en 360x720', (

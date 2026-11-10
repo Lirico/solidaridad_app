@@ -125,9 +125,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
         statusColor = Colors.orange;
         statusIcon = Icons.hourglass_top;
         statusTitle = 'Transacción en Proceso';
-        statusSubtitle = withServerMessage(
-          'La autorización sigue en curso.',
-        );
+        statusSubtitle = withServerMessage('La autorización sigue en curso.');
       case PaymentResult.underReview:
         statusColor = Colors.orange.shade800;
         statusIcon = Icons.manage_search;
@@ -179,12 +177,15 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
             onRetry: result == PaymentResult.connectionError
                 ? () => _retrySale(context)
                 : null,
-            finalizeLabel: result == PaymentResult.underReview
+            finalizeLabel:
+                result == PaymentResult.pending ||
+                    result == PaymentResult.underReview
                 ? 'NUEVA VENTA'
                 : 'FINALIZAR',
             onFinalize: () {
-              if (result == PaymentResult.underReview) {
-                context.read<SalesCubit>().startNewSaleAfterReview();
+              if (result == PaymentResult.pending ||
+                  result == PaymentResult.underReview) {
+                context.read<SalesCubit>().startNewSaleAfterHandoff();
               }
               Navigator.pushNamedAndRemoveUntil(
                 context,

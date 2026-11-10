@@ -4,7 +4,18 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-11-09
+Última revisión: 2026-11-10
+
+> ✅ **2026-11-10 — timeout de venta y continuidad operativa (G-P1-02 / RA-14):**
+> la pantalla de procesamiento ya no ofrece una salida manual, oculta el menú
+> de usuario y bloquea el back de Android. Tras 30 segundos de polling, la
+> operación conserva su estado `PENDING`, avisa que no debe repetirse y que se
+> puede consultar en el historial; **NUEVA VENTA** libera el flujo activo sin
+> descartar esa operación. Una venta independiente genera otra
+> `Idempotency-Key` y está permitida aunque haya recuperaciones pendientes. El
+> cierre de lote continúa rechazándose mientras algún resultado pueda cambiar.
+> Evidencia: `mobile/lib/features/sales/presentation/{cubit,screens,widgets}` y
+> `mobile/test/{sales_polling_test,terminal_layout_test}.dart`.
 
 > **2026-11-06 — ciclo compartido PSDK (G-P0-06 y G-P0-07):** el bridge
 > conserva la instancia y espera los eventos de inicialización y cierre; la
@@ -648,7 +659,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. **2026-11-05:** se eliminó `POST /v1/auth/register`; las cuentas se dan de alta directamente en la base con comercio obligatorio. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-11-09:** manual y banda llaman `prepareSale` / `prepareSaleFromMsr`, generan una única clave y envían directo a procesamiento; la pantalla/ruta de confirmación fue eliminada. El formulario manual se bloquea antes de preparar la venta para que dos toques no generen otra clave ni otro `POST`. Cubierto por `mobile/test/sale_direct_charge_test.dart`. El botón `REINTENTAR` de un error de red conserva la misma clave y `sendIsoMessage` ignora un segundo envío durante `SalesProcessing`/`SalesAwaitingAuthorization`. `202 PENDING` se consulta por número de operación, sin reenviar el `POST`; `UNDER_REVIEW` detiene el polling y permite iniciar una venta nueva. Última revisión: 2026-11-09. |
+| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-11-09:** manual y banda llaman `prepareSale` / `prepareSaleFromMsr`, generan una única clave y envían directo a procesamiento; la pantalla/ruta de confirmación fue eliminada. El formulario manual se bloquea antes de preparar la venta para que dos toques no generen otra clave ni otro `POST`. El botón `REINTENTAR` de un error de red conserva la misma clave y `sendIsoMessage` ignora un segundo envío durante `SalesProcessing`/`SalesAwaitingAuthorization`. `202 PENDING` se consulta por número de operación, sin reenviar el `POST`. **2026-11-10:** mientras la pantalla procesa no permite salida manual, logout ni back de Android. Al vencer los 30 segundos, conserva la pendiente en historial y permite una venta independiente con otra clave; esto no habilita el cierre del lote. Evidencia: `mobile/test/{sale_direct_charge_test,sales_polling_test,terminal_layout_test}.dart`. Última revisión: 2026-11-10. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |
@@ -689,6 +700,16 @@ una autorización `PENDING` por su `transaction_number`. Conserva esa referencia
 y su idempotencia inicial, respeta `poll_after_seconds`, no envía un nuevo
 `0200` durante polling ni ante fallos transitorios, y puede reanudar desde el
 historial tras reinicio. `UNDER_REVIEW` detiene la consulta automática.
+
+**Actualización RA-14 — 2026-11-10:** la prohibición de un segundo `0200`
+aplica al mismo intento de venta, que conserva su `Idempotency-Key`; no impide
+una venta independiente. La pantalla de procesamiento no admite salida manual.
+Al vencer los 30 segundos, muestra la operación como pendiente, indica que no
+debe repetirse y permite consultarla en el historial antes de liberar una nueva
+venta. El cierre sigue usando el estado durable y rechaza el lote mientras
+exista una operación que pueda cambiar. `may_start_new_sale` se conserva por
+compatibilidad de contrato, pero Mobile ya no lo usa para bloquear el
+formulario.
 
 **RA-15:** `UNDER_REVIEW` se representa como una verificación, no un rechazo.
 La terminal entrega e imprime un comprobante con la referencia y el PAN siempre

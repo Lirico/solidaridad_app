@@ -67,6 +67,16 @@ impresión de ticket.
   - **ingreso manual** como fallback;
   - validación de la captura y envío directo al backend, sin pantalla
     intermedia de confirmación, para todos los medios de pago implementados;
+  - durante el procesamiento no se puede abandonar manualmente la operación;
+    Mobile consulta el estado durante hasta 30 segundos y sólo un resultado o
+    ese timeout liberan la pantalla;
+  - si vence la espera después de recibir un número de operación, la venta
+    permanece `PENDING` en el backend y en el historial. La pantalla de
+    resultado indica que no se repita esa misma venta, que puede consultarse en
+    el historial y que es posible iniciar una venta independiente con otra
+    `Idempotency-Key`;
+  - una venta pendiente no bloquea ventas independientes. Sí bloquea el cierre
+    de lote mientras su resultado todavía pueda cambiar;
   - visualización de resultado (aprobada / rechazada / error de
     comunicación o procesamiento).
 - Mensajes de error comprensibles a partir de la respuesta del backend/procesador.

@@ -8,16 +8,14 @@ import 'sales_state.dart';
 
 class SalesCubit extends Cubit<SalesState> {
   static const String unconfirmedSaleMessage =
-      'La venta sigue sin confirmar. Puede consultarla en el historial.';
-  static const String blockedNewSaleMessage = 'Hay una venta sin confirmar.';
+      'La operación sigue pendiente. No repita esta misma venta. '
+      'Puede consultar su resultado en el historial e iniciar una venta diferente.';
 
   final SalesRepository salesRepository;
   final Future<void> Function(Duration) _wait;
   final DateTime Function() _now;
   final Duration pollingTimeout;
   bool _polling = false;
-  bool _pollingCancelled = false;
-  bool _leaveRequested = false;
 
   SalesCubit({
     required this.salesRepository,
@@ -27,15 +25,6 @@ class SalesCubit extends Cubit<SalesState> {
   }) : _wait = wait ?? Future<void>.delayed,
        _now = now ?? DateTime.now,
        super(const SalesLoading());
-
-  /// Hay un cobro en curso que todavía puede cambiar de resultado.
-  /// Una revisión de oficina no bloquea la venta siguiente.
-  bool get blocksNewSale {
-    final current = state;
-    return current is SalesAwaitingAuthorization &&
-        current.pendingReason != PendingSaleReason.underReview &&
-        !current.mayStartNewSale;
-  }
 
   Future<void> loadHistory({
     required String token,
@@ -71,7 +60,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String productLabel,
     required double amount,
   }) {
-    if (blocksNewSale) return;
     emit(
       SalesProductSelected(
         productCode: productCode,
@@ -94,7 +82,6 @@ class SalesCubit extends Cubit<SalesState> {
     required String cvv,
     required String expirationDate,
   }) {
-    if (blocksNewSale) return;
     emit(
       SalesReady(
         productCode: productCode,
@@ -114,7 +101,6 @@ class SalesCubit extends Cubit<SalesState> {
   /// La banda magnética no contiene CVV. La lectura completa los mismos datos
   /// que el ingreso manual y el vencimiento ya está en formato YYMM.
   void prepareSaleFromMsr(MsrCardData data) {
-    if (blocksNewSale) return;
     emit(
       SalesReady(
         productCode: state.productCode,
@@ -133,8 +119,6 @@ class SalesCubit extends Cubit<SalesState> {
     if (state is SalesProcessing || state is SalesAwaitingAuthorization) {
       return;
     }
-    _leaveRequested = false;
-
     final currentProductCode = state.productCode;
     final currentProductLabel = state.productLabel;
     final currentAmount = state.amount;
@@ -171,7 +155,7 @@ class SalesCubit extends Cubit<SalesState> {
     }
 
     var response = await register();
-    if (response.connectionError && !_leaveRequested && !isClosed) {
+    if (response.connectionError && !isClosed) {
       response = await register();
     }
 
@@ -192,10 +176,7 @@ class SalesCubit extends Cubit<SalesState> {
         history: currentHistory,
         idempotencyKey: currentIdempotencyKey,
       );
-      if (_leaveRequested || isClosed) {
-        cancelPendingSalePolling();
-        return;
-      }
+      if (isClosed) return;
       await pollPendingSale(token: token);
       return;
     }
@@ -253,11 +234,10 @@ class SalesCubit extends Cubit<SalesState> {
   Future<void> pollPendingSale({required String token}) async {
     if (_polling || state is! SalesAwaitingAuthorization) return;
     _polling = true;
-    _pollingCancelled = false;
     final startedAt = _now();
 
     try {
-      while (!_pollingCancelled && !isClosed) {
+      while (!isClosed) {
         final current = state;
         if (current is! SalesAwaitingAuthorization) return;
         if (current.pendingReason == PendingSaleReason.underReview ||
@@ -270,7 +250,7 @@ class SalesCubit extends Cubit<SalesState> {
         }
 
         await _wait(Duration(seconds: current.pollAfterSeconds!));
-        if (_pollingCancelled || isClosed) return;
+        if (isClosed) return;
 
         SaleResponse response;
         try {
@@ -318,21 +298,6 @@ class SalesCubit extends Cubit<SalesState> {
     } finally {
       _polling = false;
     }
-  }
-
-  /// Corta la espera visible. No vuelve a enviar la venta ni la da por
-  /// rechazada: el servidor sigue hasta un resultado.
-  void leaveUnconfirmedSale() {
-    _leaveRequested = true;
-    _pollingCancelled = true;
-    final current = state;
-    if (current is SalesAwaitingAuthorization && !current.pollingStopped) {
-      emit(_stoppedPolling(current, unconfirmedSaleMessage));
-    }
-  }
-
-  void cancelPendingSalePolling() {
-    leaveUnconfirmedSale();
   }
 
   SalesAwaitingAuthorization _stoppedPolling(
@@ -501,18 +466,19 @@ class SalesCubit extends Cubit<SalesState> {
     emit(SalesInitial());
   }
 
-  /// Cierra el handoff visible de una operación bajo revisión sin descartarla.
-  /// La operación se conserva para una consulta manual posterior y la próxima
-  /// venta vuelve a generar su propia clave en [prepareSale].
-  bool startNewSaleAfterReview() {
+  /// Cierra el handoff visible sin descartar la operación pendiente.
+  ///
+  /// Solo se habilita cuando el polling ya terminó por timeout o la API derivó
+  /// la venta a revisión. La operación queda en el historial y la próxima venta
+  /// independiente genera su propia clave en [prepareSale].
+  bool startNewSaleAfterHandoff() {
     final current = state;
     if (current is! SalesAwaitingAuthorization ||
-        current.pendingReason != PendingSaleReason.underReview ||
-        !current.mayStartNewSale) {
+        (!current.pollingStopped &&
+            current.pendingReason != PendingSaleReason.underReview)) {
       return false;
     }
 
-    _pollingCancelled = true;
     emit(SalesInitialWithHistory(history: current.history));
     return true;
   }
@@ -582,9 +548,4 @@ class SalesCubit extends Cubit<SalesState> {
     emit(SalesInitialWithHistory(history: [...state.history, ...items]));
   }
 
-  @override
-  Future<void> close() {
-    _pollingCancelled = true;
-    return super.close();
-  }
 }

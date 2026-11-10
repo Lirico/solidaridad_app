@@ -209,6 +209,13 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
   `0400`, el job de reverso queda `CANCELLED` con motivo
   `AUTHORIZATION_RESOLVED_BEFORE_REVERSAL` y no se contacta nuevamente al
   procesador. La cancelación sólo aplica mientras el reverso sigue sin enviarse.
+- La política separa cuatro tiempos: presupuesto síncrono de autorización
+  (`authorization_budget_seconds`), antigüedad de una autorización huérfana
+  (`stale_pending_authorization_seconds`), gracia previa al `0400`
+  (`reversal_grace_seconds`) y abandono de un reverso reclamado
+  (`reversal_processing_timeout_seconds`). El worker durable se inicia por
+  defecto con la API; puede desactivarse explícitamente para mantenimiento o
+  pruebas deterministas y su salud forma parte de `/health/ready`.
 - La caracterización VA-00 comprobó que el `0400/020000` del legacy vigente
   acusa `0410/00` pero no neutraliza una anulación. Una anulación ambigua queda
   en revisión operativa durable; no se reenvía desde la app ni se intenta su

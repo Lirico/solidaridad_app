@@ -11,16 +11,19 @@ El runbook de incidentes y los límites de acceso a datos sensibles están en
 
 ## Valores iniciales
 
-La bandera queda desactivada de forma segura en el artefacto base. El despliegue
-del ambiente que se activa debe inyectar estos valores explícitos:
+La bandera queda activada en el artefacto base. Un ambiente puede desactivarla
+explícitamente durante mantenimiento, rollback o pruebas deterministas:
 
 | Variable / configuración durable | Inicial | Justificación |
 | --- | ---: | --- |
-| `EMBEDDED_RECOVERY_WORKER_ENABLED` | `false` antes de cada etapa; `true` solo en réplicas seleccionadas | Permite desplegar y observar antes de reclamar jobs. |
+| `EMBEDDED_RECOVERY_WORKER_ENABLED` | `true` | Inicia la recuperación durable junto con la API; usar `false` sólo como override operativo. |
 | `EMBEDDED_RECOVERY_WORKER_SHUTDOWN_GRACE_SECONDS` | `40` s | Da tiempo a terminar la iteración actual durante un rollout o rollback. |
 | `RECOVERY_WORKER_MAX_ITERATION_AGE_SECONDS` | `30` s | Hace que readiness falle si el loop deja de progresar. |
 | `payment_processing_config.worker_poll_interval_seconds` | `1` s | Mantiene latencia baja sin usar polling desde mobile fuera del contrato público. |
-| `payment_processing_config.processing_timeout_seconds` | `60` s | Debe ser mayor al timeout máximo del reverso y su margen operativo. |
+| `payment_processing_config.authorization_budget_seconds` | `60` s | Presupuesto para reintentos síncronos definitivamente no enviados. |
+| `payment_processing_config.stale_pending_authorization_seconds` | `45` s | Antigüedad del último intento para recuperar un request interrumpido. |
+| `payment_processing_config.reversal_grace_seconds` | `45` s | Espera desde el último intento antes de habilitar un `0400`. |
+| `payment_processing_config.reversal_processing_timeout_seconds` | `60` s | Cuarentena de un job reclamado que dejó de progresar. |
 | `payment_processing_config.max_reversal_attempts` | `5` | Cuenta el primer envío; agotarlo deriva a `MANUAL_REVIEW`. |
 
 Cambios a `payment_processing_config` se realizan con el mecanismo operativo
@@ -31,8 +34,9 @@ autorizado y se auditan. No reactivan automáticamente un job
 
 1. Confirmar migraciones aplicadas y que `GET /health/live` responde en todas
    las réplicas.
-2. Confirmar que `GET /health/ready` responde `200` cuando la bandera está
-   apagada y que la respuesta declara `recovery_worker.enabled=false`.
+2. Confirmar que `GET /health/ready` responde `200` y declara
+   `recovery_worker.enabled=true`, `alive=true` y `stale=false`. Si se prepara
+   un canary, las demás réplicas deben declarar `enabled=false` por override.
 3. Verificar que el gateway apunta al transporte correspondiente al ambiente:
    `ISO_TRANSPORT=mock` únicamente para pruebas controladas; nunca asumir el
    mock en producción.
@@ -50,10 +54,10 @@ autorizado y se auditan. No reactivan automáticamente un job
 
 ## Activación por etapas
 
-1. Desplegar API y gateway con
-   `EMBEDDED_RECOVERY_WORKER_ENABLED=false` en todas las réplicas. Verificar
-   tráfico normal de autorizaciones y que ningún request síncrono envía un
-   `0400`.
+1. Para un rollout canary, desplegar API y gateway con
+   `EMBEDDED_RECOVERY_WORKER_ENABLED=false` como override temporal en las
+   réplicas no seleccionadas. Verificar tráfico normal de autorizaciones y que
+   ningún request síncrono envía un `0400`.
 2. En el ambiente de prueba, habilitar la bandera en una única réplica y
    reiniciarla. Esperar dos intervalos de polling y comprobar
    `GET /health/ready`: `enabled=true`, `alive=true`, `stale=false` y sin
@@ -135,6 +139,7 @@ venta independiente.
 | Reverso `NOT_SENT`, respuesta ambigua y cuarentena | `api/tests/test_recovery_end_to_end.py` |
 | Crash, timeout, alerta durable y no reenvío | `api/tests/test_recovery_end_to_end.py` |
 | Dos workers reclaman solo una vez | `api/tests/test_recovery_end_to_end.py` y `api/tests/test_processor_job_repository.py` |
+| Locks reales entre watchdog, resultado tardío y claim | `api/tests/postgresql/test_recovery_concurrency.py` (`make -C api recovery-concurrency-local`) |
 | Mobile ante `PROCESSING` y `UNDER_REVIEW` | `mobile/test/sales_polling_test.dart`, `mobile/test/sale_status_screen_test.dart` |
 | Cierre de lote bloqueado | `api/tests/test_close_batch.py`, `api/tests/test_transaction_repository.py` |
 | PAN ausente de eventos, respuestas y logs | `api/tests/test_sensitive_data_leakage.py` |

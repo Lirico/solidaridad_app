@@ -6,6 +6,18 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 
 Última revisión: 2026-11-10
 
+> ✅ **2026-11-10 — timeouts independientes, worker activo y carreras reales
+> (G-P1-09):** la migración `20261110_0018` reemplaza el timeout compartido por
+> `authorization_budget_seconds`, `stale_pending_authorization_seconds` y
+> `reversal_processing_timeout_seconds`, manteniendo
+> `reversal_grace_seconds` como reloj separado. El worker embebido queda
+> habilitado por defecto y puede apagarse explícitamente para mantenimiento o
+> tests. La matriz `api/tests/postgresql/test_recovery_concurrency.py` se
+> ejecutó contra PostgreSQL 16 migrada a `head`: dos watchdogs, resultado tardío
+> contra enqueue/cancelación y precedencia de un reverso confirmado, 3 pruebas
+> OK. El análisis temporal fue consolidado en la documentación oficial y se
+> eliminó `docs/revision-pr-65-temporal.md`.
+
 > ✅ **2026-11-10 — timeout de venta y continuidad operativa (G-P1-02 / RA-14):**
 > la pantalla de procesamiento ya no ofrece una salida manual, oculta el menú
 > de usuario y bloquea el back de Android. Tras 30 segundos de polling, la
@@ -103,8 +115,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
 > timeout y reclamo concurrente entre workers. El rollout por canary, rollback
 > sin borrar jobs y conciliación posterior quedaron documentados; el worker
-> conserva desactivación segura por defecto y puede iniciarse explícitamente en
-> una única instancia controlada. La activación real sigue requiriendo la
+> queda activado por defecto desde 2026-11-10 y puede desactivarse explícitamente
+> en las réplicas fuera de un canary. La activación real sigue requiriendo la
 > aprobación y ejecución de Operaciones/Riesgo en cada ambiente. Evidencia:
 > `api/tests/test_recovery_end_to_end.py`,
 > `docs/rollout-recuperacion-reversos.md` y `make -C api check`.
@@ -133,15 +145,16 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > usa el intervalo persistido. El apagado evita reclamar trabajo nuevo y espera
 > un período de gracia por el job en curso; un error fatal degrada
 > `GET /health/ready` con estado, última iteración y error sanitizado, sin
-> quedar silencioso. El flag `EMBEDDED_RECOVERY_WORKER_ENABLED` permanece
-> desactivado por defecto. Cada worker Uvicorn tiene un loop propio y `--reload`
+> quedar silencioso. El flag `EMBEDDED_RECOVERY_WORKER_ENABLED` queda
+> activado por defecto desde 2026-11-10 y admite desactivación explícita. Cada
+> worker Uvicorn tiene un loop propio y `--reload`
 > reinicia ese loop; los claims durables con `SKIP LOCKED` impiden duplicar
 > jobs. Evidencia: pruebas de lifecycle, shutdown, fallo fatal, sesiones por
 > vuelta y `make -C api check` (287 pruebas, 93.83% de cobertura). Pendiente:
 > resolución por casa central (RA-12). Ver G-P1-09.
 
 > ✅ **Último cambio (2026-10-14, RA-10):** la API detecta un job
-> `PROCESSING` que alcanza `processing_timeout_seconds` y lo mueve, con
+> `PROCESSING` que alcanza `reversal_processing_timeout_seconds` y lo mueve, con
 > `FOR UPDATE SKIP LOCKED`, a `MANUAL_REVIEW` sin reenviarlo al procesador.
 > La migración `20261014_0011` incorpora alertas durables `OPEN`, únicas por
 > job y causa; los timeouts, agotamientos, rechazos permanentes, ambigüedades
@@ -756,6 +769,15 @@ sin PAN. El gap sigue `partial`: falta ejecutar la activación controlada en los
 ambientes reales y una resolución administrativa autenticada/auditada para
 `MANUAL_REVIEW`.
 
+**Actualización RA-17 — 2026-11-10:** el worker está habilitado por defecto;
+`false` queda como override de mantenimiento, rollback o pruebas. La matriz
+PostgreSQL real se ejecuta con `make -C api recovery-concurrency-local` y cubre
+locks entre dos watchdogs, enqueue contra aprobación tardía/cancelación y la
+precedencia de un reverso confirmado. Los cuatro relojes de autorización y
+recuperación quedaron separados por la migración `20261110_0018`. Esta nota
+reemplaza las referencias anteriores a desactivación por defecto y al campo
+compartido `processing_timeout_seconds`.
+
 ### Actualización G-P1-15 — 2026-10-14
 
 **RA-16:** continúa abierta la deuda PCI por PAN y vencimiento en texto plano,
@@ -783,6 +805,7 @@ retención/borrado y auditoría efectiva de accesos.
 | G-P2-09 | Resultado de venta sin datos y ciclo del PSDK entre lectura e impresión | done | **2026-09-28 (VE-11):** `SaleStatusScreen` sin `OperationModel` ya no se dibuja como «¡Transacción Aprobada!»: avisa que faltan datos y vuelve atrás (`Navigator.maybePop`), igual que `sale_detail_screen.dart`. Test `mobile/test/sale_status_screen_test.dart`. **2026-09-28 (VE-12):** `readCard` libera el PSDK (`cancelReadMsr` → `tearDown`) antes de devolver el resultado, y el `dispose` de la pantalla de espera solo aborta una lectura todavía en curso. Ver G-P0-06 y G-P0-07. |
 | G-P2-10 | Cierre administrativo de lote y comprobante impreso | partial | **2026-10-06:** se decidió no integrar el cierre ISO `0500` ni modificar `payment_processor/legacy/`: para Solidaridad el lote es un corte administrativo, no una secuencia financiera rotativa. La migración `20261006_0007_administrative_batch_closes.py` crea `batch_closes`; `transactions.batch_close_id IS NULL` define el lote actual. `POST /v1/transactions/batch-close` se asocia al usuario y la terminal del token, exige `Idempotency-Key`, bloquea las filas actuales, rechaza pagos `PENDING`/`UNKNOWN`, crea el corte y devuelve las operaciones incluidas. `GET /v1/transactions` ahora devuelve sólo ese lote actual y `VoidTransaction` rechaza transacciones con `batch_close_id`, por lo que una venta cerrada no se anula desde la terminal. Flutter confirma el corte, conserva la misma clave para reintentos ambiguos y recibe el listado para conectarlo a impresión futura; ya no aplica un corte por día. El identificador visible es `ACTUAL`; el identificador durable del corte es `batch_close_id`, no el número fijo del procesador. **Pendiente:** ticket de cierre con `ReceiptPrinter`, consulta de cortes históricos/exportación y peso por producto desde backend. El total sigue en kg porque `amount` es cantidad y no hay precio público (D-3 de `docs/errores-ventas.md`); `batchKgPerUnit` sigue local. El cierre forzado legacy queda como antecedente operativo, pero no participa de este flujo. Evidencia: `api/{application/payments/close_batch.py,persistence/models/batch_close.py,persistence/repositories/transaction_repository.py}` y `mobile/lib/features/batch_close/**`; `make -C api check` OK (146 tests, cobertura 93%). |
 | G-P2-11 | Índices históricos de API ausentes de metadata ORM | open | **Detectado 2026-10-13 durante RA-04:** `alembic check` propone eliminar `ix_transaction_status_events_created_at`, `ix_transaction_status_events_transaction_id_created_at` e `ix_transactions_user_created_at` porque existen por migraciones previas pero no están declarados en los modelos SQLAlchemy. No afecta runtime ni el gate actual, pero vuelve riesgosa una futura autogeneración. El índice nuevo `ix_processor_jobs_available` sí quedó alineado entre migración y metadata. |
+| G-P2-12 | Watchdog de autorizaciones antiguas sin límite por iteración | open | **2026-11-10:** la consulta usa `FOR UPDATE SKIP LOCKED` y la matriz PostgreSQL verifica exclusión entre réplicas, pero todavía carga todas las candidatas disponibles en una vuelta. Pendiente: ordenar por `authorization_last_attempt_at, id`, aplicar un límite configurable y exponer métricas de backlog/antigüedad. |
 
 ---
 

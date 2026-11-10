@@ -28,8 +28,10 @@ Los valores iniciales se cambian por entorno y requieren redeploy:
 | `RECOVERY_WORKER_MAX_ITERATION_AGE_SECONDS` | 30 s | Degrada readiness si el loop no completa una vuelta. Debe superar el intervalo de polling más la variación normal. |
 
 `payment_processing_config` conserva los valores de política de la cola,
-incluidos `worker_poll_interval_seconds`, `processing_timeout_seconds` y el
-máximo de intentos. Cambiarlos no reactiva un `MANUAL_REVIEW`.
+incluidos `worker_poll_interval_seconds`, `authorization_budget_seconds`,
+`stale_pending_authorization_seconds`, `reversal_grace_seconds`,
+`reversal_processing_timeout_seconds` y el máximo de intentos. Cambiarlos no
+reactiva un `MANUAL_REVIEW`.
 
 ## Triage de una alerta durable
 

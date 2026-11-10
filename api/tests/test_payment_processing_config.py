@@ -28,6 +28,7 @@ def _values() -> dict[str, object]:
         "reversal_backoff_multiplier": Decimal("2"),
         "jitter_percentage": 20,
         "processing_timeout_seconds": 60,
+        "reversal_grace_seconds": 45,
         "worker_poll_interval_seconds": Decimal("1"),
         "created_at": now,
         "updated_at": now,
@@ -50,6 +51,7 @@ def test_repository_reads_consistent_default_snapshot() -> None:
     assert config.config_name == "default"
     assert config.max_authorization_attempts == 3
     assert config.max_reversal_attempts == 5
+    assert config.reversal_grace_seconds == 45
     assert config.worker_poll_interval_seconds == Decimal("1")
 
 
@@ -75,6 +77,7 @@ def test_repository_reports_missing_default() -> None:
         ("reversal_backoff_multiplier", Decimal("0.9"), "backoff"),
         ("jitter_percentage", 101, "jitter_percentage"),
         ("processing_timeout_seconds", 0, "processing_timeout"),
+        ("reversal_grace_seconds", 0, "reversal_grace"),
         ("worker_poll_interval_seconds", Decimal("0"), "poll_interval"),
     ],
 )
@@ -88,4 +91,3 @@ def test_config_rejects_invalid_values(
 
     with pytest.raises(ValueError, match=message):
         PaymentProcessingConfig(**values)  # type: ignore[arg-type]
-

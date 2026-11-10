@@ -23,6 +23,7 @@ def _to_domain(row: PaymentProcessingConfigModel) -> PaymentProcessingConfig:
         reversal_backoff_multiplier=row.reversal_backoff_multiplier,
         jitter_percentage=row.jitter_percentage,
         processing_timeout_seconds=row.processing_timeout_seconds,
+        reversal_grace_seconds=row.reversal_grace_seconds,
         worker_poll_interval_seconds=row.worker_poll_interval_seconds,
         created_at=row.created_at,
         updated_at=row.updated_at,

@@ -199,6 +199,8 @@ temporalmente por compatibilidad sin condicionar el formulario.
 
 ## Mejora: evitar un reverso concurrente con una autorización activa
 
+**Estado: mitigada el 2026-11-10 mediante un timeout conservador.**
+
 ### Problema
 
 La venta `PENDING` se confirma en la base antes de llamar al gateway. El nuevo
@@ -215,47 +217,48 @@ El resultado tardío del `0200` y el resultado del reverso pueden actualizar la
 misma transacción en órdenes distintos. Esto puede dejar el estado público en
 desacuerdo con el efecto real del procesador.
 
-### Recomendación
+### Decisión aplicada
 
-No inferir que una autorización fue abandonada únicamente desde `created_at`.
-Persistir un lease explícito para la ejecución síncrona, por ejemplo:
+No se modifica el procesador legacy ni se reenvía un `0200` ambiguo. Su
+deduplicación no es atómica y un reintento concurrente podría registrar dos
+ventas. El `0400` tampoco deja un tombstone capaz de neutralizar una venta que
+llegue después.
 
-- `authorization_owner` o token de ejecución;
-- `authorization_lease_expires_at`;
-- `authorization_finished_at` cuando el request ya no puede producir un nuevo
-  resultado.
+La API adopta una mitigación temporal y explícita:
 
-El request de autorización debería renovar o fijar el lease antes de cada
-intento. El watchdog sólo podría crear el reverso cuando el lease haya vencido
-y después de bloquear la transacción para verificar nuevamente su estado.
+1. `authorization_last_attempt_at` se persiste al iniciar cada intento de
+   autorización;
+2. `reversal_grace_seconds` queda separado del presupuesto síncrono y vale 45
+   segundos por defecto, contados desde ese inicio;
+3. un resultado `INDETERMINATE` crea el job durable antes de responder, pero su
+   `next_attempt_at` queda después de la gracia;
+4. el watchdog de requests interrumpidos mide la antigüedad desde el último
+   intento, no desde la creación de la venta;
+5. sólo después de vencer ese plazo el worker puede reclamar y enviar el
+   `0400`.
 
-También se recomienda:
-
-1. separar `stale_authorization_timeout_seconds` de
-   `processing_timeout_seconds`, porque este último ya controla jobs de reverso
-   abandonados;
-2. calcular el timeout de autorización de modo que cubra el peor caso completo
-   de llamadas HTTP, delays y margen operativo;
-3. serializar todos los resultados tardíos (`APPROVED`, `DECLINED`, `NOT_SENT`
-   e `INDETERMINATE`) con el estado del job, no sólo el resultado
-   `INDETERMINATE`;
-4. definir explícitamente qué transición gana si el reverso ya fue reclamado;
-5. impedir que un resultado tardío sobrescriba silenciosamente una recuperación
-   confirmada.
+Este timeout reduce la posibilidad de que autorización y reverso se solapen,
+pero no la elimina matemáticamente: el legacy no permite cancelar o consultar
+el `0200` ni garantiza un tiempo máximo de ejecución. Se acepta esa limitación
+como deuda de diseño del procesador.
 
 ### Pruebas recomendadas
 
-- autorización lenta todavía activa cuando se alcanza el umbral del watchdog;
-- segundo intento de autorización iniciado cerca del límite;
+- un resultado ambiguo agenda el job exactamente después de la gracia;
+- un segundo intento actualiza `authorization_last_attempt_at`;
+- el watchdog no selecciona una venta según su `created_at` si el último intento
+  es reciente;
 - watchdog y request compitiendo por la misma fila en dos sesiones PostgreSQL;
 - resultado `APPROVED` tardío después de crear el job, pero antes de reclamarlo;
 - resultado tardío después de que el reverso quedó `PROCESSING` o `COMPLETED`;
 - dos instancias del watchdog ejecutándose concurrentemente.
 
-Estas pruebas deberían usar PostgreSQL real y primitivas de sincronización, no
-solamente mocks, porque el comportamiento depende de locks y commits.
+Las pruebas unitarias cubren el plazo y la referencia temporal. Las carreras de
+locks y commits deben conservarse en la matriz PostgreSQL de recuperación.
 
 ## Mejora: separar las configuraciones de timeout
+
+**Estado: parcialmente aplicada el 2026-11-10.**
 
 ### Problema
 
@@ -279,6 +282,11 @@ Separar al menos las siguientes configuraciones:
   resultado ni job;
 - `reversal_processing_timeout_seconds`: job de reverso reclamado que dejó de
   progresar.
+
+Se agregó `reversal_grace_seconds` para la espera previa al `0400` y dejó de
+usarse `processing_timeout_seconds` para detectar ventas `PENDING` abandonadas.
+Este último todavía comparte el presupuesto síncrono y el monitoreo de jobs
+`PROCESSING`, por lo que la separación completa sigue pendiente.
 
 Cada valor debería tener validaciones cruzadas. Por ejemplo, el umbral de una
 autorización abandonada debe ser mayor al peor caso del request síncrono más un
@@ -360,9 +368,10 @@ La rama actual conserva la idempotencia del mismo intento, evita presentar como
 rechazada una venta incierta, mueve la recuperación al backend y permite otra
 venta independiente después del timeout sin habilitar el cierre del lote.
 
-El ítem de continuidad operativa quedó aplicado. Antes de considerar completa
-la solución global del PR todavía conviene demostrar que una autorización dejó
-de estar activa antes de que el watchdog envíe su reverso.
+El ítem de continuidad operativa y la gracia previa al reverso quedaron
+aplicados. La ausencia de una garantía de finalización del `0200` permanece como
+limitación aceptada del procesador legacy, no como una garantía que la API pueda
+probar.
 
 Las demás mejoras refuerzan operabilidad, escalabilidad y consistencia de la
 documentación.

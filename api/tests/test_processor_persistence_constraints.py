@@ -24,6 +24,7 @@ def _config_values() -> dict[str, object]:
         "reversal_backoff_multiplier": 2,
         "jitter_percentage": 20,
         "processing_timeout_seconds": 60,
+        "reversal_grace_seconds": 45,
         "worker_poll_interval_seconds": 1,
     }
 
@@ -41,6 +42,7 @@ def _config_values() -> dict[str, object]:
         ("reversal_backoff_multiplier", 0.5),
         ("jitter_percentage", 101),
         ("processing_timeout_seconds", 0),
+        ("reversal_grace_seconds", 0),
         ("worker_poll_interval_seconds", 0),
     ],
 )

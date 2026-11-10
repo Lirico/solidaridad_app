@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, call
 from zoneinfo import ZoneInfo
@@ -75,6 +75,7 @@ def _build(
     installation_code: str | None = "05000001",
     max_authorization_attempts: int = 1,
     processing_timeout_seconds: int = 3,
+    reversal_grace_seconds: int = 45,
     monotonic: MagicMock | None = None,
     now: Callable[[], datetime] | None = None,
     business_timezone: ZoneInfo | None = None,
@@ -101,10 +102,12 @@ def _build(
         else None
     )
     transactions.next_transaction_number.return_value = "OP-260716-00000001"
+    attempt_started_at = now() if now is not None else datetime.now(UTC)
     pending = _tx(
         status=TransactionStatus.PENDING,
         user_message="pending",
         processor_ticket="00000001",
+        authorization_last_attempt_at=attempt_started_at,
     )
     # fingerprint filled by use case after create; for create path we stub update
     transactions.create_pending.return_value = pending
@@ -138,6 +141,7 @@ def _build(
         reversal_backoff_multiplier=Decimal("2"),
         jitter_percentage=0,
         processing_timeout_seconds=processing_timeout_seconds,
+        reversal_grace_seconds=reversal_grace_seconds,
         worker_poll_interval_seconds=Decimal("1"),
         created_at=config_now,
         updated_at=config_now,
@@ -382,10 +386,13 @@ def test_replay_conflict_on_different_body() -> None:
 
 
 def test_gateway_timeout_enqueues_reverse_and_returns_pending() -> None:
+    observed_at = datetime(2026, 11, 10, 12, tzinfo=UTC)
     use_case, transactions, _, _ = _build(
         gateway_result=AuthorizeResult(
             outcome=AuthorizationGatewayOutcome.INDETERMINATE
         ),
+        now=lambda: observed_at,
+        reversal_grace_seconds=45,
     )
     transactions.update_result.return_value = _tx(status=TransactionStatus.PENDING)
     result = use_case.execute(
@@ -407,6 +414,7 @@ def test_gateway_timeout_enqueues_reverse_and_returns_pending() -> None:
     assert create_job["transaction_id"] == 1
     assert create_job["original_stan"] == "000001"
     assert create_job["original_ticket"] == "00000001"
+    assert create_job["next_attempt_at"] == observed_at + timedelta(seconds=45)
     assert len(create_job["reversal_stan"]) == 6
     use_case._gateway.reverse.assert_not_called()
     use_case._transactions.record_reversal_enqueued.assert_called_once_with(

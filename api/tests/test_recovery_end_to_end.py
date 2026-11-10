@@ -112,6 +112,7 @@ class _Transactions:
             request_fingerprint=str(values["request_fingerprint"]),
             created_at=NOW,
             updated_at=NOW,
+            authorization_last_attempt_at=NOW,
         )
         self.rows[row_id] = row
         self._idempotency[(row.user_id, row.idempotency_key)] = row_id
@@ -127,7 +128,11 @@ class _Transactions:
     def start_authorization_retry(self, *, transaction_id: int) -> int:
         row = self.rows[transaction_id]
         attempt = row.authorization_attempt_count + 1
-        self.rows[transaction_id] = replace(row, authorization_attempt_count=attempt)
+        self.rows[transaction_id] = replace(
+            row,
+            authorization_attempt_count=attempt,
+            authorization_last_attempt_at=NOW,
+        )
         return attempt
 
     def get_by_id_for_update(self, *, transaction_id: int) -> Transaction:
@@ -161,7 +166,7 @@ class _Transactions:
         )
 
     def list_stale_pending_without_reverse_job(
-        self, *, created_before: datetime
+        self, *, attempted_before: datetime
     ) -> list[Transaction]:
         selected: list[Transaction] = []
         for row in self.rows.values():
@@ -169,7 +174,10 @@ class _Transactions:
                 continue
             if row.authorization_outcome is not AuthorizationOutcome.PENDING:
                 continue
-            if row.created_at > created_before:
+            if (
+                row.authorization_last_attempt_at is None
+                or row.authorization_last_attempt_at > attempted_before
+            ):
                 continue
             if row.stan is None or row.processor_ticket is None:
                 continue
@@ -361,6 +369,7 @@ class _Configs:
             reversal_backoff_multiplier=Decimal("1"),
             jitter_percentage=0,
             processing_timeout_seconds=60,
+            reversal_grace_seconds=45,
             worker_poll_interval_seconds=Decimal("1"),
             created_at=NOW,
             updated_at=NOW,

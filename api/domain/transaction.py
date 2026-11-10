@@ -36,3 +36,4 @@ class Transaction:
     expiration_date: str | None = field(default=None, repr=False)
     authorization_outcome: AuthorizationOutcome | None = None
     authorization_attempt_count: int = 0
+    authorization_last_attempt_at: datetime | None = None

@@ -198,6 +198,13 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - El reverso técnico `0400` se genera únicamente para un `0200` previamente
   enviado. `0410/DE39=00` se considera confirmación operativa del reverso; una
   fila `0400` sin original no afecta saldo, reportes ni cierre.
+- Una autorización ambigua no se reenvía. La API registra el momento del último
+  intento y difiere cualquier reverso automático durante
+  `reversal_grace_seconds` (45 segundos por defecto, medidos desde el inicio del
+  último intento). Este plazo reduce el
+  riesgo de superponer `0200` y `0400`, pero no lo elimina porque el procesador
+  legacy no ofrece cancelación, consulta de estado ni un límite de ejecución
+  garantizado.
 - La caracterización VA-00 comprobó que el `0400/020000` del legacy vigente
   acusa `0410/00` pero no neutraliza una anulación. Una anulación ambigua queda
   en revisión operativa durable; no se reenvía desde la app ni se intenta su

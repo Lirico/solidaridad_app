@@ -62,6 +62,10 @@ class PaymentProcessingConfig(Base):
             name="ck_payment_config_processing_timeout",
         ),
         CheckConstraint(
+            "reversal_grace_seconds > 0",
+            name="ck_payment_config_reversal_grace",
+        ),
+        CheckConstraint(
             "worker_poll_interval_seconds > 0",
             name="ck_payment_config_worker_poll_interval",
         ),
@@ -98,6 +102,7 @@ class PaymentProcessingConfig(Base):
     )
     jitter_percentage: Mapped[int] = mapped_column(Integer, nullable=False)
     processing_timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    reversal_grace_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     worker_poll_interval_seconds: Mapped[Decimal] = mapped_column(
         Numeric(10, 4),
         nullable=False,

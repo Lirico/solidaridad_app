@@ -24,6 +24,7 @@ def _config() -> PaymentProcessingConfig:
         reversal_backoff_multiplier=Decimal("2"),
         jitter_percentage=0,
         processing_timeout_seconds=60,
+        reversal_grace_seconds=45,
         worker_poll_interval_seconds=Decimal("1"),
         created_at=NOW,
         updated_at=NOW,

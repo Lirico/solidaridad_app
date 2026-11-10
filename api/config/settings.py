@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     postgres_port: int = 5434
     payment_gateway_url: str = "http://127.0.0.1:8001"
     payment_gateway_timeout_seconds: float = 35.0
-    embedded_recovery_worker_enabled: bool = False
+    embedded_recovery_worker_enabled: bool = True
     embedded_recovery_worker_shutdown_grace_seconds: float = 40.0
     recovery_worker_max_iteration_age_seconds: float = Field(default=30.0, gt=0)
 

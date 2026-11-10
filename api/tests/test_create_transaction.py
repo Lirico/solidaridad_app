@@ -24,7 +24,10 @@ from domain.exceptions import (
 )
 from domain.installation import Installation
 from domain.payment_processing_config import PaymentProcessingConfig
-from domain.processor_job import ProcessorJobState
+from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    ProcessorJobState,
+)
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -194,6 +197,65 @@ def test_create_approves() -> None:
     transactions.update_result.assert_called_once()
     update_kwargs = transactions.update_result.call_args.kwargs
     assert update_kwargs["authorization_outcome"] == AuthorizationOutcome.APPROVED
+
+
+@pytest.mark.parametrize(
+    "gateway_result",
+    [
+        AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        ),
+        AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.DECLINED,
+            response_code="51",
+        ),
+        AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
+    ],
+)
+def test_definitive_result_cancels_an_unsent_reverse(
+    gateway_result: AuthorizeResult,
+) -> None:
+    resolved_at = datetime(2026, 11, 10, 15, tzinfo=UTC)
+    use_case, transactions, _, _ = _build(
+        gateway_result=gateway_result,
+        now=lambda: resolved_at,
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="late-result",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    transactions.get_by_id_for_update.assert_called_once_with(transaction_id=1)
+    use_case._jobs.cancel_unsent_reverse.assert_called_once_with(
+        transaction_id=1,
+        cancelled_at=resolved_at,
+        reason=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    )
+
+
+def test_indeterminate_result_keeps_the_reverse_ready() -> None:
+    use_case, _, _, _ = _build(
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.INDETERMINATE
+        )
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="ambiguous",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    use_case._jobs.cancel_unsent_reverse.assert_not_called()
 
 
 def test_business_date_uses_argentina_timezone() -> None:

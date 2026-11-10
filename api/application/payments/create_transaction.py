@@ -40,7 +40,10 @@ from domain.exceptions import (
     MissingTerminalId,
 )
 from domain.money import Money, parse_amount
-from domain.processor_job import ProcessorOperationType
+from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    ProcessorOperationType,
+)
 from domain.product import (
     Product,
     parse_product,
@@ -287,13 +290,14 @@ class CreateTransaction:
                 outcome=AuthorizationOutcome(result.outcome.value),
                 processor_response_code=result.response_code,
             )
-            self._session.commit()
 
             if (
                 result.outcome != AuthorizationGatewayOutcome.NOT_SENT
                 or attempt_number >= policy.max_attempts
             ):
                 return result
+
+            self._session.commit()
 
             next_attempt = attempt_number + 1
             delay = policy.delay_before_attempt(next_attempt)
@@ -370,12 +374,18 @@ class CreateTransaction:
             authorization_outcome = AuthorizationOutcome.INDETERMINATE
             message = MSG_UNKNOWN
 
-        if result.outcome == AuthorizationGatewayOutcome.INDETERMINATE:
-            # Serializes this path with the stale-PENDING watchdog.  Once the
-            # lock is held, a replay/recovery race can observe an existing job
-            # instead of creating a second one.
-            transaction = self._transactions.get_by_id_for_update(
-                transaction_id=transaction.id
+        # Serialize every final gateway result with the stale-PENDING watchdog.
+        # A definitive result can then cancel an unsent reverse in the same
+        # transaction that makes the sale terminal.
+        transaction = self._transactions.get_by_id_for_update(
+            transaction_id=transaction.id
+        )
+
+        if result.outcome != AuthorizationGatewayOutcome.INDETERMINATE:
+            self._jobs.cancel_unsent_reverse(
+                transaction_id=transaction.id,
+                cancelled_at=self._now(),
+                reason=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
             )
 
         updated = self._transactions.update_result(

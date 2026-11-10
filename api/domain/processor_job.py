@@ -16,7 +16,13 @@ class ProcessorJobState(StrEnum):
     PROCESSING = "PROCESSING"
     RETRY = "RETRY"
     COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
     MANUAL_REVIEW = "MANUAL_REVIEW"
+
+
+REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED = (
+    "AUTHORIZATION_RESOLVED_BEFORE_REVERSAL"
+)
 
 
 class InvalidProcessorJobTransition(ValueError):
@@ -25,19 +31,29 @@ class InvalidProcessorJobTransition(ValueError):
 
 _ALLOWED_TRANSITIONS: dict[ProcessorJobState, frozenset[ProcessorJobState]] = {
     ProcessorJobState.READY: frozenset(
-        {ProcessorJobState.PROCESSING, ProcessorJobState.MANUAL_REVIEW}
+        {
+            ProcessorJobState.PROCESSING,
+            ProcessorJobState.CANCELLED,
+            ProcessorJobState.MANUAL_REVIEW,
+        }
     ),
     ProcessorJobState.PROCESSING: frozenset(
         {
             ProcessorJobState.RETRY,
             ProcessorJobState.COMPLETED,
+            ProcessorJobState.CANCELLED,
             ProcessorJobState.MANUAL_REVIEW,
         }
     ),
     ProcessorJobState.RETRY: frozenset(
-        {ProcessorJobState.PROCESSING, ProcessorJobState.MANUAL_REVIEW}
+        {
+            ProcessorJobState.PROCESSING,
+            ProcessorJobState.CANCELLED,
+            ProcessorJobState.MANUAL_REVIEW,
+        }
     ),
     ProcessorJobState.COMPLETED: frozenset(),
+    ProcessorJobState.CANCELLED: frozenset(),
     ProcessorJobState.MANUAL_REVIEW: frozenset(
         {ProcessorJobState.RETRY, ProcessorJobState.COMPLETED}
     ),

@@ -205,6 +205,10 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
   riesgo de superponer `0200` y `0400`, pero no lo elimina porque el procesador
   legacy no ofrece cancelación, consulta de estado ni un límite de ejecución
   garantizado.
+- Si la autorización obtiene un resultado definitivo antes de enviar el
+  `0400`, el job de reverso queda `CANCELLED` con motivo
+  `AUTHORIZATION_RESOLVED_BEFORE_REVERSAL` y no se contacta nuevamente al
+  procesador. La cancelación sólo aplica mientras el reverso sigue sin enviarse.
 - La caracterización VA-00 comprobó que el `0400/020000` del legacy vigente
   acusa `0410/00` pero no neutraliza una anulación. Una anulación ambigua queda
   en revisión operativa durable; no se reenvía desde la app ni se intenta su

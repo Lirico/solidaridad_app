@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
     InvalidProcessorJobTransition,
     ProcessorJobState,
     ProcessorOperationType,
@@ -153,6 +154,46 @@ def test_claim_ignores_when_no_due_reverse_job_is_available() -> None:
     )
 
     assert claimed is None
+    session.flush.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "initial_state", [ProcessorJobState.READY, ProcessorJobState.RETRY]
+)
+def test_cancels_reverse_that_was_definitely_not_sent(
+    initial_state: ProcessorJobState,
+) -> None:
+    session = MagicMock()
+    row = _row(initial_state)
+    session.scalar.return_value = row
+    cancelled_at = datetime(2026, 11, 10, 15, tzinfo=UTC)
+
+    cancelled = ProcessorJobRepository(session).cancel_unsent_reverse(
+        transaction_id=11,
+        cancelled_at=cancelled_at,
+        reason=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    )
+
+    assert cancelled is not None
+    assert cancelled.state is ProcessorJobState.CANCELLED
+    assert cancelled.result == REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED
+    assert cancelled.completed_at == cancelled_at
+    statement = session.scalar.call_args.args[0]
+    assert "FOR UPDATE" in str(statement)
+    session.flush.assert_called_once()
+
+
+def test_does_not_cancel_reverse_that_may_have_been_sent() -> None:
+    session = MagicMock()
+    session.scalar.return_value = None
+
+    cancelled = ProcessorJobRepository(session).cancel_unsent_reverse(
+        transaction_id=11,
+        cancelled_at=datetime.now(UTC),
+        reason=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    )
+
+    assert cancelled is None
     session.flush.assert_not_called()
 
 
@@ -306,3 +347,15 @@ def test_completed_jobs_are_terminal_and_missing_job_is_ignored() -> None:
 
     session.get.return_value = None
     assert repo.transition(job_id=999, target=ProcessorJobState.MANUAL_REVIEW) is None
+
+
+def test_cancelled_jobs_are_terminal() -> None:
+    session = MagicMock()
+    session.get.return_value = _row(ProcessorJobState.CANCELLED)
+
+    with pytest.raises(InvalidProcessorJobTransition, match="CANCELLED to RETRY"):
+        ProcessorJobRepository(session).transition(
+            job_id=7,
+            target=ProcessorJobState.RETRY,
+            next_attempt_at=datetime.now(UTC),
+        )

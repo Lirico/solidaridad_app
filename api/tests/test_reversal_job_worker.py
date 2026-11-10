@@ -11,6 +11,7 @@ from application.payments.ports import ReversalOutcome, ReverseResult
 from application.payments.reversal_job_worker import ReversalJobWorker
 from domain.payment_processing_config import PaymentProcessingConfig
 from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
     ProcessorJob,
     ProcessorJobState,
     ProcessorOperationType,
@@ -184,6 +185,25 @@ def test_run_once_commits_claim_before_sending_reversal() -> None:
     assert update["transaction_id"] == 11
     assert update["status"] is TransactionStatus.FAILED
     assert update["processor_response_code"] == "00"
+
+
+def test_run_once_cancels_claim_when_authorization_already_resolved() -> None:
+    worker, session, _, jobs, alerts, gateway = _build(
+        transaction=_transaction(status=TransactionStatus.APPROVED)
+    )
+
+    assert worker.run_once() is True
+
+    gateway.reverse.assert_not_called()
+    alerts.open_for_job.assert_not_called()
+    jobs.finalize_claim.assert_called_once_with(
+        job_id=7,
+        claim_token=TOKEN,
+        target=ProcessorJobState.CANCELLED,
+        finalized_at=NOW,
+        result=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    )
+    assert session.commit.call_count == 2
 
 
 def test_run_once_retries_only_definitely_unsent_result_with_attempts_left() -> None:

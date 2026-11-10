@@ -86,6 +86,43 @@ class ProcessorJobRepository:
         self._session.flush()
         return _to_domain(row)
 
+    def cancel_unsent_reverse(
+        self,
+        *,
+        transaction_id: int,
+        cancelled_at: datetime,
+        reason: str,
+    ) -> ProcessorJob | None:
+        """Cancel recovery only while no reversal may have reached the processor."""
+        if not reason.strip():
+            raise ValueError("cancellation reason must not be empty")
+        row = self._session.scalar(
+            select(ProcessorJobModel)
+            .where(
+                ProcessorJobModel.transaction_id == transaction_id,
+                ProcessorJobModel.operation_type
+                == ProcessorOperationType.REVERSE.value,
+                ProcessorJobModel.state.in_(
+                    (ProcessorJobState.READY.value, ProcessorJobState.RETRY.value)
+                ),
+            )
+            .with_for_update()
+        )
+        if row is None:
+            return None
+
+        validate_processor_job_transition(
+            ProcessorJobState(row.state), ProcessorJobState.CANCELLED
+        )
+        row.state = ProcessorJobState.CANCELLED.value
+        row.result = reason
+        row.completed_at = cancelled_at
+        row.updated_at = cancelled_at
+        row.last_error_code = None
+        row.last_error_detail_sanitized = None
+        self._session.flush()
+        return _to_domain(row)
+
     def claim_next_due_reverse(
         self,
         *,
@@ -178,8 +215,10 @@ class ProcessorJobRepository:
         validate_processor_job_transition(ProcessorJobState.PROCESSING, target)
         if target is ProcessorJobState.RETRY and next_attempt_at is None:
             raise ValueError("RETRY requires next_attempt_at")
-        if target is ProcessorJobState.COMPLETED and result is None:
-            raise ValueError("COMPLETED requires result")
+        if target in {ProcessorJobState.COMPLETED, ProcessorJobState.CANCELLED} and (
+            result is None
+        ):
+            raise ValueError(f"{target.value} requires result")
 
         values: dict[str, object] = {
             "state": target.value,
@@ -191,7 +230,7 @@ class ProcessorJobRepository:
             values["next_attempt_at"] = next_attempt_at
         if result is not None:
             values["result"] = result
-        if target is ProcessorJobState.COMPLETED:
+        if target in {ProcessorJobState.COMPLETED, ProcessorJobState.CANCELLED}:
             values["completed_at"] = finalized_at
 
         outcome = self._session.execute(
@@ -233,10 +272,10 @@ class ProcessorJobRepository:
             )
         if target is ProcessorJobState.RETRY and next_attempt_at is None:
             raise ValueError("RETRY requires next_attempt_at")
-        if target is ProcessorJobState.COMPLETED and (
+        if target in {ProcessorJobState.COMPLETED, ProcessorJobState.CANCELLED} and (
             result is None or completed_at is None
         ):
-            raise ValueError("COMPLETED requires result and completed_at")
+            raise ValueError(f"{target.value} requires result and completed_at")
 
         row.state = target.value
         row.updated_at = datetime.now(UTC)

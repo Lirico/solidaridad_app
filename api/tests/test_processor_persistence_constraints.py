@@ -97,6 +97,30 @@ def test_database_rejects_invalid_processor_job(field: str, value: object) -> No
         connection.execute(insert(ProcessorJob).values(**values))
 
 
+def test_database_accepts_cancelled_job_with_reason_and_completion_time() -> None:
+    engine = create_engine("sqlite://")
+    ProcessorJob.__table__.create(engine)
+    values = _job_values()
+    values.update(
+        state="CANCELLED",
+        result="AUTHORIZATION_RESOLVED_BEFORE_REVERSAL",
+        completed_at=datetime.now(UTC),
+    )
+
+    with engine.begin() as connection:
+        connection.execute(insert(ProcessorJob).values(**values))
+
+
+def test_database_rejects_cancelled_job_without_reason() -> None:
+    engine = create_engine("sqlite://")
+    ProcessorJob.__table__.create(engine)
+    values = _job_values()
+    values.update(state="CANCELLED", completed_at=datetime.now(UTC))
+
+    with engine.connect() as connection, pytest.raises(IntegrityError):
+        connection.execute(insert(ProcessorJob).values(**values))
+
+
 @pytest.mark.parametrize("duplicate_field", ["operation_type", "reversal_stan"])
 def test_database_rejects_duplicate_job_identity(duplicate_field: str) -> None:
     engine = create_engine("sqlite://")

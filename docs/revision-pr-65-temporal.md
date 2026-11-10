@@ -236,11 +236,17 @@ La API adopta una mitigación temporal y explícita:
    intento, no desde la creación de la venta;
 5. sólo después de vencer ese plazo el worker puede reclamar y enviar el
    `0400`.
+6. si antes del envío llega un resultado definitivo del `0200`, el job pasa a
+   `CANCELLED` con motivo `AUTHORIZATION_RESOLVED_BEFORE_REVERSAL` en la misma
+   transacción que actualiza la venta;
+7. como defensa adicional, después del claim el worker vuelve a comprobar el
+   estado de la venta y cancela el job sin llamar al gateway si ya es terminal.
 
 Este timeout reduce la posibilidad de que autorización y reverso se solapen,
 pero no la elimina matemáticamente: el legacy no permite cancelar o consultar
-el `0200` ni garantiza un tiempo máximo de ejecución. Se acepta esa limitación
-como deuda de diseño del procesador.
+el `0200` ni garantiza un tiempo máximo de ejecución. `CANCELLED` resuelve el
+caso observable antes de iniciar el `0400`; una vez comenzada la llamada de
+reverso permanece la limitación aceptada del procesador.
 
 ### Pruebas recomendadas
 
@@ -253,7 +259,8 @@ como deuda de diseño del procesador.
 - resultado tardío después de que el reverso quedó `PROCESSING` o `COMPLETED`;
 - dos instancias del watchdog ejecutándose concurrentemente.
 
-Las pruebas unitarias cubren el plazo y la referencia temporal. Las carreras de
+Las pruebas unitarias y end-to-end cubren el plazo, la referencia temporal y la
+cancelación de un job no enviado ante una aprobación tardía. Las carreras de
 locks y commits deben conservarse en la matriz PostgreSQL de recuperación.
 
 ## Mejora: separar las configuraciones de timeout
@@ -314,25 +321,18 @@ backlog entre varias réplicas.
 
 ## Mejora: actualizar la documentación oficial
 
+**Estado: aplicada el 2026-11-10.**
+
 ### Problema
 
-El cambio modifica comportamiento asociado a G-P1-09 y RA-13, pero
-`docs/gaps.md` todavía contiene afirmaciones incompatibles:
-
-- en la fila principal de G-P1-09 aparece RA-13 como pendiente;
-- la actualización de RA-13 dice que cualquier outcome `INDETERMINATE` bloquea
-  el cierre;
-- el PR permite correctamente cerrar una venta `FAILED + INDETERMINATE` cuando
-  ya no existe un job abierto.
-
-Además, la espera visible de 30 segundos, la ausencia de salida manual y la
-posibilidad de continuar con una venta independiente después del timeout son
-decisiones de producto. Quedaron registradas en `docs/alcance.md` y en
-G-P1-02 / RA-14 de `docs/gaps.md`.
+El cambio modifica comportamiento asociado a G-P1-09 y RA-13. La espera visible
+de 30 segundos, la ausencia de salida manual, las ventas independientes y la
+cancelación del reverso no enviado son decisiones que deben permanecer
+consistentes entre código, alcance e inventario de gaps.
 
 ### Recomendación
 
-En el mismo trabajo que implemente las correcciones:
+Se actualizaron `docs/alcance.md` y `docs/gaps.md` para:
 
 1. actualizar G-P1-09 con la activación del watchdog de pendientes sin job;
 2. describir la diferencia entre outcome histórico y estado recuperable actual;
@@ -343,6 +343,8 @@ En el mismo trabajo que implemente las correcciones:
 5. actualizar la fecha de última revisión y la evidencia de tests;
 6. reflejar en `docs/alcance.md` la espera de 30 segundos y el handoff al
    historial, manteniendo el `409` para el cierre de lote;
+7. documentar `CANCELLED` cuando la autorización se resuelve antes de enviar el
+   `0400`.
 
 ## Mejora: completar la validación operativa
 
@@ -368,8 +370,9 @@ La rama actual conserva la idempotencia del mismo intento, evita presentar como
 rechazada una venta incierta, mueve la recuperación al backend y permite otra
 venta independiente después del timeout sin habilitar el cierre del lote.
 
-El ítem de continuidad operativa y la gracia previa al reverso quedaron
-aplicados. La ausencia de una garantía de finalización del `0200` permanece como
+El ítem de continuidad operativa, la gracia previa al reverso y la cancelación
+de un job todavía no enviado quedaron aplicados. La ausencia de una garantía de
+finalización del `0200` una vez iniciada la recuperación permanece como
 limitación aceptada del procesador legacy, no como una garantía que la API pueda
 probar.
 

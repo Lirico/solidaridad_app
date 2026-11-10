@@ -238,6 +238,31 @@ class _Jobs:
         self._next_id += 1
         return row
 
+    def cancel_unsent_reverse(
+        self, *, transaction_id: int, cancelled_at: datetime, reason: str
+    ) -> ProcessorJob | None:
+        with self._lock:
+            row = self.get_by_transaction(
+                transaction_id=transaction_id,
+                operation_type=ProcessorOperationType.REVERSE,
+            )
+            if row is None or row.state not in (
+                ProcessorJobState.READY,
+                ProcessorJobState.RETRY,
+            ):
+                return None
+            cancelled = replace(
+                row,
+                state=ProcessorJobState.CANCELLED,
+                result=reason,
+                updated_at=cancelled_at,
+                completed_at=cancelled_at,
+                last_error_code=None,
+                last_error_detail_sanitized=None,
+            )
+            self.rows[row.id] = cancelled
+            return cancelled
+
     def claim_next_due_reverse(
         self, *, worker_id: str, claim_token: UUID, claimed_at: datetime
     ) -> ProcessorJob | None:
@@ -291,7 +316,10 @@ class _Jobs:
                 last_error_code=values.get("last_error_code"),
                 last_error_detail_sanitized=values.get("last_error_detail_sanitized"),
                 completed_at=(
-                    finalized_at if target is ProcessorJobState.COMPLETED else None
+                    finalized_at
+                    if target
+                    in (ProcessorJobState.COMPLETED, ProcessorJobState.CANCELLED)
+                    else None
                 ),
             )
             return True
@@ -476,6 +504,35 @@ def test_end_to_end_normal_approval_and_decline_do_not_create_reversal_jobs() ->
     assert declined_result.transaction.status is TransactionStatus.DECLINED
     assert approved.jobs.rows == {}
     assert declined.jobs.rows == {}
+
+
+def test_late_approval_cancels_reverse_before_it_is_sent() -> None:
+    harness = _Harness(authorizations=[])
+
+    def approve_after_watchdog_enqueues(_request: object) -> AuthorizeResult:
+        transaction = next(iter(harness.transactions.rows.values()))
+        harness.jobs.create_reverse(
+            transaction_id=transaction.id,
+            original_stan=transaction.stan,
+            original_ticket=transaction.processor_ticket,
+            reversal_stan="900123",
+            next_attempt_at=NOW,
+        )
+        return AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        )
+
+    harness.gateway.authorize = approve_after_watchdog_enqueues  # type: ignore[method-assign]
+
+    result = harness.create()
+
+    job = next(iter(harness.jobs.rows.values()))
+    assert result.transaction.status is TransactionStatus.APPROVED
+    assert job.state is ProcessorJobState.CANCELLED
+    assert job.result == "AUTHORIZATION_RESOLVED_BEFORE_REVERSAL"
+    assert harness.worker("worker-a").run_once() is False
+    assert harness.gateway.reverse_requests == []
 
 
 def test_end_to_end_unsent_authorization_retries_then_fails_without_reversal() -> None:

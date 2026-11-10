@@ -27,6 +27,16 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > ni garantiza su tiempo máximo. Evidencia: `api/tests/{test_create_transaction,
 > test_enqueue_stale_pending_reversals,test_reversal_job_worker,
 > test_reversal_grace_migration}.py`.
+>
+> ✅ **2026-11-10 — cancelación de reverso todavía no enviado (G-P1-09):** si
+> el `0200` obtiene un resultado definitivo después de que el watchdog creó el
+> job, pero antes de enviar el `0400`, el job pasa a `CANCELLED` con motivo
+> `AUTHORIZATION_RESOLVED_BEFORE_REVERSAL`. La resolución de la venta y la
+> cancelación se confirman juntas; el worker también vuelve a comprobar el
+> estado definitivo antes de llamar al gateway. Evidencia:
+> `api/tests/{test_create_transaction,test_processor_job_repository,
+> test_reversal_job_worker,test_recovery_end_to_end,
+> test_cancelled_reversal_migration}.py`.
 
 > **2026-11-06 — ciclo compartido PSDK (G-P0-06 y G-P0-07):** el bridge
 > conserva la instancia y espera los eventos de inicialización y cierre; la

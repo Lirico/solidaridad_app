@@ -39,7 +39,9 @@ class StaleProcessingJobMonitor:
         """Quarantine one timed-out job and return whether one was found."""
         observed_at = self._now()
         try:
-            timeout_seconds = self._configs.get_default().processing_timeout_seconds
+            timeout_seconds = (
+                self._configs.get_default().reversal_processing_timeout_seconds
+            )
             job = self._jobs.move_next_stale_processing_to_manual_review(
                 processing_started_before=(
                     observed_at - timedelta(seconds=timeout_seconds)

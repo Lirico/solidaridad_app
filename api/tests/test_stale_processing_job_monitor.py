@@ -23,7 +23,10 @@ def _config() -> PaymentProcessingConfig:
         reversal_max_delay_seconds=30,
         reversal_backoff_multiplier=Decimal("2"),
         jitter_percentage=0,
-        processing_timeout_seconds=60,
+        authorization_budget_seconds=60,
+        stale_pending_authorization_seconds=45,
+        reversal_grace_seconds=45,
+        reversal_processing_timeout_seconds=75,
         worker_poll_interval_seconds=Decimal("1"),
         created_at=NOW,
         updated_at=NOW,
@@ -50,7 +53,7 @@ def test_monitor_moves_a_job_at_the_exact_timeout_boundary() -> None:
     assert monitor.run_once() is True
 
     jobs.move_next_stale_processing_to_manual_review.assert_called_once_with(
-        processing_started_before=NOW - timedelta(seconds=60),
+        processing_started_before=NOW - timedelta(seconds=75),
         reviewed_at=NOW,
     )
     session.commit.assert_called_once()

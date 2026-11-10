@@ -6,7 +6,7 @@ import secrets
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import IntEnum
 from zoneinfo import ZoneInfo
 
@@ -40,7 +40,11 @@ from domain.exceptions import (
     MissingTerminalId,
 )
 from domain.money import Money, parse_amount
-from domain.processor_job import ProcessorOperationType
+from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    ProcessorJobState,
+    ProcessorOperationType,
+)
 from domain.product import (
     Product,
     parse_product,
@@ -182,8 +186,9 @@ class CreateTransaction:
         if existing is not None:
             return self._replay(existing, fingerprint, idempotency_key=key)
 
+        config = self._configs.get_default()
         policy = AuthorizationRetryPolicy.from_config(
-            self._configs.get_default(),
+            config,
             random_value=self._random_value,
         )
 
@@ -255,7 +260,11 @@ class CreateTransaction:
             policy=policy,
         )
         try:
-            final = self._apply_gateway_result(pending, gateway_result)
+            final = self._apply_gateway_result(
+                pending,
+                gateway_result,
+                reversal_grace_seconds=config.reversal_grace_seconds,
+            )
             # For an ambiguous authorization this is one database transaction:
             # the public PENDING state, the recovery job and both audit events.
             self._session.commit()
@@ -271,7 +280,7 @@ class CreateTransaction:
         request: AuthorizeRequest,
         policy: AuthorizationRetryPolicy,
     ) -> AuthorizeResult:
-        deadline = self._monotonic() + policy.processing_timeout_seconds
+        deadline = self._monotonic() + policy.authorization_budget_seconds
         attempt_number = 1
 
         while True:
@@ -282,13 +291,14 @@ class CreateTransaction:
                 outcome=AuthorizationOutcome(result.outcome.value),
                 processor_response_code=result.response_code,
             )
-            self._session.commit()
 
             if (
                 result.outcome != AuthorizationGatewayOutcome.NOT_SENT
                 or attempt_number >= policy.max_attempts
             ):
                 return result
+
+            self._session.commit()
 
             next_attempt = attempt_number + 1
             delay = policy.delay_before_attempt(next_attempt)
@@ -345,6 +355,8 @@ class CreateTransaction:
         self,
         transaction: Transaction,
         result: AuthorizeResult,
+        *,
+        reversal_grace_seconds: int,
     ) -> Transaction:
         if result.outcome == AuthorizationGatewayOutcome.APPROVED:
             status = TransactionStatus.APPROVED
@@ -363,12 +375,27 @@ class CreateTransaction:
             authorization_outcome = AuthorizationOutcome.INDETERMINATE
             message = MSG_UNKNOWN
 
-        if result.outcome == AuthorizationGatewayOutcome.INDETERMINATE:
-            # Serializes this path with the stale-PENDING watchdog.  Once the
-            # lock is held, a replay/recovery race can observe an existing job
-            # instead of creating a second one.
-            transaction = self._transactions.get_by_id_for_update(
-                transaction_id=transaction.id
+        # Serialize every final gateway result with the stale-PENDING watchdog.
+        # A definitive result can then cancel an unsent reverse in the same
+        # transaction that makes the sale terminal.
+        transaction = self._transactions.get_by_id_for_update(
+            transaction_id=transaction.id
+        )
+
+        if result.outcome != AuthorizationGatewayOutcome.INDETERMINATE:
+            existing_job = self._jobs.get_by_transaction(
+                transaction_id=transaction.id,
+                operation_type=ProcessorOperationType.REVERSE,
+            )
+            if existing_job is not None and existing_job.state in {
+                ProcessorJobState.COMPLETED,
+                ProcessorJobState.MANUAL_REVIEW,
+            }:
+                return transaction
+            self._jobs.cancel_unsent_reverse(
+                transaction_id=transaction.id,
+                cancelled_at=self._now(),
+                reason=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
             )
 
         updated = self._transactions.update_result(
@@ -388,7 +415,11 @@ class CreateTransaction:
             operation_type=ProcessorOperationType.REVERSE,
         )
         if existing_job is None:
-            if transaction.stan is None or transaction.processor_ticket is None:
+            if (
+                transaction.stan is None
+                or transaction.processor_ticket is None
+                or transaction.authorization_last_attempt_at is None
+            ):
                 raise ValueError(
                     "ambiguous authorization is missing recovery identifiers"
                 )
@@ -397,7 +428,8 @@ class CreateTransaction:
                 original_stan=transaction.stan,
                 original_ticket=transaction.processor_ticket,
                 reversal_stan=f"{secrets.randbelow(1_000_000):06d}",
-                next_attempt_at=datetime.now(UTC),
+                next_attempt_at=transaction.authorization_last_attempt_at
+                + timedelta(seconds=reversal_grace_seconds),
             )
             self._transactions.record_reversal_enqueued(transaction_id=transaction.id)
         return updated

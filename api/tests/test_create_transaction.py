@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, call
 from zoneinfo import ZoneInfo
@@ -24,7 +24,10 @@ from domain.exceptions import (
 )
 from domain.installation import Installation
 from domain.payment_processing_config import PaymentProcessingConfig
-from domain.processor_job import ProcessorJobState
+from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    ProcessorJobState,
+)
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
@@ -74,7 +77,8 @@ def _build(
     gateway_results: list[AuthorizeResult] | None = None,
     installation_code: str | None = "05000001",
     max_authorization_attempts: int = 1,
-    processing_timeout_seconds: int = 3,
+    authorization_budget_seconds: int = 3,
+    reversal_grace_seconds: int = 45,
     monotonic: MagicMock | None = None,
     now: Callable[[], datetime] | None = None,
     business_timezone: ZoneInfo | None = None,
@@ -101,10 +105,12 @@ def _build(
         else None
     )
     transactions.next_transaction_number.return_value = "OP-260716-00000001"
+    attempt_started_at = now() if now is not None else datetime.now(UTC)
     pending = _tx(
         status=TransactionStatus.PENDING,
         user_message="pending",
         processor_ticket="00000001",
+        authorization_last_attempt_at=attempt_started_at,
     )
     # fingerprint filled by use case after create; for create path we stub update
     transactions.create_pending.return_value = pending
@@ -137,7 +143,10 @@ def _build(
         reversal_max_delay_seconds=300,
         reversal_backoff_multiplier=Decimal("2"),
         jitter_percentage=0,
-        processing_timeout_seconds=processing_timeout_seconds,
+        authorization_budget_seconds=authorization_budget_seconds,
+        stale_pending_authorization_seconds=45,
+        reversal_grace_seconds=reversal_grace_seconds,
+        reversal_processing_timeout_seconds=60,
         worker_poll_interval_seconds=Decimal("1"),
         created_at=config_now,
         updated_at=config_now,
@@ -190,6 +199,99 @@ def test_create_approves() -> None:
     transactions.update_result.assert_called_once()
     update_kwargs = transactions.update_result.call_args.kwargs
     assert update_kwargs["authorization_outcome"] == AuthorizationOutcome.APPROVED
+
+
+@pytest.mark.parametrize(
+    "gateway_result",
+    [
+        AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        ),
+        AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.DECLINED,
+            response_code="51",
+        ),
+        AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
+    ],
+)
+def test_definitive_result_cancels_an_unsent_reverse(
+    gateway_result: AuthorizeResult,
+) -> None:
+    resolved_at = datetime(2026, 11, 10, 15, tzinfo=UTC)
+    use_case, transactions, _, _ = _build(
+        gateway_result=gateway_result,
+        now=lambda: resolved_at,
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="late-result",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    transactions.get_by_id_for_update.assert_called_once_with(transaction_id=1)
+    use_case._jobs.cancel_unsent_reverse.assert_called_once_with(
+        transaction_id=1,
+        cancelled_at=resolved_at,
+        reason=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    )
+
+
+def test_indeterminate_result_keeps_the_reverse_ready() -> None:
+    use_case, _, _, _ = _build(
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.INDETERMINATE
+        )
+    )
+
+    use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="ambiguous",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    use_case._jobs.cancel_unsent_reverse.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("job_state", "durable_status"),
+    [
+        (ProcessorJobState.COMPLETED, TransactionStatus.FAILED),
+        (ProcessorJobState.MANUAL_REVIEW, TransactionStatus.PENDING),
+    ],
+)
+def test_late_result_does_not_overwrite_recovery_that_may_have_been_sent(
+    job_state: ProcessorJobState,
+    durable_status: TransactionStatus,
+) -> None:
+    use_case, transactions, _, _ = _build(
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        )
+    )
+    transactions.get_by_id_for_update.return_value = _tx(status=durable_status)
+    use_case._jobs.get_by_transaction.return_value = MagicMock(state=job_state)
+
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="late-after-recovery",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    assert result.transaction.status is durable_status
+    transactions.update_result.assert_not_called()
+    use_case._jobs.cancel_unsent_reverse.assert_not_called()
 
 
 def test_business_date_uses_argentina_timezone() -> None:
@@ -382,10 +484,13 @@ def test_replay_conflict_on_different_body() -> None:
 
 
 def test_gateway_timeout_enqueues_reverse_and_returns_pending() -> None:
+    observed_at = datetime(2026, 11, 10, 12, tzinfo=UTC)
     use_case, transactions, _, _ = _build(
         gateway_result=AuthorizeResult(
             outcome=AuthorizationGatewayOutcome.INDETERMINATE
         ),
+        now=lambda: observed_at,
+        reversal_grace_seconds=45,
     )
     transactions.update_result.return_value = _tx(status=TransactionStatus.PENDING)
     result = use_case.execute(
@@ -407,6 +512,7 @@ def test_gateway_timeout_enqueues_reverse_and_returns_pending() -> None:
     assert create_job["transaction_id"] == 1
     assert create_job["original_stan"] == "000001"
     assert create_job["original_ticket"] == "00000001"
+    assert create_job["next_attempt_at"] == observed_at + timedelta(seconds=45)
     assert len(create_job["reversal_stan"]) == 6
     use_case._gateway.reverse.assert_not_called()
     use_case._transactions.record_reversal_enqueued.assert_called_once_with(
@@ -601,7 +707,7 @@ def test_sync_budget_prevents_retry_when_delay_does_not_fit() -> None:
     use_case, transactions, _, gateway = _build(
         gateway_result=AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
         max_authorization_attempts=3,
-        processing_timeout_seconds=1,
+        authorization_budget_seconds=1,
         monotonic=clock,
     )
 

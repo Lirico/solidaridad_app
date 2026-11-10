@@ -48,8 +48,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
       !_loadingProducts && _productsError == null && _products.isNotEmpty;
 
   bool get _allowsDecimals =>
-      _selectedProduct?.unit.allowsDecimals ??
-      _selectedProductCode == 'GRANEL';
+      _selectedProduct?.unit.allowsDecimals ?? _selectedProductCode == 'GRANEL';
 
   @override
   void initState() {
@@ -229,7 +228,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton(
-                    onPressed: _canContinue ? _onNext : null,
+                    onPressed: !_canContinue ? null : _onNext,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryOrange,
                       foregroundColor: Colors.white,

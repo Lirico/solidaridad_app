@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import UUID
@@ -11,6 +11,7 @@ from application.payments.ports import ReversalOutcome, ReverseResult
 from application.payments.reversal_job_worker import ReversalJobWorker
 from domain.payment_processing_config import PaymentProcessingConfig
 from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
     ProcessorJob,
     ProcessorJobState,
     ProcessorOperationType,
@@ -90,7 +91,10 @@ def _config(**overrides: object) -> PaymentProcessingConfig:
         "reversal_max_delay_seconds": 30,
         "reversal_backoff_multiplier": Decimal("2"),
         "jitter_percentage": 0,
-        "processing_timeout_seconds": 60,
+        "authorization_budget_seconds": 60,
+        "stale_pending_authorization_seconds": 50,
+        "reversal_grace_seconds": 45,
+        "reversal_processing_timeout_seconds": 60,
         "worker_poll_interval_seconds": Decimal("1"),
         "created_at": NOW,
         "updated_at": NOW,
@@ -123,6 +127,7 @@ def _build(
     jobs.claim_next_due_reverse.return_value = claimed or _job()
     jobs.finalize_claim.return_value = True
     transactions.get_by_id.return_value = transaction or _transaction()
+    transactions.list_stale_pending_without_reverse_job.return_value = []
     configs.get_default.return_value = _config()
     gateway.reverse.return_value = ReverseResult(outcome=outcome, response_code="00")
     worker = ReversalJobWorker(
@@ -182,6 +187,25 @@ def test_run_once_commits_claim_before_sending_reversal() -> None:
     assert update["transaction_id"] == 11
     assert update["status"] is TransactionStatus.FAILED
     assert update["processor_response_code"] == "00"
+
+
+def test_run_once_cancels_claim_when_authorization_already_resolved() -> None:
+    worker, session, _, jobs, alerts, gateway = _build(
+        transaction=_transaction(status=TransactionStatus.APPROVED)
+    )
+
+    assert worker.run_once() is True
+
+    gateway.reverse.assert_not_called()
+    alerts.open_for_job.assert_not_called()
+    jobs.finalize_claim.assert_called_once_with(
+        job_id=7,
+        claim_token=TOKEN,
+        target=ProcessorJobState.CANCELLED,
+        finalized_at=NOW,
+        result=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    )
+    assert session.commit.call_count == 2
 
 
 def test_run_once_retries_only_definitely_unsent_result_with_attempts_left() -> None:
@@ -294,6 +318,40 @@ def test_late_gateway_result_with_an_old_claim_token_changes_nothing() -> None:
 
     transactions.update_result.assert_not_called()
     session.rollback.assert_called_once()
+
+
+def test_run_once_enqueues_one_stale_pending_before_claim() -> None:
+    worker, _, transactions, jobs, _, gateway = _build()
+    pending = _transaction()
+    listed = 0
+
+    def list_stale(**kwargs: object) -> list[Transaction]:
+        nonlocal listed
+        listed += 1
+        assert kwargs["attempted_before"] == NOW - timedelta(seconds=50)
+        return [pending] if listed == 1 else []
+
+    order: list[str] = []
+
+    def claim(**kwargs: object) -> None:
+        order.append("claim")
+        return None
+
+    def create_reverse(**kwargs: object) -> None:
+        order.append("enqueue")
+
+    transactions.list_stale_pending_without_reverse_job.side_effect = list_stale
+    jobs.claim_next_due_reverse.side_effect = claim
+    jobs.create_reverse.side_effect = create_reverse
+
+    assert worker.run_once() is False
+    assert order == ["enqueue", "claim"]
+    jobs.create_reverse.assert_called_once()
+
+    jobs.create_reverse.reset_mock()
+    assert worker.run_once() is False
+    jobs.create_reverse.assert_not_called()
+    gateway.reverse.assert_not_called()
 
 
 def test_run_once_returns_false_without_due_work() -> None:

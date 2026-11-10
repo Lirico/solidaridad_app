@@ -43,7 +43,7 @@ class EnqueueStalePendingReversals:
     def execute(self) -> list[Transaction]:
         now = self._now()
         candidates = self._transactions.list_stale_pending_without_reverse_job(
-            created_before=now - self._stale_after
+            attempted_before=now - self._stale_after
         )
         recovered: list[Transaction] = []
         try:
@@ -67,7 +67,8 @@ class EnqueueStalePendingReversals:
                     transaction_id=transaction.id
                 )
                 recovered.append(transaction)
-            self._session.commit()
+            if recovered:
+                self._session.commit()
         except Exception:
             self._session.rollback()
             raise

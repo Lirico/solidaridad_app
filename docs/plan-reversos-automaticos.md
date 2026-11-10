@@ -454,7 +454,7 @@ processing_started_at = now()
 
 La transacción SQL se confirma antes de hacer la llamada de red. Un job en
 `PROCESSING` nunca vuelve automáticamente a `READY` o `RETRY`: si el worker
-muere o supera `processing_timeout_seconds`, un monitor lo mueve a
+muere o supera `reversal_processing_timeout_seconds`, un monitor lo mueve a
 `MANUAL_REVIEW` y emite una alerta. Esta decisión evita un segundo `0400`
 cuando no puede probarse si el primero fue enviado.
 
@@ -517,7 +517,10 @@ reversal_initial_delay_seconds  INTEGER
 reversal_max_delay_seconds      INTEGER
 reversal_backoff_multiplier     NUMERIC
 jitter_percentage               INTEGER
-processing_timeout_seconds      INTEGER
+authorization_budget_seconds    INTEGER
+stale_pending_authorization_seconds INTEGER
+reversal_grace_seconds          INTEGER
+reversal_processing_timeout_seconds INTEGER
 worker_poll_interval_seconds    NUMERIC
 created_at
 updated_at
@@ -536,7 +539,9 @@ reversal_initial_delay_seconds >= 0
 reversal_max_delay_seconds >= reversal_initial_delay_seconds
 reversal_backoff_multiplier >= 1
 jitter_percentage BETWEEN 0 AND 100
-processing_timeout_seconds > 0
+authorization_budget_seconds > 0
+stale_pending_authorization_seconds >= reversal_grace_seconds > 0
+reversal_processing_timeout_seconds > 0
 worker_poll_interval_seconds > 0
 ```
 
@@ -553,7 +558,10 @@ Los valores iniciales acordados para esa fila son:
 | `reversal_max_delay_seconds` | `300` |
 | `reversal_backoff_multiplier` | `2` |
 | `jitter_percentage` | `20` |
-| `processing_timeout_seconds` | `60` |
+| `authorization_budget_seconds` | `60` |
+| `stale_pending_authorization_seconds` | `45` |
+| `reversal_grace_seconds` | `45` |
+| `reversal_processing_timeout_seconds` | `60` |
 | `worker_poll_interval_seconds` | `1` |
 
 La API consulta la configuración `default` al comenzar una autorización y usa
@@ -671,7 +679,8 @@ Un watchdog debe buscar periódicamente:
 
 - transacciones `PENDING` con antigüedad superior al timeout máximo;
 - trabajos `PROCESSING` cuyo `processing_started_at` superó
-  `processing_timeout_seconds`, para moverlos una sola vez a `MANUAL_REVIEW`;
+  `reversal_processing_timeout_seconds`, para moverlos una sola vez a
+  `MANUAL_REVIEW`;
 - recuperaciones que superaron el SLA esperado.
 
 ## 10. Idempotencia y límite de la garantía
@@ -982,9 +991,9 @@ peor caso de intentos de autorización quepa dentro del presupuesto de API y
 este, a su vez, sea menor que el timeout mobile. Un resultado ambiguo corta el
 loop inmediatamente, aunque todavía queden intentos configurados.
 
-`processing_timeout_seconds` debe ser mayor que el timeout máximo de la llamada
-de reverso más un margen operativo. No habilita un reintento: únicamente
-determina cuándo un job `PROCESSING` abandonado debe pasar a
+`reversal_processing_timeout_seconds` debe ser mayor que el timeout máximo de
+la llamada de reverso más un margen operativo. No habilita un reintento:
+únicamente determina cuándo un job `PROCESSING` abandonado debe pasar a
 `MANUAL_REVIEW`.
 
 Ante un resultado ambiguo, la API persiste el trabajo y responde `202 PENDING`

@@ -557,7 +557,7 @@ recuperación automática peligrosa.
 **Alcance:**
 
 - monitor de `PROCESSING` más antiguo que
-  `processing_timeout_seconds`;
+  `reversal_processing_timeout_seconds`;
 - transición condicional a `MANUAL_REVIEW` con error
   `PROCESSING_TIMEOUT`;
 - considerar también agotamiento, error permanente e inconsistencia;
@@ -882,7 +882,8 @@ Secuencia recomendada:
 
 1. desplegar migraciones y escritura de datos de recuperación;
 2. desplegar gateway con `/v1/reverse`;
-3. desplegar API con creación de jobs y consulta, worker desactivado;
+3. desplegar API con creación de jobs y consulta; para un rollout canary,
+   desactivar explícitamente el worker en las réplicas no seleccionadas;
 4. desplegar mobile con soporte de `PENDING` antes de habilitar el worker;
 5. verificar casa central, alertas y comprobantes;
 6. habilitar worker en un ambiente controlado;

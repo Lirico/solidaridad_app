@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
@@ -180,7 +178,7 @@ void main() {
 
       await cubit.sendIsoMessage(token: 'token');
 
-      expect(cubit.startNewSaleAfterReview(), isTrue);
+      expect(cubit.startNewSaleAfterHandoff(), isTrue);
       expect(cubit.state, isA<SalesInitialWithHistory>());
       expect(cubit.state.history.single.result, PaymentResult.underReview);
 
@@ -256,21 +254,107 @@ void main() {
     expect(calls, 2);
   });
 
-  test('cancelar la pantalla corta el timer y conserva la pendiente', () async {
-    final delayed = Completer<void>();
-    final cubit = makeCubit(wait: (_) => delayed.future);
+  test(
+    'el timeout conserva la pendiente y permite otra venta con una clave nueva',
+    () async {
+      var now = DateTime(2026);
+      final cubit = makeCubit(
+        timeout: const Duration(seconds: 3),
+        now: () => now,
+        wait: (duration) async => now = now.add(duration),
+      );
+      addTearDown(cubit.close);
+      openReview(cubit);
+      final originalKey = cubit.state.idempotencyKey;
+      stubRegister(_pending);
+      when(
+        () =>
+            repository.getSaleStatus(token: 'token', transactionNumber: 'OP-1'),
+      ).thenAnswer((_) async => _pending);
+
+      await cubit.sendIsoMessage(token: 'token');
+
+      expect(cubit.state, isA<SalesAwaitingAuthorization>());
+      final pending = cubit.state as SalesAwaitingAuthorization;
+      expect(pending.pollingStopped, isTrue);
+      expect(pending.message, SalesCubit.unconfirmedSaleMessage);
+      expect(pending.message, contains('historial'));
+      expect(pending.message, contains('No repita esta misma venta'));
+      expect(cubit.startNewSaleAfterHandoff(), isTrue);
+      expect(cubit.state, isA<SalesInitialWithHistory>());
+      expect(cubit.state.history.single.id, 'OP-1');
+
+      cubit.setProductAndAmount(
+        productCode: 'GARRAFA_15',
+        productLabel: 'Garrafa 15 kg',
+        amount: 1,
+      );
+      cubit.prepareSale(
+        productCode: 'GARRAFA_15',
+        productLabel: 'Garrafa 15 kg',
+        amount: 1,
+        cardNumber: '6063007014007403',
+        cvv: '878',
+        expirationDate: '1228',
+      );
+      expect(cubit.state, isA<SalesReady>());
+      expect(cubit.state.idempotencyKey, isNot(originalKey));
+      verify(
+        () => repository.registerSale(
+          product: any(named: 'product'),
+          amount: any(named: 'amount'),
+          cardNumber: any(named: 'cardNumber'),
+          cvv: any(named: 'cvv'),
+          expirationDate: any(named: 'expirationDate'),
+          token: any(named: 'token'),
+          idempotencyKey: any(named: 'idempotencyKey'),
+        ),
+      ).called(1);
+    },
+  );
+
+  test('un envío sin respuesta se reintenta una sola vez', () async {
+    final cubit = makeCubit(wait: (_) async {});
     addTearDown(cubit.close);
     openReview(cubit);
-    stubRegister(_pending);
+    when(
+      () => repository.registerSale(
+        product: any(named: 'product'),
+        amount: any(named: 'amount'),
+        cardNumber: any(named: 'cardNumber'),
+        cvv: any(named: 'cvv'),
+        expirationDate: any(named: 'expirationDate'),
+        token: any(named: 'token'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).thenAnswer(
+      (_) async => const SaleResponse(
+        isApproved: false,
+        operationNumber: '',
+        message: 'Sin red',
+        errorCode: '99',
+        connectionError: true,
+      ),
+    );
 
-    final sending = cubit.sendIsoMessage(token: 'token');
-    await Future<void>.delayed(Duration.zero);
-    cubit.cancelPendingSalePolling();
-    delayed.complete();
-    await sending;
+    await cubit.sendIsoMessage(token: 'token');
 
-    expect(cubit.state, isA<SalesAwaitingAuthorization>());
-    expect((cubit.state as SalesAwaitingAuthorization).pollingStopped, isTrue);
+    expect(cubit.state, isA<SalesCompleted>());
+    expect(
+      (cubit.state as SalesCompleted).result,
+      PaymentResult.connectionError,
+    );
+    verify(
+      () => repository.registerSale(
+        product: any(named: 'product'),
+        amount: any(named: 'amount'),
+        cardNumber: any(named: 'cardNumber'),
+        cvv: any(named: 'cvv'),
+        expirationDate: any(named: 'expirationDate'),
+        token: any(named: 'token'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).called(2);
     verifyNever(
       () => repository.getSaleStatus(
         token: any(named: 'token'),
@@ -279,25 +363,9 @@ void main() {
     );
   });
 
-  test('el timeout de UI deja la venta pendiente para retomarla', () async {
-    var now = DateTime(2026);
-    final cubit = makeCubit(
-      timeout: const Duration(seconds: 3),
-      now: () => now,
-      wait: (duration) async => now = now.add(duration),
-    );
+  test('la espera visible por defecto es de 30 segundos', () {
+    final cubit = SalesCubit(salesRepository: repository);
     addTearDown(cubit.close);
-    openReview(cubit);
-    stubRegister(_pending);
-    when(
-      () => repository.getSaleStatus(token: 'token', transactionNumber: 'OP-1'),
-    ).thenAnswer((_) async => _pending);
-
-    await cubit.sendIsoMessage(token: 'token');
-
-    expect(cubit.state, isA<SalesAwaitingAuthorization>());
-    final pending = cubit.state as SalesAwaitingAuthorization;
-    expect(pending.pollingStopped, isTrue);
-    expect(pending.message, contains('historial'));
+    expect(cubit.pollingTimeout, const Duration(seconds: 30));
   });
 }

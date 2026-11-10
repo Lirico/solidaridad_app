@@ -75,6 +75,7 @@ class _Transactions:
         self.rows: dict[int, Transaction] = {}
         self._idempotency: dict[tuple[int, str], int] = {}
         self._next_id = 1
+        self.jobs = None
 
     def get_by_idempotency(
         self, *, user_id: int, idempotency_key: str
@@ -111,6 +112,7 @@ class _Transactions:
             request_fingerprint=str(values["request_fingerprint"]),
             created_at=NOW,
             updated_at=NOW,
+            authorization_last_attempt_at=NOW,
         )
         self.rows[row_id] = row
         self._idempotency[(row.user_id, row.idempotency_key)] = row_id
@@ -126,7 +128,11 @@ class _Transactions:
     def start_authorization_retry(self, *, transaction_id: int) -> int:
         row = self.rows[transaction_id]
         attempt = row.authorization_attempt_count + 1
-        self.rows[transaction_id] = replace(row, authorization_attempt_count=attempt)
+        self.rows[transaction_id] = replace(
+            row,
+            authorization_attempt_count=attempt,
+            authorization_last_attempt_at=NOW,
+        )
         return attempt
 
     def get_by_id_for_update(self, *, transaction_id: int) -> Transaction:
@@ -158,6 +164,34 @@ class _Transactions:
             ),
             None,
         )
+
+    def list_stale_pending_without_reverse_job(
+        self, *, attempted_before: datetime
+    ) -> list[Transaction]:
+        selected: list[Transaction] = []
+        for row in self.rows.values():
+            if row.status is not TransactionStatus.PENDING:
+                continue
+            if row.authorization_outcome is not AuthorizationOutcome.PENDING:
+                continue
+            if (
+                row.authorization_last_attempt_at is None
+                or row.authorization_last_attempt_at > attempted_before
+            ):
+                continue
+            if row.stan is None or row.processor_ticket is None:
+                continue
+            if (
+                self.jobs is not None
+                and self.jobs.get_by_transaction(
+                    transaction_id=row.id,
+                    operation_type=ProcessorOperationType.REVERSE,
+                )
+                is not None
+            ):
+                continue
+            selected.append(row)
+        return selected
 
 
 class _Jobs:
@@ -203,6 +237,31 @@ class _Jobs:
         self.rows[row.id] = row
         self._next_id += 1
         return row
+
+    def cancel_unsent_reverse(
+        self, *, transaction_id: int, cancelled_at: datetime, reason: str
+    ) -> ProcessorJob | None:
+        with self._lock:
+            row = self.get_by_transaction(
+                transaction_id=transaction_id,
+                operation_type=ProcessorOperationType.REVERSE,
+            )
+            if row is None or row.state not in (
+                ProcessorJobState.READY,
+                ProcessorJobState.RETRY,
+            ):
+                return None
+            cancelled = replace(
+                row,
+                state=ProcessorJobState.CANCELLED,
+                result=reason,
+                updated_at=cancelled_at,
+                completed_at=cancelled_at,
+                last_error_code=None,
+                last_error_detail_sanitized=None,
+            )
+            self.rows[row.id] = cancelled
+            return cancelled
 
     def claim_next_due_reverse(
         self, *, worker_id: str, claim_token: UUID, claimed_at: datetime
@@ -257,7 +316,10 @@ class _Jobs:
                 last_error_code=values.get("last_error_code"),
                 last_error_detail_sanitized=values.get("last_error_detail_sanitized"),
                 completed_at=(
-                    finalized_at if target is ProcessorJobState.COMPLETED else None
+                    finalized_at
+                    if target
+                    in (ProcessorJobState.COMPLETED, ProcessorJobState.CANCELLED)
+                    else None
                 ),
             )
             return True
@@ -334,7 +396,10 @@ class _Configs:
             reversal_max_delay_seconds=0,
             reversal_backoff_multiplier=Decimal("1"),
             jitter_percentage=0,
-            processing_timeout_seconds=60,
+            authorization_budget_seconds=60,
+            stale_pending_authorization_seconds=45,
+            reversal_grace_seconds=45,
+            reversal_processing_timeout_seconds=60,
             worker_poll_interval_seconds=Decimal("1"),
             created_at=NOW,
             updated_at=NOW,
@@ -372,6 +437,7 @@ class _Harness:
         self.session = _Session()
         self.transactions = _Transactions()
         self.jobs = _Jobs()
+        self.transactions.jobs = self.jobs
         self.alerts = _Alerts()
         self.configs = _Configs()
         self.gateway = _ProcessorMock(
@@ -440,6 +506,35 @@ def test_end_to_end_normal_approval_and_decline_do_not_create_reversal_jobs() ->
     assert declined_result.transaction.status is TransactionStatus.DECLINED
     assert approved.jobs.rows == {}
     assert declined.jobs.rows == {}
+
+
+def test_late_approval_cancels_reverse_before_it_is_sent() -> None:
+    harness = _Harness(authorizations=[])
+
+    def approve_after_watchdog_enqueues(_request: object) -> AuthorizeResult:
+        transaction = next(iter(harness.transactions.rows.values()))
+        harness.jobs.create_reverse(
+            transaction_id=transaction.id,
+            original_stan=transaction.stan,
+            original_ticket=transaction.processor_ticket,
+            reversal_stan="900123",
+            next_attempt_at=NOW,
+        )
+        return AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        )
+
+    harness.gateway.authorize = approve_after_watchdog_enqueues  # type: ignore[method-assign]
+
+    result = harness.create()
+
+    job = next(iter(harness.jobs.rows.values()))
+    assert result.transaction.status is TransactionStatus.APPROVED
+    assert job.state is ProcessorJobState.CANCELLED
+    assert job.result == "AUTHORIZATION_RESOLVED_BEFORE_REVERSAL"
+    assert harness.worker("worker-a").run_once() is False
+    assert harness.gateway.reverse_requests == []
 
 
 def test_end_to_end_unsent_authorization_retries_then_fails_without_reversal() -> None:

@@ -4,7 +4,51 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-11-09
+Última revisión: 2026-11-10
+
+> ✅ **2026-11-10 — timeouts independientes, worker activo y carreras reales
+> (G-P1-09):** la migración `20261110_0018` reemplaza el timeout compartido por
+> `authorization_budget_seconds`, `stale_pending_authorization_seconds` y
+> `reversal_processing_timeout_seconds`, manteniendo
+> `reversal_grace_seconds` como reloj separado. El worker embebido queda
+> habilitado por defecto y puede apagarse explícitamente para mantenimiento o
+> tests. La matriz `api/tests/postgresql/test_recovery_concurrency.py` se
+> ejecutó contra PostgreSQL 16 migrada a `head`: dos watchdogs, resultado tardío
+> contra enqueue/cancelación y precedencia de un reverso confirmado, 3 pruebas
+> OK. El análisis temporal fue consolidado en la documentación oficial y se
+> eliminó `docs/revision-pr-65-temporal.md`.
+
+> ✅ **2026-11-10 — timeout de venta y continuidad operativa (G-P1-02 / RA-14):**
+> la pantalla de procesamiento ya no ofrece una salida manual, oculta el menú
+> de usuario y bloquea el back de Android. Tras 30 segundos de polling, la
+> operación conserva su estado `PENDING`, avisa que no debe repetirse y que se
+> puede consultar en el historial; **NUEVA VENTA** libera el flujo activo sin
+> descartar esa operación. Una venta independiente genera otra
+> `Idempotency-Key` y está permitida aunque haya recuperaciones pendientes. El
+> cierre de lote continúa rechazándose mientras algún resultado pueda cambiar.
+> Evidencia: `mobile/lib/features/sales/presentation/{cubit,screens,widgets}` y
+> `mobile/test/{sales_polling_test,terminal_layout_test}.dart`.
+
+> ✅ **2026-11-10 — gracia previa al reverso automático (G-P1-09):** la API ya
+> no deja un job `REVERSE` ambiguo disponible inmediatamente. La migración
+> `20261110_0016` agrega `reversal_grace_seconds` (45 s por defecto) y
+> `authorization_last_attempt_at`; tanto los resultados `INDETERMINATE` como el
+> watchdog de requests interrumpidos esperan desde el último intento antes de
+> habilitar el `0400`. Es una mitigación explícita del legacy, no una garantía
+> de ausencia de carrera: el procesador no permite consultar/cancelar un `0200`
+> ni garantiza su tiempo máximo. Evidencia: `api/tests/{test_create_transaction,
+> test_enqueue_stale_pending_reversals,test_reversal_job_worker,
+> test_reversal_grace_migration}.py`.
+>
+> ✅ **2026-11-10 — cancelación de reverso todavía no enviado (G-P1-09):** si
+> el `0200` obtiene un resultado definitivo después de que el watchdog creó el
+> job, pero antes de enviar el `0400`, el job pasa a `CANCELLED` con motivo
+> `AUTHORIZATION_RESOLVED_BEFORE_REVERSAL`. La resolución de la venta y la
+> cancelación se confirman juntas; el worker también vuelve a comprobar el
+> estado definitivo antes de llamar al gateway. Evidencia:
+> `api/tests/{test_create_transaction,test_processor_job_repository,
+> test_reversal_job_worker,test_recovery_end_to_end,
+> test_cancelled_reversal_migration}.py`.
 
 > **2026-11-06 — ciclo compartido PSDK (G-P0-06 y G-P0-07):** el bridge
 > conserva la instancia y espera los eventos de inicialización y cierre; la
@@ -71,8 +115,8 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > prueba autorización, reverso, reintentos, pérdida de respuesta, crash,
 > timeout y reclamo concurrente entre workers. El rollout por canary, rollback
 > sin borrar jobs y conciliación posterior quedaron documentados; el worker
-> conserva desactivación segura por defecto y puede iniciarse explícitamente en
-> una única instancia controlada. La activación real sigue requiriendo la
+> queda activado por defecto desde 2026-11-10 y puede desactivarse explícitamente
+> en las réplicas fuera de un canary. La activación real sigue requiriendo la
 > aprobación y ejecución de Operaciones/Riesgo en cada ambiente. Evidencia:
 > `api/tests/test_recovery_end_to_end.py`,
 > `docs/rollout-recuperacion-reversos.md` y `make -C api check`.
@@ -101,15 +145,16 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > usa el intervalo persistido. El apagado evita reclamar trabajo nuevo y espera
 > un período de gracia por el job en curso; un error fatal degrada
 > `GET /health/ready` con estado, última iteración y error sanitizado, sin
-> quedar silencioso. El flag `EMBEDDED_RECOVERY_WORKER_ENABLED` permanece
-> desactivado por defecto. Cada worker Uvicorn tiene un loop propio y `--reload`
+> quedar silencioso. El flag `EMBEDDED_RECOVERY_WORKER_ENABLED` queda
+> activado por defecto desde 2026-11-10 y admite desactivación explícita. Cada
+> worker Uvicorn tiene un loop propio y `--reload`
 > reinicia ese loop; los claims durables con `SKIP LOCKED` impiden duplicar
 > jobs. Evidencia: pruebas de lifecycle, shutdown, fallo fatal, sesiones por
 > vuelta y `make -C api check` (287 pruebas, 93.83% de cobertura). Pendiente:
 > resolución por casa central (RA-12). Ver G-P1-09.
 
 > ✅ **Último cambio (2026-10-14, RA-10):** la API detecta un job
-> `PROCESSING` que alcanza `processing_timeout_seconds` y lo mueve, con
+> `PROCESSING` que alcanza `reversal_processing_timeout_seconds` y lo mueve, con
 > `FOR UPDATE SKIP LOCKED`, a `MANUAL_REVIEW` sin reenviarlo al procesador.
 > La migración `20261014_0011` incorpora alertas durables `OPEN`, únicas por
 > job y causa; los timeouts, agotamientos, rechazos permanentes, ambigüedades
@@ -648,7 +693,7 @@ Verifone (banda + térmica).
 | ID | Gap | Estado | Evidencia / notas |
 |----|-----|--------|-------------------|
 | G-P1-01 | Usuario habilitado / altas solo desde central | done | Decisión de producto: los usuarios son dados de alta únicamente por la empresa (vía Postman/central). El formulario de registro de la app mobile no se usará en producción. **2026-11-05:** se eliminó `POST /v1/auth/register`; las cuentas se dan de alta directamente en la base con comercio obligatorio. Ver comentarios en TC-007 a TC-013 y TC-057/TC-058 en `docs/test_cases_index.md`. |
-| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-11-09:** manual y banda llaman `prepareSale` / `prepareSaleFromMsr`, generan una única clave y envían directo a procesamiento; la pantalla/ruta de confirmación fue eliminada. El formulario manual se bloquea antes de preparar la venta para que dos toques no generen otra clave ni otro `POST`. Cubierto por `mobile/test/sale_direct_charge_test.dart`. El botón `REINTENTAR` de un error de red conserva la misma clave y `sendIsoMessage` ignora un segundo envío durante `SalesProcessing`/`SalesAwaitingAuthorization`. `202 PENDING` se consulta por número de operación, sin reenviar el `POST`; `UNDER_REVIEW` detiene el polling y permite iniciar una venta nueva. Última revisión: 2026-11-09. |
+| G-P1-02 | Reintentos e idempotencia en mobile | done | API usa `Idempotency-Key` y estados `PENDING`/`UNKNOWN`. **2026-11-09:** manual y banda llaman `prepareSale` / `prepareSaleFromMsr`, generan una única clave y envían directo a procesamiento; la pantalla/ruta de confirmación fue eliminada. El formulario manual se bloquea antes de preparar la venta para que dos toques no generen otra clave ni otro `POST`. El botón `REINTENTAR` de un error de red conserva la misma clave y `sendIsoMessage` ignora un segundo envío durante `SalesProcessing`/`SalesAwaitingAuthorization`. `202 PENDING` se consulta por número de operación, sin reenviar el `POST`. **2026-11-10:** mientras la pantalla procesa no permite salida manual, logout ni back de Android. Al vencer los 30 segundos, conserva la pendiente en historial y permite una venta independiente con otra clave; esto no habilita el cierre del lote. Evidencia: `mobile/test/{sale_direct_charge_test,sales_polling_test,terminal_layout_test}.dart`. Última revisión: 2026-11-10. |
 
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |
@@ -658,7 +703,7 @@ Verifone (banda + térmica).
 
 
 | G-P1-08 | UI mobile de anulación | partial | Flujo para resultado definitivo: botón "ANULAR VENTA" en el detalle, reingreso de tarjeta y `VoidResultScreen`. **2026-10-22 (VA-01):** ante `200/FAILED` con `reason=UNDER_REVIEW`, mobile muestra “Anulación en verificación”, no vuelve a enviarla y conserva la venta como aprobada en historial. Falta validación en V660P e impresión específica del handoff; ver G-P1-17. |
-| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias y ejecución contra `authkig` + MySQL locales. **Decisión 2026-10-13:** el `0400` solo se genera para un `0200` previamente enviado y `0410/00` se acepta como confirmación; un `0400` sin original no interviene en el cálculo de saldo, reportes ni cierre. **RA-01:** se agregaron `ReverseCommand`, `ReversalResult`, `IsoProcessor.reverse`, mock, transporte TCP de un solo intento y `build_reversal_request` separado de la anulación. **RA-02:** `POST /v1/reverse` ejecuta un intento y distingue `NOT_SENT` de `INDETERMINATE`. **RA-03 (2026-10-13):** `transactions` persiste datos y outcome de recuperación antes del efecto externo; filas históricas quedan fuera de recuperación automática. **RA-04 (2026-10-13):** migración `20261013_0009`, modelos y repositorios agregan `processor_jobs` y `payment_processing_config`, fila `default`, constraints y validación de transiciones, sin ejecutar aún un worker. **RA-05 (2026-10-13):** la API tipa autorización como `APPROVED`/`DECLINED`/`NOT_SENT`/`INDETERMINATE`, incorpora el puerto y cliente HTTP de `/v1/reverse`, clasifica fallos de transporte/HTTP y conserva contratos separados para balance y anulación. **RA-06 (2026-10-14):** la API toma un snapshot de política, reintenta el mismo `0200` solo tras `NOT_SENT`, conserva STAN, ticket e `Idempotency-Key`, aplica backoff/jitter dentro del presupuesto síncrono y publica `FAILED` únicamente al agotar resultados no enviados. Cada intento queda registrado sin PAN, vencimiento ni clave de idempotencia. **RA-07 (2026-10-14):** un resultado `INDETERMINATE` mantiene la venta en `PENDING` y, antes de responder `202`, persiste atómicamente el resultado, un único job `REVERSE/READY` con STAN de reverso y evento de auditoría. No se llama a `reverse()` durante el request. Un watchdog explícito bloquea pendientes envejecidas sin job y las encola conservadoramente. **RA-08 (2026-10-14):** `GET /v1/transactions/{transaction_number}` queda aislado a la terminal autenticada y proyecta `READY`/`PROCESSING`/`RETRY` como `PENDING / PROCESSING` (polling de 2 s, sin nueva venta) y `MANUAL_REVIEW` como `PENDING / UNDER_REVIEW` (sin polling, nueva venta permitida), sin exponer detalles del job. El `POST` y su replay devuelven la misma proyección; `VOIDED` conserva su contrato de anulación independiente. Evidencia: pruebas de contratos públicos, aislamiento y OpenAPI. **RA-09 (2026-10-14):** `ReversalJobWorker.run_once()` reclama a lo sumo un `REVERSE` vencido con `FOR UPDATE SKIP LOCKED`, confirma el claim antes de red y lo protege con `claim_token`; reconstruye el `0400` desde Postgres, reintenta solo `NOT_SENT` con backoff, confirma `FAILED` tras `REVERSED_CONFIRMED` y pasa rechazo, agotamiento, ambigüedad o datos faltantes a `MANUAL_REVIEW`. **RA-10 (2026-10-14):** el monitor mueve un `PROCESSING` vencido a `MANUAL_REVIEW` y abre una alerta durable única. **RA-11 (2026-10-14):** cada proceso FastAPI puede activar un thread de recuperación con sesión y cliente por vuelta; lifecycle, shutdown con gracia, monitoreo de jobs abandonados y readiness observable quedan cubiertos. La activación queda explícitamente deshabilitada por defecto. **RA-12 (2026-10-14):** casa central consulta temporalmente por SQL de solo lectura, sin rol ni endpoints de API; la resolución auditada y el reintento manual quedan diferidos. **Pendiente:** guardia de cierre (RA-13) y herramienta administrativa de resolución. Última revisión: 2026-10-14. |
+| G-P1-09 | Reverso automático (MTI `0400`) ante `UNKNOWN`/timeout | partial | **RA-00 (2026-10-12):** contrato caracterizado con fixtures binarias y ejecución contra `authkig` + MySQL locales. **Decisión 2026-10-13:** el `0400` solo se genera para un `0200` previamente enviado y `0410/00` se acepta como confirmación; un `0400` sin original no interviene en el cálculo de saldo, reportes ni cierre. **RA-01:** se agregaron `ReverseCommand`, `ReversalResult`, `IsoProcessor.reverse`, mock, transporte TCP de un solo intento y `build_reversal_request` separado de la anulación. **RA-02:** `POST /v1/reverse` ejecuta un intento y distingue `NOT_SENT` de `INDETERMINATE`. **RA-03 (2026-10-13):** `transactions` persiste datos y outcome de recuperación antes del efecto externo; filas históricas quedan fuera de recuperación automática. **RA-04 (2026-10-13):** migración `20261013_0009`, modelos y repositorios agregan `processor_jobs` y `payment_processing_config`, fila `default`, constraints y validación de transiciones, sin ejecutar aún un worker. **RA-05 (2026-10-13):** la API tipa autorización como `APPROVED`/`DECLINED`/`NOT_SENT`/`INDETERMINATE`, incorpora el puerto y cliente HTTP de `/v1/reverse`, clasifica fallos de transporte/HTTP y conserva contratos separados para balance y anulación. **RA-06 (2026-10-14):** la API toma un snapshot de política, reintenta el mismo `0200` solo tras `NOT_SENT`, conserva STAN, ticket e `Idempotency-Key`, aplica backoff/jitter dentro del presupuesto síncrono y publica `FAILED` únicamente al agotar resultados no enviados. Cada intento queda registrado sin PAN, vencimiento ni clave de idempotencia. **RA-07 (2026-10-14):** un resultado `INDETERMINATE` mantiene la venta en `PENDING` y, antes de responder `202`, persiste atómicamente el resultado, un único job `REVERSE/READY` con STAN de reverso y evento de auditoría. No se llama a `reverse()` durante el request. Un watchdog explícito bloquea pendientes envejecidas sin job y las encola conservadoramente. **RA-08 (2026-10-14):** `GET /v1/transactions/{transaction_number}` queda aislado a la terminal autenticada y proyecta `READY`/`PROCESSING`/`RETRY` como `PENDING / PROCESSING` (polling de 2 s, sin nueva venta) y `MANUAL_REVIEW` como `PENDING / UNDER_REVIEW` (sin polling, nueva venta permitida), sin exponer detalles del job. El `POST` y su replay devuelven la misma proyección; `VOIDED` conserva su contrato de anulación independiente. Evidencia: pruebas de contratos públicos, aislamiento y OpenAPI. **RA-09 (2026-10-14):** `ReversalJobWorker.run_once()` reclama a lo sumo un `REVERSE` vencido con `FOR UPDATE SKIP LOCKED`, confirma el claim antes de red y lo protege con `claim_token`; reconstruye el `0400` desde Postgres, reintenta solo `NOT_SENT` con backoff, confirma `FAILED` tras `REVERSED_CONFIRMED` y pasa rechazo, agotamiento, ambigüedad o datos faltantes a `MANUAL_REVIEW`. **RA-10 (2026-10-14):** el monitor mueve un `PROCESSING` vencido a `MANUAL_REVIEW` y abre una alerta durable única. **RA-11 (2026-10-14):** cada proceso FastAPI puede activar un thread de recuperación con sesión y cliente por vuelta; lifecycle, shutdown con gracia, monitoreo de jobs abandonados y readiness observable quedan cubiertos. La activación queda explícitamente deshabilitada por defecto. **RA-12 (2026-10-14):** casa central consulta temporalmente por SQL de solo lectura, sin rol ni endpoints de API; la resolución auditada y el reintento manual quedan diferidos. **2026-11-10:** la migración `20261110_0016` separa `reversal_grace_seconds` (45 s por defecto), persiste `authorization_last_attempt_at` al iniciar cada intento, agenda los jobs ambiguos desde ese instante y hace que el watchdog mida desde el intento en lugar de `created_at`. No se reenvía un `0200` ambiguo. El timeout mitiga, pero no elimina, la carrera del legacy. RA-13 ya está aplicado; queda pendiente la herramienta administrativa de resolución y la activación controlada del worker. Última revisión: 2026-11-10. |
 | G-P1-17 | Anulación ambigua sin recuperación durable | partial | **2026-10-22 (VA-00/VA-01):** la sonda contra `authkig` probó que el `0400/020000` recibe `0410/00` pero deja activa la fila de anulación: `anula_cupon()` guarda vencimiento `NULL` y `reversa_cupon()` exige DE14 para hallarla. La migración `20261022_0013` agrega `void_operations` y alertas únicas; la API persiste la intención antes del gateway, mantiene la venta `APPROVED`, clasifica `NOT_SENT`/`INDETERMINATE`, expone `POST`/`GET .../void` y proyecta lo ambiguo como `FAILED` con `reason=UNDER_REVIEW` (estado interno `UNDER_REVIEW`) sin job emisor de `0400`. `202` queda reservado para estado público `PENDING`; las anulaciones terminales devuelven `200`. El cierre de lote y solo una nueva anulación del mismo cupón quedan bloqueados; las demás ventas permanecen independientes. Mobile presenta el handoff. Pendiente: aplicar la migración en los ambientes, herramienta administrativa auditada para resolver revisiones y validación V660P. Evidencia: `docs/diseno-recuperacion-anulaciones.md`, `api/tests/test_void_transaction.py` y contrato legacy. |
 | G-P1-15 | PAN de recuperación persistido en texto plano amplía deuda PCI | open | **RA-03 (2026-10-13):** aceptación de riesgo ya definida en `plan-reversos-automaticos.md`. El PAN y vencimiento se guardan para recuperación durable, pero se excluyen de respuestas, eventos, errores y `repr`; CVV nunca se persiste. Pendiente: cifrado/tokenización a nivel aplicación, política de retención/borrado, controles y auditoría de acceso a DB/backups. |
 | G-P1-16 | Métricas y alertas automáticas de recuperación | open | **RA-16 (2026-10-15):** se difiere la exposición de métricas por estado, antigüedad, intentos y tiempo de resolución. Mientras tanto, operación usa `GET /health/ready`, alertas durables `recovery_alerts` y eventos estructurados sin datos sensibles; ver `docs/runbook-recuperacion-pagos.md`. |
@@ -690,6 +735,16 @@ y su idempotencia inicial, respeta `poll_after_seconds`, no envía un nuevo
 `0200` durante polling ni ante fallos transitorios, y puede reanudar desde el
 historial tras reinicio. `UNDER_REVIEW` detiene la consulta automática.
 
+**Actualización RA-14 — 2026-11-10:** la prohibición de un segundo `0200`
+aplica al mismo intento de venta, que conserva su `Idempotency-Key`; no impide
+una venta independiente. La pantalla de procesamiento no admite salida manual.
+Al vencer los 30 segundos, muestra la operación como pendiente, indica que no
+debe repetirse y permite consultarla en el historial antes de liberar una nueva
+venta. El cierre sigue usando el estado durable y rechaza el lote mientras
+exista una operación que pueda cambiar. `may_start_new_sale` se conserva por
+compatibilidad de contrato, pero Mobile ya no lo usa para bloquear el
+formulario.
+
 **RA-15:** `UNDER_REVIEW` se representa como una verificación, no un rechazo.
 La terminal entrega e imprime un comprobante con la referencia y el PAN siempre
 enmascarado, alerta sobre el posible cobro duplicado, conserva la operación en
@@ -713,6 +768,15 @@ activación canary, el rollback que sólo detiene nuevos claims y la conciliaci�
 sin PAN. El gap sigue `partial`: falta ejecutar la activación controlada en los
 ambientes reales y una resolución administrativa autenticada/auditada para
 `MANUAL_REVIEW`.
+
+**Actualización RA-17 — 2026-11-10:** el worker está habilitado por defecto;
+`false` queda como override de mantenimiento, rollback o pruebas. La matriz
+PostgreSQL real se ejecuta con `make -C api recovery-concurrency-local` y cubre
+locks entre dos watchdogs, enqueue contra aprobación tardía/cancelación y la
+precedencia de un reverso confirmado. Los cuatro relojes de autorización y
+recuperación quedaron separados por la migración `20261110_0018`. Esta nota
+reemplaza las referencias anteriores a desactivación por defecto y al campo
+compartido `processing_timeout_seconds`.
 
 ### Actualización G-P1-15 — 2026-10-14
 
@@ -741,6 +805,7 @@ retención/borrado y auditoría efectiva de accesos.
 | G-P2-09 | Resultado de venta sin datos y ciclo del PSDK entre lectura e impresión | done | **2026-09-28 (VE-11):** `SaleStatusScreen` sin `OperationModel` ya no se dibuja como «¡Transacción Aprobada!»: avisa que faltan datos y vuelve atrás (`Navigator.maybePop`), igual que `sale_detail_screen.dart`. Test `mobile/test/sale_status_screen_test.dart`. **2026-09-28 (VE-12):** `readCard` libera el PSDK (`cancelReadMsr` → `tearDown`) antes de devolver el resultado, y el `dispose` de la pantalla de espera solo aborta una lectura todavía en curso. Ver G-P0-06 y G-P0-07. |
 | G-P2-10 | Cierre administrativo de lote y comprobante impreso | partial | **2026-10-06:** se decidió no integrar el cierre ISO `0500` ni modificar `payment_processor/legacy/`: para Solidaridad el lote es un corte administrativo, no una secuencia financiera rotativa. La migración `20261006_0007_administrative_batch_closes.py` crea `batch_closes`; `transactions.batch_close_id IS NULL` define el lote actual. `POST /v1/transactions/batch-close` se asocia al usuario y la terminal del token, exige `Idempotency-Key`, bloquea las filas actuales, rechaza pagos `PENDING`/`UNKNOWN`, crea el corte y devuelve las operaciones incluidas. `GET /v1/transactions` ahora devuelve sólo ese lote actual y `VoidTransaction` rechaza transacciones con `batch_close_id`, por lo que una venta cerrada no se anula desde la terminal. Flutter confirma el corte, conserva la misma clave para reintentos ambiguos y recibe el listado para conectarlo a impresión futura; ya no aplica un corte por día. El identificador visible es `ACTUAL`; el identificador durable del corte es `batch_close_id`, no el número fijo del procesador. **Pendiente:** ticket de cierre con `ReceiptPrinter`, consulta de cortes históricos/exportación y peso por producto desde backend. El total sigue en kg porque `amount` es cantidad y no hay precio público (D-3 de `docs/errores-ventas.md`); `batchKgPerUnit` sigue local. El cierre forzado legacy queda como antecedente operativo, pero no participa de este flujo. Evidencia: `api/{application/payments/close_batch.py,persistence/models/batch_close.py,persistence/repositories/transaction_repository.py}` y `mobile/lib/features/batch_close/**`; `make -C api check` OK (146 tests, cobertura 93%). |
 | G-P2-11 | Índices históricos de API ausentes de metadata ORM | open | **Detectado 2026-10-13 durante RA-04:** `alembic check` propone eliminar `ix_transaction_status_events_created_at`, `ix_transaction_status_events_transaction_id_created_at` e `ix_transactions_user_created_at` porque existen por migraciones previas pero no están declarados en los modelos SQLAlchemy. No afecta runtime ni el gate actual, pero vuelve riesgosa una futura autogeneración. El índice nuevo `ix_processor_jobs_available` sí quedó alineado entre migración y metadata. |
+| G-P2-12 | Watchdog de autorizaciones antiguas sin límite por iteración | open | **2026-11-10:** la consulta usa `FOR UPDATE SKIP LOCKED` y la matriz PostgreSQL verifica exclusión entre réplicas, pero todavía carga todas las candidatas disponibles en una vuelta. Pendiente: ordenar por `authorization_last_attempt_at, id`, aplicar un límite configurable y exponer métricas de backlog/antigüedad. |
 
 ---
 

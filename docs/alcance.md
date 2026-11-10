@@ -67,6 +67,16 @@ impresión de ticket.
   - **ingreso manual** como fallback;
   - validación de la captura y envío directo al backend, sin pantalla
     intermedia de confirmación, para todos los medios de pago implementados;
+  - durante el procesamiento no se puede abandonar manualmente la operación;
+    Mobile consulta el estado durante hasta 30 segundos y sólo un resultado o
+    ese timeout liberan la pantalla;
+  - si vence la espera después de recibir un número de operación, la venta
+    permanece `PENDING` en el backend y en el historial. La pantalla de
+    resultado indica que no se repita esa misma venta, que puede consultarse en
+    el historial y que es posible iniciar una venta independiente con otra
+    `Idempotency-Key`;
+  - una venta pendiente no bloquea ventas independientes. Sí bloquea el cierre
+    de lote mientras su resultado todavía pueda cambiar;
   - visualización de resultado (aprobada / rechazada / error de
     comunicación o procesamiento).
 - Mensajes de error comprensibles a partir de la respuesta del backend/procesador.
@@ -188,6 +198,24 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 - El reverso técnico `0400` se genera únicamente para un `0200` previamente
   enviado. `0410/DE39=00` se considera confirmación operativa del reverso; una
   fila `0400` sin original no afecta saldo, reportes ni cierre.
+- Una autorización ambigua no se reenvía. La API registra el momento del último
+  intento y difiere cualquier reverso automático durante
+  `reversal_grace_seconds` (45 segundos por defecto, medidos desde el inicio del
+  último intento). Este plazo reduce el
+  riesgo de superponer `0200` y `0400`, pero no lo elimina porque el procesador
+  legacy no ofrece cancelación, consulta de estado ni un límite de ejecución
+  garantizado.
+- Si la autorización obtiene un resultado definitivo antes de enviar el
+  `0400`, el job de reverso queda `CANCELLED` con motivo
+  `AUTHORIZATION_RESOLVED_BEFORE_REVERSAL` y no se contacta nuevamente al
+  procesador. La cancelación sólo aplica mientras el reverso sigue sin enviarse.
+- La política separa cuatro tiempos: presupuesto síncrono de autorización
+  (`authorization_budget_seconds`), antigüedad de una autorización huérfana
+  (`stale_pending_authorization_seconds`), gracia previa al `0400`
+  (`reversal_grace_seconds`) y abandono de un reverso reclamado
+  (`reversal_processing_timeout_seconds`). El worker durable se inicia por
+  defecto con la API; puede desactivarse explícitamente para mantenimiento o
+  pruebas deterministas y su salud forma parte de `/health/ready`.
 - La caracterización VA-00 comprobó que el `0400/020000` del legacy vigente
   acusa `0410/00` pero no neutraliza una anulación. Una anulación ambigua queda
   en revisión operativa durable; no se reenvía desde la app ni se intenta su

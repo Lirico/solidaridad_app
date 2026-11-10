@@ -38,6 +38,7 @@ def test_to_domain_maps_fields() -> None:
     row.expiration_date = "3012"
     row.authorization_outcome = "APPROVED"
     row.authorization_attempt_count = 1
+    row.authorization_last_attempt_at = now
     row.stan = "1"
     row.processor_ticket = "00000007"
     row.auth_id = "A"
@@ -77,6 +78,7 @@ def test_to_domain_keeps_historical_rows_without_pan_unrecoverable() -> None:
         "expiration_date": None,
         "authorization_outcome": None,
         "authorization_attempt_count": 0,
+        "authorization_last_attempt_at": datetime.now(UTC),
         "stan": "1",
         "processor_ticket": "00000007",
         "auth_id": "A",
@@ -114,6 +116,7 @@ def test_orm_repr_never_contains_recovery_card_data() -> None:
         expiration_date="3012",
         authorization_outcome="PENDING",
         authorization_attempt_count=1,
+        authorization_last_attempt_at=datetime.now(UTC),
         idempotency_key="key",
         request_fingerprint="a" * 64,
     )
@@ -216,10 +219,11 @@ def test_close_batch_blocks_each_open_recovery_job_state(
     ("status", "outcome"),
     [
         (TransactionStatus.PENDING, AuthorizationOutcome.PENDING),
-        (TransactionStatus.APPROVED, AuthorizationOutcome.INDETERMINATE),
+        (TransactionStatus.PENDING, AuthorizationOutcome.INDETERMINATE),
+        (TransactionStatus.UNKNOWN, AuthorizationOutcome.INDETERMINATE),
     ],
 )
-def test_close_batch_blocks_pending_or_indeterminate_transactions(
+def test_close_batch_blocks_pending_or_unknown_transactions(
     status: TransactionStatus,
     outcome: AuthorizationOutcome,
 ) -> None:
@@ -235,6 +239,42 @@ def test_close_batch_blocks_pending_or_indeterminate_transactions(
     assert result == "in_flight"
     assert session.scalar.call_count == 1
     assert session.add.call_count == 0
+
+
+def test_close_batch_allows_failed_sale_after_confirmed_reversal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = _current_batch_row(
+        status=TransactionStatus.FAILED,
+        authorization_outcome=AuthorizationOutcome.INDETERMINATE,
+    )
+    session = _batch_close_session(row, open_recovery_job=None)
+
+    def assign_close_id() -> None:
+        if session.add.called:
+            session.add.call_args.args[0].id = 23
+
+    session.flush.side_effect = assign_close_id
+    expected_close = MagicMock()
+    expected_transaction = MagicMock()
+    monkeypatch.setattr(
+        "persistence.repositories.transaction_repository._to_batch_close",
+        lambda _: expected_close,
+    )
+    monkeypatch.setattr(
+        "persistence.repositories.transaction_repository._to_domain",
+        lambda _: expected_transaction,
+    )
+
+    result = TransactionRepository(session).close_current_batch(
+        terminal_id="05000001",
+        closed_by_user_id=1,
+        idempotency_key="close-1",
+    )
+
+    assert result == (expected_close, [expected_transaction])
+    assert row.batch_close_id is not None
+    session.add.assert_called_once()
 
 
 def test_close_batch_allows_confirmed_transaction_without_open_recovery(
@@ -374,6 +414,7 @@ def test_create_pending_and_update_result() -> None:
     assert created.expiration_date == "3012"
     assert created.authorization_outcome == AuthorizationOutcome.PENDING
     assert created.authorization_attempt_count == 1
+    assert created.authorization_last_attempt_at is not None
     assert created.id == 1
     create_events = [e for e in added if isinstance(e, TransactionStatusEvent)]
     assert len(create_events) == 1
@@ -397,6 +438,7 @@ def test_create_pending_and_update_result() -> None:
     row.expiration_date = "3012"
     row.authorization_outcome = "PENDING"
     row.authorization_attempt_count = 1
+    row.authorization_last_attempt_at = datetime.now(UTC)
     row.stan = "000001"
     row.processor_ticket = "00000001"
     row.auth_id = None
@@ -442,9 +484,12 @@ def test_records_authorization_retry_and_sanitized_attempt_outcome() -> None:
     row.user_id = 1
     row.status = TransactionStatus.PENDING.value
     row.authorization_attempt_count = 1
+    previous_attempt_at = datetime(2026, 1, 1, tzinfo=UTC)
+    row.authorization_last_attempt_at = previous_attempt_at
     session.get.return_value = row
 
     attempt_number = repo.start_authorization_retry(transaction_id=1)
+    attempt_started_at = row.authorization_last_attempt_at
     repo.record_authorization_attempt(
         transaction_id=1,
         attempt_number=attempt_number,
@@ -453,6 +498,7 @@ def test_records_authorization_retry_and_sanitized_attempt_outcome() -> None:
 
     assert attempt_number == 2
     assert row.authorization_attempt_count == 2
+    assert row.authorization_last_attempt_at > previous_attempt_at
     events = [
         event
         for event in added
@@ -465,6 +511,30 @@ def test_records_authorization_retry_and_sanitized_attempt_outcome() -> None:
     assert events[0].processor_response_code is None
     assert events[0].user_message is None
     assert events[0].idempotency_key is None
+    assert row.authorization_last_attempt_at == attempt_started_at
+
+
+def test_stale_pending_filter_uses_last_authorization_attempt() -> None:
+    session = MagicMock()
+    session.scalars.return_value.all.return_value = []
+    attempted_before = datetime(2026, 11, 10, 12, tzinfo=UTC)
+
+    repository = TransactionRepository(session)
+    transactions = repository.list_stale_pending_without_reverse_job(
+        attempted_before=attempted_before
+    )
+
+    assert transactions == []
+    statement = session.scalars.call_args.args[0]
+    sql = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "authorization_last_attempt_at <=" in sql
+    assert "transactions.created_at <=" not in sql
+    assert "FOR UPDATE SKIP LOCKED" in sql
 
 
 @pytest.mark.parametrize(
@@ -518,6 +588,7 @@ def test_apply_void_result_appends_event() -> None:
     row.expiration_date = "3012"
     row.authorization_outcome = "APPROVED"
     row.authorization_attempt_count = 1
+    row.authorization_last_attempt_at = datetime.now(UTC)
     row.stan = "000001"
     row.processor_ticket = "00000001"
     row.auth_id = "A"

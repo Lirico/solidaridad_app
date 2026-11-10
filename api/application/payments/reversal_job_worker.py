@@ -7,6 +7,9 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
+from application.payments.enqueue_stale_pending_reversals import (
+    EnqueueStalePendingReversals,
+)
 from application.payments.ports import (
     PaymentGateway,
     ReversalOutcome,
@@ -18,7 +21,11 @@ from application.payments.response_messages import MSG_FAILED
 from application.payments.reversal_retry import ReversalRetryPolicy
 from application.payments.sanitize import sanitize_processor_code
 from domain.authorization_outcome import AuthorizationOutcome
-from domain.processor_job import ProcessorJob, ProcessorJobState
+from domain.processor_job import (
+    REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    ProcessorJob,
+    ProcessorJobState,
+)
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from persistence.repositories.payment_processing_config_repository import (
@@ -64,6 +71,9 @@ class ReversalJobWorker:
 
     def run_once(self) -> bool:
         """Process one job, returning whether this worker claimed any work."""
+        if self._should_stop():
+            return False
+        self._enqueue_stale_pending()
         claimed = self._claim()
         if claimed is None:
             return False
@@ -71,6 +81,12 @@ class ReversalJobWorker:
         transaction = self._transactions.get_by_id(
             transaction_id=claimed.transaction_id
         )
+        if (
+            transaction is not None
+            and transaction.status is not TransactionStatus.PENDING
+        ):
+            self._persist_cancelled(claimed, transaction.transaction_number)
+            return True
         request = self._reverse_request(claimed, transaction)
         if request is None:
             self._persist_manual_review(
@@ -136,6 +152,19 @@ class ReversalJobWorker:
             finalized_at=finalized_at,
         )
         return True
+
+    def _enqueue_stale_pending(self) -> None:
+        """Queue one reverse for each PENDING sale older than the wait."""
+        config = self._configs.get_default()
+        EnqueueStalePendingReversals(
+            session=self._session,
+            transactions=self._transactions,
+            jobs=self._jobs,
+            stale_after=timedelta(
+                seconds=config.stale_pending_authorization_seconds
+            ),
+            now=self._now,
+        ).execute()
 
     def _claim(self) -> ProcessorJob | None:
         if self._should_stop():
@@ -216,6 +245,27 @@ class ReversalJobWorker:
                 processor_job_id=claimed.id,
                 state=ProcessorJobState.RETRY,
                 error_code=ReversalOutcome.NOT_SENT.value,
+            )
+        else:
+            self._session.rollback()
+
+    def _persist_cancelled(
+        self,
+        claimed: ProcessorJob,
+        transaction_number: str,
+    ) -> None:
+        if self._jobs.finalize_claim(
+            job_id=claimed.id,
+            claim_token=self._claim_token(claimed),
+            target=ProcessorJobState.CANCELLED,
+            finalized_at=self._now(),
+            result=REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+        ):
+            self._commit_outcome()
+            log_recovery_job_transition(
+                transaction_number=transaction_number,
+                processor_job_id=claimed.id,
+                state=ProcessorJobState.CANCELLED,
             )
         else:
             self._session.rollback()

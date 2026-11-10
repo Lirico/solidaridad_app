@@ -61,7 +61,7 @@ class SaleStatusContent extends StatelessWidget {
           statusSubtitle,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: Colors.grey),
-          maxLines: 2,
+          maxLines: 4,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 16),

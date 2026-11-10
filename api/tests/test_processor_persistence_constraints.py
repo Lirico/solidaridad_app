@@ -23,7 +23,10 @@ def _config_values() -> dict[str, object]:
         "reversal_max_delay_seconds": 300,
         "reversal_backoff_multiplier": 2,
         "jitter_percentage": 20,
-        "processing_timeout_seconds": 60,
+        "authorization_budget_seconds": 60,
+        "stale_pending_authorization_seconds": 45,
+        "reversal_grace_seconds": 45,
+        "reversal_processing_timeout_seconds": 60,
         "worker_poll_interval_seconds": 1,
     }
 
@@ -40,7 +43,10 @@ def _config_values() -> dict[str, object]:
         ("reversal_max_delay_seconds", 4),
         ("reversal_backoff_multiplier", 0.5),
         ("jitter_percentage", 101),
-        ("processing_timeout_seconds", 0),
+        ("authorization_budget_seconds", 0),
+        ("stale_pending_authorization_seconds", 0),
+        ("reversal_grace_seconds", 0),
+        ("reversal_processing_timeout_seconds", 0),
         ("worker_poll_interval_seconds", 0),
     ],
 )
@@ -49,6 +55,16 @@ def test_database_rejects_invalid_payment_config(field: str, value: object) -> N
     PaymentProcessingConfig.__table__.create(engine)
     values = _config_values()
     values[field] = value
+
+    with engine.connect() as connection, pytest.raises(IntegrityError):
+        connection.execute(insert(PaymentProcessingConfig).values(**values))
+
+
+def test_database_rejects_stale_pending_timeout_before_reversal_grace() -> None:
+    engine = create_engine("sqlite://")
+    PaymentProcessingConfig.__table__.create(engine)
+    values = _config_values()
+    values["stale_pending_authorization_seconds"] = 44
 
     with engine.connect() as connection, pytest.raises(IntegrityError):
         connection.execute(insert(PaymentProcessingConfig).values(**values))
@@ -90,6 +106,30 @@ def test_database_rejects_invalid_processor_job(field: str, value: object) -> No
     ProcessorJob.__table__.create(engine)
     values = _job_values()
     values[field] = value
+
+    with engine.connect() as connection, pytest.raises(IntegrityError):
+        connection.execute(insert(ProcessorJob).values(**values))
+
+
+def test_database_accepts_cancelled_job_with_reason_and_completion_time() -> None:
+    engine = create_engine("sqlite://")
+    ProcessorJob.__table__.create(engine)
+    values = _job_values()
+    values.update(
+        state="CANCELLED",
+        result="AUTHORIZATION_RESOLVED_BEFORE_REVERSAL",
+        completed_at=datetime.now(UTC),
+    )
+
+    with engine.begin() as connection:
+        connection.execute(insert(ProcessorJob).values(**values))
+
+
+def test_database_rejects_cancelled_job_without_reason() -> None:
+    engine = create_engine("sqlite://")
+    ProcessorJob.__table__.create(engine)
+    values = _job_values()
+    values.update(state="CANCELLED", completed_at=datetime.now(UTC))
 
     with engine.connect() as connection, pytest.raises(IntegrityError):
         connection.execute(insert(ProcessorJob).values(**values))

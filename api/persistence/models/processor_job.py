@@ -41,7 +41,7 @@ class ProcessorJob(Base):
         ),
         CheckConstraint(
             "state IN ('READY', 'PROCESSING', 'RETRY', 'COMPLETED', "
-            "'MANUAL_REVIEW')",
+            "'CANCELLED', 'MANUAL_REVIEW')",
             name="ck_processor_jobs_state",
         ),
         CheckConstraint("attempt_count >= 0", name="ck_processor_jobs_attempt_count"),
@@ -53,6 +53,10 @@ class ProcessorJob(Base):
         CheckConstraint(
             "state <> 'COMPLETED' OR (result IS NOT NULL AND completed_at IS NOT NULL)",
             name="ck_processor_jobs_completed_result",
+        ),
+        CheckConstraint(
+            "state <> 'CANCELLED' OR (result IS NOT NULL AND completed_at IS NOT NULL)",
+            name="ck_processor_jobs_cancelled_reason",
         ),
         Index(
             "ix_processor_jobs_available",

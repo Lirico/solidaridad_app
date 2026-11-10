@@ -72,7 +72,7 @@ class BatchCloseCubit extends Cubit<BatchCloseState> {
       emit(const BatchCloseSessionExpired());
       return;
     }
-    if (result.connectionError) {
+    if (result.connectionError || result.rejected) {
       emit(
         BatchCloseCloseFailed(
           summary: summary,

@@ -65,7 +65,7 @@ def test_enqueues_each_stale_pending_transaction_once() -> None:
 
     assert recovered == [transaction]
     transactions.list_stale_pending_without_reverse_job.assert_called_once_with(
-        created_before=datetime(2026, 10, 14, 11, 59, tzinfo=UTC)
+        attempted_before=datetime(2026, 10, 14, 11, 59, tzinfo=UTC)
     )
     jobs.create_reverse.assert_called_once()
     kwargs = jobs.create_reverse.call_args.kwargs

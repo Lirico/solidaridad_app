@@ -49,6 +49,7 @@ def _to_domain(row: TransactionModel) -> Transaction:
             else None
         ),
         authorization_attempt_count=row.authorization_attempt_count,
+        authorization_last_attempt_at=row.authorization_last_attempt_at,
         stan=row.stan,
         auth_id=row.auth_id,
         retrieval_reference=row.retrieval_reference,
@@ -151,7 +152,9 @@ class TransactionRepository:
         if row is None:
             raise LookupError(f"transaction {transaction_id} not found")
         row.authorization_attempt_count += 1
-        row.updated_at = datetime.now(UTC)
+        now = datetime.now(UTC)
+        row.authorization_last_attempt_at = now
+        row.updated_at = now
         self._session.flush()
         return row.authorization_attempt_count
 
@@ -167,6 +170,8 @@ class TransactionRepository:
         row = self._session.get(TransactionModel, transaction_id)
         if row is None:
             raise LookupError(f"transaction {transaction_id} not found")
+        now = datetime.now(UTC)
+        row.updated_at = now
         self._append_status_event(
             transaction_id=row.id,
             from_status=row.status,
@@ -198,7 +203,7 @@ class TransactionRepository:
     def list_stale_pending_without_reverse_job(
         self,
         *,
-        created_before: datetime,
+        attempted_before: datetime,
     ) -> list[Transaction]:
         """Lock recoverable pending payments stranded before classification.
 
@@ -219,7 +224,7 @@ class TransactionRepository:
                 TransactionModel.status == TransactionStatus.PENDING.value,
                 TransactionModel.authorization_outcome
                 == AuthorizationOutcome.PENDING.value,
-                TransactionModel.created_at <= created_before,
+                TransactionModel.authorization_last_attempt_at <= attempted_before,
                 TransactionModel.stan.is_not(None),
                 TransactionModel.processor_ticket.is_not(None),
                 ~reverse_job_exists,
@@ -288,6 +293,7 @@ class TransactionRepository:
             expiration_date=expiration_date,
             authorization_outcome=AuthorizationOutcome.PENDING.value,
             authorization_attempt_count=1,
+            authorization_last_attempt_at=now,
             stan=stan,
             processor_ticket=processor_ticket,
             user_message=user_message,
@@ -349,8 +355,10 @@ class TransactionRepository:
         """Atomically move the terminal's current operations into a close.
 
         New operations inserted after this locked snapshot stay in the next
-        current batch. Pending or ambiguous processor outcomes block the close
-        so a later approval cannot alter an already printed summary.
+        current batch. A sale that can still change result blocks the close:
+        public status PENDING or UNKNOWN, an open reversal job, or an open
+        void. A finished reversal keeps authorization_outcome INDETERMINATE
+        and a final public status; that historical outcome does not block.
         """
         existing = self._session.scalar(
             select(BatchCloseModel).where(
@@ -388,7 +396,6 @@ class TransactionRepository:
         if any(
             row.status
             in {TransactionStatus.PENDING.value, TransactionStatus.UNKNOWN.value}
-            or row.authorization_outcome == AuthorizationOutcome.INDETERMINATE.value
             for row in current
         ):
             return "in_flight"

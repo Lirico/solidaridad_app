@@ -58,8 +58,24 @@ class PaymentProcessingConfig(Base):
             name="ck_payment_config_jitter_percentage",
         ),
         CheckConstraint(
-            "processing_timeout_seconds > 0",
-            name="ck_payment_config_processing_timeout",
+            "authorization_budget_seconds > 0",
+            name="ck_payment_config_authorization_budget",
+        ),
+        CheckConstraint(
+            "stale_pending_authorization_seconds > 0",
+            name="ck_payment_config_stale_pending_authorization",
+        ),
+        CheckConstraint(
+            "reversal_grace_seconds > 0",
+            name="ck_payment_config_reversal_grace",
+        ),
+        CheckConstraint(
+            "stale_pending_authorization_seconds >= reversal_grace_seconds",
+            name="ck_payment_config_stale_pending_after_grace",
+        ),
+        CheckConstraint(
+            "reversal_processing_timeout_seconds > 0",
+            name="ck_payment_config_reversal_processing_timeout",
         ),
         CheckConstraint(
             "worker_poll_interval_seconds > 0",
@@ -97,7 +113,16 @@ class PaymentProcessingConfig(Base):
         nullable=False,
     )
     jitter_percentage: Mapped[int] = mapped_column(Integer, nullable=False)
-    processing_timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    authorization_budget_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    stale_pending_authorization_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+    reversal_grace_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    reversal_processing_timeout_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
     worker_poll_interval_seconds: Mapped[Decimal] = mapped_column(
         Numeric(10, 4),
         nullable=False,

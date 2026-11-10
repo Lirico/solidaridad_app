@@ -81,6 +81,10 @@ class Transaction(Base):
         default=0,
         server_default="0",
     )
+    authorization_last_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
     stan: Mapped[str | None] = mapped_column(String(6), nullable=True)
     processor_ticket: Mapped[str | None] = mapped_column(String(24), nullable=True)
     auth_id: Mapped[str | None] = mapped_column(String(32), nullable=True)

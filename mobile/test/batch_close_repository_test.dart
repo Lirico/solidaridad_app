@@ -294,7 +294,8 @@ void main() {
       idempotencyKey: 'close-1',
     );
 
-    expect(result.connectionError, isTrue);
+    expect(result.connectionError, isFalse);
+    expect(result.rejected, isTrue);
     expect(result.errorMessage, 'Hay transacciones en curso');
   });
 }

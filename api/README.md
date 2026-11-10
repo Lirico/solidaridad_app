@@ -137,6 +137,7 @@ Copy `.env.example` → `.env` (`.env` is gitignored).
 | `JWT_SECRET` | JWT signing secret | long local-only string |
 | `JWT_ALGORITHM` | JWT algorithm | `HS256` |
 | `JWT_EXPIRE_MINUTES` | Access token TTL | `1440` |
+| `EMBEDDED_RECOVERY_WORKER_ENABLED` | Worker durable embebido; desactivar sólo para mantenimiento/tests deterministas | `true` |
 
 ### Hitting the API from a device / emulator
 
@@ -185,6 +186,7 @@ make integ-stub HOST=127.0.0.1
 # 2. API configured with a dedicated, migrated DATABASE_URL, the stub and
 #    recovery disabled for deterministic PENDING assertions.
 DATABASE_URL=postgresql+psycopg://... PAYMENT_GATEWAY_URL=http://127.0.0.1:8011 \
+  EMBEDDED_RECOVERY_WORKER_ENABLED=false \
   make run HOST=127.0.0.1
 
 # 3. In a third terminal, execute the gate.
@@ -197,6 +199,20 @@ INTEGRATION_DATABASE_URL=postgresql+psycopg://... \
 integration environment. `INTEGRATION_GATEWAY_CONTROL_URL` is intentionally
 separate: it resets and scripts only the test gateway. Never expose that stub
 or its `__test__` endpoints in an environment that handles real payment data.
+
+### Carreras PostgreSQL de recuperación
+
+La matriz de locks y commits usa la PostgreSQL E2E dedicada del puerto `5435`:
+
+```bash
+make recovery-concurrency-local
+```
+
+El target reinicia únicamente el volumen `solidaridad-e2e`, migra a `head` y
+verifica dos watchdogs concurrentes, la aprobación tardía que cancela un
+reverso no enviado y la precedencia de un reverso ya confirmado. Para una base
+ya preparada puede usarse `make recovery-concurrency-test` sobrescribiendo
+`E2E_DATABASE_URL` si fuera necesario.
 
 ### E2E contra el procesador local
 

@@ -1,10 +1,11 @@
-.PHONY: install run run-once run-recovery-worker integ-stub integ-test integ-test-processor db-up db-down db-logs db-reset e2e-db-up e2e-db-down e2e-db-reset migrate migrate-new db-seed \
+.PHONY: install run run-once run-recovery-worker integ-stub integ-test integ-test-processor recovery-concurrency-test recovery-concurrency-local db-up db-down db-logs db-reset e2e-db-up e2e-db-down e2e-db-reset migrate migrate-new db-seed \
 	dev lint lint-fix typecheck test test-cov check
 
 HOST ?= 0.0.0.0
 API_BASE_URL ?= http://127.0.0.1:8000
 INTEGRATION_GATEWAY_CONTROL_URL ?= http://127.0.0.1:8011
 E2E_COMPOSE := docker compose --project-name solidaridad-e2e -f docker-compose.e2e.yml
+E2E_DATABASE_URL := postgresql+psycopg://solidaridad_e2e:solidaridad_e2e@localhost:5435/solidaridad_e2e
 
 install:
 	uv sync
@@ -49,7 +50,7 @@ run:
 run-once:
 	uv run uvicorn main:app --host $(HOST) --port 8000
 
-# Controlled rollout only: one process, without reload spawning another worker.
+# Explicit single-process runner; the worker is already enabled by default.
 run-recovery-worker:
 	EMBEDDED_RECOVERY_WORKER_ENABLED=true uv run uvicorn main:app --host $(HOST) --port 8000
 
@@ -68,6 +69,15 @@ integ-test:
 # ISO_TRANSPORT=tcp and the local processor fixtures have been installed.
 integ-test-processor:
 	INTEGRATION_TESTS=1 INTEGRATION_PROCESSOR_TESTS=1 API_BASE_URL="$(API_BASE_URL)" uv run pytest tests/integration/test_local_processor_http_integration.py
+
+# Real PostgreSQL lock/commit races for authorization recovery.
+recovery-concurrency-test:
+	RECOVERY_CONCURRENCY_DATABASE_URL="$(E2E_DATABASE_URL)" uv run pytest tests/postgresql/test_recovery_concurrency.py
+
+# Reset the dedicated disposable DB, migrate it and run the race matrix.
+recovery-concurrency-local: e2e-db-reset
+	DATABASE_URL="$(E2E_DATABASE_URL)" uv run alembic upgrade head
+	$(MAKE) recovery-concurrency-test
 
 dev: db-up migrate run
 

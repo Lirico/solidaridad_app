@@ -18,8 +18,10 @@ class PaymentProcessingConfig:
     reversal_max_delay_seconds: int
     reversal_backoff_multiplier: Decimal
     jitter_percentage: int
-    processing_timeout_seconds: int
+    authorization_budget_seconds: int
+    stale_pending_authorization_seconds: int
     reversal_grace_seconds: int
+    reversal_processing_timeout_seconds: int
     worker_poll_interval_seconds: Decimal
     created_at: datetime
     updated_at: datetime
@@ -49,10 +51,26 @@ class PaymentProcessingConfig:
             raise ValueError("reversal_backoff_multiplier must be at least 1")
         if not 0 <= self.jitter_percentage <= 100:
             raise ValueError("jitter_percentage must be between 0 and 100")
-        if self.processing_timeout_seconds <= 0:
-            raise ValueError("processing_timeout_seconds must be positive")
+        if self.authorization_budget_seconds <= 0:
+            raise ValueError("authorization_budget_seconds must be positive")
+        if self.stale_pending_authorization_seconds <= 0:
+            raise ValueError(
+                "stale_pending_authorization_seconds must be positive"
+            )
         if self.reversal_grace_seconds <= 0:
             raise ValueError("reversal_grace_seconds must be positive")
+        if (
+            self.stale_pending_authorization_seconds
+            < self.reversal_grace_seconds
+        ):
+            raise ValueError(
+                "stale_pending_authorization_seconds must be at least "
+                "reversal_grace_seconds"
+            )
+        if self.reversal_processing_timeout_seconds <= 0:
+            raise ValueError(
+                "reversal_processing_timeout_seconds must be positive"
+            )
         if self.worker_poll_interval_seconds <= 0:
             raise ValueError("worker_poll_interval_seconds must be positive")
 

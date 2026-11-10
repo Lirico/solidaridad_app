@@ -22,8 +22,14 @@ def _to_domain(row: PaymentProcessingConfigModel) -> PaymentProcessingConfig:
         reversal_max_delay_seconds=row.reversal_max_delay_seconds,
         reversal_backoff_multiplier=row.reversal_backoff_multiplier,
         jitter_percentage=row.jitter_percentage,
-        processing_timeout_seconds=row.processing_timeout_seconds,
+        authorization_budget_seconds=row.authorization_budget_seconds,
+        stale_pending_authorization_seconds=(
+            row.stale_pending_authorization_seconds
+        ),
         reversal_grace_seconds=row.reversal_grace_seconds,
+        reversal_processing_timeout_seconds=(
+            row.reversal_processing_timeout_seconds
+        ),
         worker_poll_interval_seconds=row.worker_poll_interval_seconds,
         created_at=row.created_at,
         updated_at=row.updated_at,

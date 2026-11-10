@@ -160,7 +160,9 @@ class ReversalJobWorker:
             session=self._session,
             transactions=self._transactions,
             jobs=self._jobs,
-            stale_after=timedelta(seconds=config.reversal_grace_seconds),
+            stale_after=timedelta(
+                seconds=config.stale_pending_authorization_seconds
+            ),
             now=self._now,
         ).execute()
 

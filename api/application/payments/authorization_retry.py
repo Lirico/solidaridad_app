@@ -16,7 +16,7 @@ class AuthorizationRetryPolicy:
     max_delay_ms: int
     backoff_multiplier: float
     jitter_percentage: int
-    processing_timeout_seconds: int
+    authorization_budget_seconds: int
     random_value: Callable[[], float] = random.random
 
     @classmethod
@@ -32,7 +32,7 @@ class AuthorizationRetryPolicy:
             max_delay_ms=config.authorization_max_delay_ms,
             backoff_multiplier=float(config.authorization_backoff_multiplier),
             jitter_percentage=config.jitter_percentage,
-            processing_timeout_seconds=config.processing_timeout_seconds,
+            authorization_budget_seconds=config.authorization_budget_seconds,
             random_value=random_value,
         )
 

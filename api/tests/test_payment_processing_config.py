@@ -27,8 +27,10 @@ def _values() -> dict[str, object]:
         "reversal_max_delay_seconds": 300,
         "reversal_backoff_multiplier": Decimal("2"),
         "jitter_percentage": 20,
-        "processing_timeout_seconds": 60,
+        "authorization_budget_seconds": 60,
+        "stale_pending_authorization_seconds": 45,
         "reversal_grace_seconds": 45,
+        "reversal_processing_timeout_seconds": 60,
         "worker_poll_interval_seconds": Decimal("1"),
         "created_at": now,
         "updated_at": now,
@@ -51,7 +53,10 @@ def test_repository_reads_consistent_default_snapshot() -> None:
     assert config.config_name == "default"
     assert config.max_authorization_attempts == 3
     assert config.max_reversal_attempts == 5
+    assert config.authorization_budget_seconds == 60
+    assert config.stale_pending_authorization_seconds == 45
     assert config.reversal_grace_seconds == 45
+    assert config.reversal_processing_timeout_seconds == 60
     assert config.worker_poll_interval_seconds == Decimal("1")
 
 
@@ -76,8 +81,18 @@ def test_repository_reports_missing_default() -> None:
         ("reversal_max_delay_seconds", 4, "reversal_max_delay"),
         ("reversal_backoff_multiplier", Decimal("0.9"), "backoff"),
         ("jitter_percentage", 101, "jitter_percentage"),
-        ("processing_timeout_seconds", 0, "processing_timeout"),
+        ("authorization_budget_seconds", 0, "authorization_budget"),
+        (
+            "stale_pending_authorization_seconds",
+            0,
+            "stale_pending_authorization",
+        ),
         ("reversal_grace_seconds", 0, "reversal_grace"),
+        (
+            "reversal_processing_timeout_seconds",
+            0,
+            "reversal_processing_timeout",
+        ),
         ("worker_poll_interval_seconds", Decimal("0"), "poll_interval"),
     ],
 )
@@ -90,4 +105,12 @@ def test_config_rejects_invalid_values(
     values[field] = value
 
     with pytest.raises(ValueError, match=message):
+        PaymentProcessingConfig(**values)  # type: ignore[arg-type]
+
+
+def test_stale_pending_timeout_cannot_precede_reversal_grace() -> None:
+    values = _values()
+    values["stale_pending_authorization_seconds"] = 44
+
+    with pytest.raises(ValueError, match="at least reversal_grace"):
         PaymentProcessingConfig(**values)  # type: ignore[arg-type]

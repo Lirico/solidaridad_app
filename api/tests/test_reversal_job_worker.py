@@ -91,8 +91,10 @@ def _config(**overrides: object) -> PaymentProcessingConfig:
         "reversal_max_delay_seconds": 30,
         "reversal_backoff_multiplier": Decimal("2"),
         "jitter_percentage": 0,
-        "processing_timeout_seconds": 60,
+        "authorization_budget_seconds": 60,
+        "stale_pending_authorization_seconds": 50,
         "reversal_grace_seconds": 45,
+        "reversal_processing_timeout_seconds": 60,
         "worker_poll_interval_seconds": Decimal("1"),
         "created_at": NOW,
         "updated_at": NOW,
@@ -326,7 +328,7 @@ def test_run_once_enqueues_one_stale_pending_before_claim() -> None:
     def list_stale(**kwargs: object) -> list[Transaction]:
         nonlocal listed
         listed += 1
-        assert kwargs["attempted_before"] == NOW - timedelta(seconds=45)
+        assert kwargs["attempted_before"] == NOW - timedelta(seconds=50)
         return [pending] if listed == 1 else []
 
     order: list[str] = []

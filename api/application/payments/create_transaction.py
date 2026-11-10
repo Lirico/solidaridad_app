@@ -42,6 +42,7 @@ from domain.exceptions import (
 from domain.money import Money, parse_amount
 from domain.processor_job import (
     REVERSAL_CANCELLED_AUTHORIZATION_RESOLVED,
+    ProcessorJobState,
     ProcessorOperationType,
 )
 from domain.product import (
@@ -279,7 +280,7 @@ class CreateTransaction:
         request: AuthorizeRequest,
         policy: AuthorizationRetryPolicy,
     ) -> AuthorizeResult:
-        deadline = self._monotonic() + policy.processing_timeout_seconds
+        deadline = self._monotonic() + policy.authorization_budget_seconds
         attempt_number = 1
 
         while True:
@@ -382,6 +383,15 @@ class CreateTransaction:
         )
 
         if result.outcome != AuthorizationGatewayOutcome.INDETERMINATE:
+            existing_job = self._jobs.get_by_transaction(
+                transaction_id=transaction.id,
+                operation_type=ProcessorOperationType.REVERSE,
+            )
+            if existing_job is not None and existing_job.state in {
+                ProcessorJobState.COMPLETED,
+                ProcessorJobState.MANUAL_REVIEW,
+            }:
+                return transaction
             self._jobs.cancel_unsent_reverse(
                 transaction_id=transaction.id,
                 cancelled_at=self._now(),

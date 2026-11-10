@@ -20,8 +20,10 @@ def _config(**overrides: object) -> PaymentProcessingConfig:
         reversal_max_delay_seconds=300,
         reversal_backoff_multiplier=Decimal("2"),
         jitter_percentage=20,
-        processing_timeout_seconds=3,
+        authorization_budget_seconds=3,
+        stale_pending_authorization_seconds=45,
         reversal_grace_seconds=45,
+        reversal_processing_timeout_seconds=60,
         worker_poll_interval_seconds=Decimal("1"),
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
@@ -37,7 +39,7 @@ def test_policy_copies_config_snapshot() -> None:
     )
 
     assert policy.max_attempts == 4
-    assert policy.processing_timeout_seconds == 3
+    assert policy.authorization_budget_seconds == 3
     assert policy.delay_before_attempt(1) == 0
     assert policy.delay_before_attempt(2) == pytest.approx(0.1)
     assert policy.delay_before_attempt(3) == pytest.approx(0.2)

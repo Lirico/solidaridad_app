@@ -77,7 +77,7 @@ def _build(
     gateway_results: list[AuthorizeResult] | None = None,
     installation_code: str | None = "05000001",
     max_authorization_attempts: int = 1,
-    processing_timeout_seconds: int = 3,
+    authorization_budget_seconds: int = 3,
     reversal_grace_seconds: int = 45,
     monotonic: MagicMock | None = None,
     now: Callable[[], datetime] | None = None,
@@ -143,8 +143,10 @@ def _build(
         reversal_max_delay_seconds=300,
         reversal_backoff_multiplier=Decimal("2"),
         jitter_percentage=0,
-        processing_timeout_seconds=processing_timeout_seconds,
+        authorization_budget_seconds=authorization_budget_seconds,
+        stale_pending_authorization_seconds=45,
         reversal_grace_seconds=reversal_grace_seconds,
+        reversal_processing_timeout_seconds=60,
         worker_poll_interval_seconds=Decimal("1"),
         created_at=config_now,
         updated_at=config_now,
@@ -255,6 +257,40 @@ def test_indeterminate_result_keeps_the_reverse_ready() -> None:
         card_number="4111111111111111",
     )
 
+    use_case._jobs.cancel_unsent_reverse.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("job_state", "durable_status"),
+    [
+        (ProcessorJobState.COMPLETED, TransactionStatus.FAILED),
+        (ProcessorJobState.MANUAL_REVIEW, TransactionStatus.PENDING),
+    ],
+)
+def test_late_result_does_not_overwrite_recovery_that_may_have_been_sent(
+    job_state: ProcessorJobState,
+    durable_status: TransactionStatus,
+) -> None:
+    use_case, transactions, _, _ = _build(
+        gateway_result=AuthorizeResult(
+            outcome=AuthorizationGatewayOutcome.APPROVED,
+            response_code="00",
+        )
+    )
+    transactions.get_by_id_for_update.return_value = _tx(status=durable_status)
+    use_case._jobs.get_by_transaction.return_value = MagicMock(state=job_state)
+
+    result = use_case.execute(
+        user_id=1,
+        installation_id="inst-1",
+        idempotency_key="late-after-recovery",
+        product="GARRAFA_10",
+        amount="2",
+        card_number="4111111111111111",
+    )
+
+    assert result.transaction.status is durable_status
+    transactions.update_result.assert_not_called()
     use_case._jobs.cancel_unsent_reverse.assert_not_called()
 
 
@@ -671,7 +707,7 @@ def test_sync_budget_prevents_retry_when_delay_does_not_fit() -> None:
     use_case, transactions, _, gateway = _build(
         gateway_result=AuthorizeResult(outcome=AuthorizationGatewayOutcome.NOT_SENT),
         max_authorization_attempts=3,
-        processing_timeout_seconds=1,
+        authorization_budget_seconds=1,
         monotonic=clock,
     )
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'core/config/api_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
 import 'features/sales/data/sales_repository.dart';
@@ -36,6 +37,16 @@ import 'core/widgets/loading_screen.dart';
 import 'core/widgets/splash_screen.dart';
 
 void main() {
+  startApp(ApiConfig.resolution);
+}
+
+void startApp(ApiConfigResolution config) {
+  final configError = config.error;
+  if (configError != null) {
+    runApp(MisconfiguredApp(message: configError));
+    return;
+  }
+
   final salesRepository = SalesRepository();
   final balanceRepository = BalanceRepository();
   final batchCloseRepository = BatchCloseRepository();
@@ -61,6 +72,35 @@ void main() {
       child: const MyApp(),
     ),
   );
+}
+
+class MisconfiguredApp extends StatelessWidget {
+  const MisconfiguredApp({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'GAS Terminal',
+      debugShowCheckedModeBanner: false,
+      theme: appTheme,
+      home: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: appTheme.textTheme.bodyLarge,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {

@@ -1,5 +1,7 @@
 import '../../domain/auth_model.dart';
 
+export '../../domain/auth_model.dart' show Merchant;
+
 abstract class AuthState {
   final User? user;
   final String? message;
@@ -19,11 +21,13 @@ class AuthLoading extends AuthState {
 
 class AuthSuccess extends AuthState {
   final bool mustChangePassword;
+  final Merchant? merchant;
 
   const AuthSuccess({
     super.user,
     super.message,
     this.mustChangePassword = false,
+    this.merchant,
   });
 }
 

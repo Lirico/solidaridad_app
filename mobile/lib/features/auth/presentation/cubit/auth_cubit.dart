@@ -24,6 +24,7 @@ class AuthCubit extends Cubit<AuthState> {
           user: response.user!,
           message: response.message,
           mustChangePassword: response.mustChangePassword,
+          merchant: response.merchant,
         ),
       );
     } else {
@@ -55,15 +56,13 @@ class AuthCubit extends Cubit<AuthState> {
     required String currentPassword,
     required String newPassword,
   }) async {
-    final previousUser = state is AuthSuccess
-        ? (state as AuthSuccess).user
-        : null;
+    final previous = state is AuthSuccess ? state as AuthSuccess : null;
     emit(const AuthLoading(loadingMessage: 'Cambiando contraseña...'));
 
     final response = await _authRepository.changePassword(
       currentPassword: currentPassword,
       newPassword: newPassword,
-      token: previousUser?.token ?? '',
+      token: previous?.user?.token ?? '',
     );
 
     if (response.sessionExpired) {
@@ -72,10 +71,46 @@ class AuthCubit extends Cubit<AuthState> {
     }
 
     if (response.isSuccess) {
-      emit(AuthSuccess(user: previousUser, message: response.message));
+      emit(
+        AuthSuccess(
+          user: previous?.user,
+          message: response.message,
+          merchant: previous?.merchant,
+        ),
+      );
     } else {
       emit(AuthError(message: response.message));
     }
+  }
+
+  /// Pide el comercio vigente. Si la red falla, conserva el del login.
+  /// Si la cuenta no tiene comercio, lo quita de la sesión.
+  Future<Merchant?> refreshMerchant() async {
+    final current = state;
+    if (current is! AuthSuccess || current.user == null) return null;
+
+    final lookup = await _authRepository.fetchCurrentMerchant(
+      token: current.user!.token,
+    );
+    if (lookup.unavailable) return current.merchant;
+    if (lookup.sessionExpired) {
+      emit(
+        const AuthSessionExpired(
+          message: 'Su sesión ha expirado. Vuelva a iniciar sesión.',
+        ),
+      );
+      return null;
+    }
+
+    emit(
+      AuthSuccess(
+        user: current.user,
+        message: current.message,
+        mustChangePassword: current.mustChangePassword,
+        merchant: lookup.merchant,
+      ),
+    );
+    return lookup.merchant;
   }
 
   Future<void> logout() async {

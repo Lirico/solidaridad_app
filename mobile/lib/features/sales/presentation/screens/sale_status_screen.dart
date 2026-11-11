@@ -9,19 +9,22 @@ import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../data/receipt_printer.dart';
+import '../../domain/receipt_defaults.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
 import '../widgets/sale_status_content.dart';
 
 class SaleStatusScreen extends StatefulWidget {
-  const SaleStatusScreen({super.key});
+  const SaleStatusScreen({super.key, this.printer});
+
+  final ReceiptPrinter? printer;
 
   @override
   State<SaleStatusScreen> createState() => _SaleStatusScreenState();
 }
 
 class _SaleStatusScreenState extends State<SaleStatusScreen> {
-  final ReceiptPrinter _printer = ReceiptPrinter();
+  late final ReceiptPrinter _printer = widget.printer ?? ReceiptPrinter();
   OperationModel? _operation;
   PrintStatus _printStatus = PrintStatus.idle;
   String _printMessage = '';
@@ -55,6 +58,27 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     Navigator.pushNamed(context, AppRoutes.saleProcessing);
   }
 
+  Future<ReceiptDefaults?> _defaultsFor(OperationModel operation) async {
+    final merchant = await context.read<AuthCubit>().refreshMerchant();
+    if (!mounted || merchant == null) return null;
+    return ReceiptDefaults.forSale(
+      merchantCode: merchant.code,
+      merchantName: merchant.name,
+      merchantAddress: merchant.address,
+      merchantCity: merchant.city,
+      merchantTaxId: merchant.taxId,
+      operation: operation,
+    );
+  }
+
+  String _missingMerchantMessage() {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is AuthSessionExpired && (auth.message ?? '').isNotEmpty) {
+      return auth.message!;
+    }
+    return 'La cuenta no tiene un comercio configurado.';
+  }
+
   bool _printsTicket(PaymentResult result) {
     return result == PaymentResult.approved ||
         result == PaymentResult.underReview ||
@@ -70,7 +94,20 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
       _printMessage = '';
     });
 
-    final PrintResult result = await _printer.printTicket(operation);
+    final defaults = await _defaultsFor(operation);
+    if (!mounted) return;
+    if (defaults == null) {
+      setState(() {
+        _printStatus = PrintStatus.error;
+        _printMessage = _missingMerchantMessage();
+      });
+      return;
+    }
+
+    final PrintResult result = await _printer.printTicket(
+      operation,
+      defaults: defaults,
+    );
 
     if (!mounted) return;
     setState(() {

@@ -1,46 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
-import '../../../sales/data/receipt_defaults_repository.dart';
 import '../../../sales/data/receipt_printer.dart';
 import '../../../sales/domain/receipt_defaults.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../widgets/sale_detail_ticket.dart';
 
 class SaleDetailScreen extends StatefulWidget {
-  const SaleDetailScreen({super.key});
+  const SaleDetailScreen({super.key, this.printer});
+
+  final ReceiptPrinter? printer;
 
   @override
   State<SaleDetailScreen> createState() => _SaleDetailScreenState();
 }
 
 class _SaleDetailScreenState extends State<SaleDetailScreen> {
-  final ReceiptDefaultsRepository _defaultsRepository =
-      ReceiptDefaultsRepository();
-  late final ReceiptPrinter _printer = ReceiptPrinter(
-    defaultsRepository: _defaultsRepository,
-  );
+  late final ReceiptPrinter _printer = widget.printer ?? ReceiptPrinter();
   ReceiptDefaults? _defaults;
   bool _defaultsFailed = false;
   bool _printing = false;
+  bool _loadedDefaults = false;
 
   @override
-  void initState() {
-    super.initState();
-    _defaultsRepository
-        .load()
-        .then((defaults) {
-          if (!mounted) return;
-          setState(() => _defaults = defaults);
-        })
-        .catchError((Object _) {
-          if (!mounted) return;
-          setState(() => _defaultsFailed = true);
-        });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loadedDefaults) return;
+    _loadedDefaults = true;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is! OperationModel) return;
+    _loadDefaults(args);
+  }
+
+  Future<void> _loadDefaults(OperationModel operation) async {
+    final defaults = await _defaultsFor(operation);
+    if (!mounted) return;
+    setState(() {
+      _defaults = defaults;
+      _defaultsFailed = defaults == null;
+    });
   }
 
   @override
@@ -141,9 +146,47 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     );
   }
 
+  Future<ReceiptDefaults?> _defaultsFor(OperationModel operation) async {
+    final merchant = await context.read<AuthCubit>().refreshMerchant();
+    if (!mounted || merchant == null) return null;
+    return ReceiptDefaults.forSale(
+      merchantCode: merchant.code,
+      merchantName: merchant.name,
+      merchantAddress: merchant.address,
+      merchantCity: merchant.city,
+      merchantTaxId: merchant.taxId,
+      operation: operation,
+    );
+  }
+
+  String _missingMerchantMessage() {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is AuthSessionExpired && (auth.message ?? '').isNotEmpty) {
+      return auth.message!;
+    }
+    return 'La cuenta no tiene un comercio configurado.';
+  }
+
   Future<void> _printTicket(OperationModel operation) async {
     setState(() => _printing = true);
-    final PrintResult result = await _printer.printTicket(operation);
+    final defaults = await _defaultsFor(operation);
+    if (!mounted) return;
+    if (defaults == null) {
+      setState(() => _printing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_missingMerchantMessage()),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    setState(() => _defaults = defaults);
+    final PrintResult result = await _printer.printTicket(
+      operation,
+      defaults: defaults,
+    );
     if (!mounted) return;
     setState(() => _printing = false);
 

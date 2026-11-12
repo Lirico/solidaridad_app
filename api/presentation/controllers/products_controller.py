@@ -25,6 +25,11 @@ def get_products(
     _current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> list[ProductResponse]:
     return [
-        ProductResponse(code=item.code, label=item.label, unit=item.unit)
+        ProductResponse(
+            code=item.code,
+            label=item.label,
+            unit=item.unit,
+            kg_per_unit=item.kg_per_unit,
+        )
         for item in list_products(active_only=True)
     ]

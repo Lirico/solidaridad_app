@@ -7,6 +7,7 @@ from solidaridad_catalog import (
     parse_processor_code,
     parse_product,
     processor_code,
+    product_label,
     requires_integer_quantity,
 )
 
@@ -17,10 +18,13 @@ def test_list_products_returns_active_catalog() -> None:
     assert products[0].code == Product.GARRAFA_10
     assert products[0].processor_code == "993"
     assert products[0].label == "Garrafa 10 kg"
+    assert products[0].kg_per_unit == 10
     assert products[0].unit.singular == "unidad"
     assert products[0].unit.plural == "unidades"
     assert products[-1].unit.singular == "m3"
     assert products[-1].unit.plural == "m3"
+    assert [item.kg_per_unit for item in products] == [10, 15, 30, 45, 1]
+    assert product_label(Product.TUBO_45) == "Tubo 45 kg"
 
 
 def test_parse_product_and_processor_code() -> None:

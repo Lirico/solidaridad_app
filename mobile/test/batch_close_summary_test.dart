@@ -7,6 +7,19 @@ final DateTime _todayMorning = DateTime(2026, 9, 22, 9, 0);
 final DateTime _todayAfternoon = DateTime(2026, 9, 22, 14, 0);
 final DateTime _yesterday = DateTime(2026, 9, 21, 23, 59);
 
+const List<ProductInfo> _catalog = <ProductInfo>[
+  ProductInfo(code: 'GARRAFA_10', label: 'Garrafa 10 kg', kgPerUnit: 10),
+  ProductInfo(code: 'GARRAFA_15', label: 'Garrafa 15 kg', kgPerUnit: 15),
+  ProductInfo(code: 'GARRAFA_30', label: 'Garrafa 30 kg', kgPerUnit: 30),
+  ProductInfo(code: 'TUBO_45', label: 'Tubo 45 kg', kgPerUnit: 45),
+  ProductInfo(
+    code: 'GRANEL',
+    label: 'Granel',
+    unit: ProductUnit.metrosCubicos,
+    kgPerUnit: 1,
+  ),
+];
+
 OperationModel _operation({
   required String productCode,
   required double amount,
@@ -29,6 +42,7 @@ void main() {
   group('BatchSummary.fromOperations', () {
     test('agrupa las ventas aprobadas y calcula kg por producto', () {
       final BatchSummary summary = BatchSummary.fromOperations(
+        catalog: _catalog,
         batchNumber: '000123',
         operations: [
           _operation(
@@ -74,6 +88,7 @@ void main() {
 
     test('acumula varias ventas del mismo producto', () {
       final BatchSummary summary = BatchSummary.fromOperations(
+        catalog: _catalog,
         batchNumber: '000001',
         operations: [
           _operation(productCode: 'GARRAFA_15', amount: 3, date: _todayMorning),
@@ -93,6 +108,7 @@ void main() {
 
     test('ignora ventas rechazadas, anuladas y con error de conexión', () {
       final BatchSummary summary = BatchSummary.fromOperations(
+        catalog: _catalog,
         batchNumber: '000001',
         operations: [
           _operation(
@@ -123,6 +139,7 @@ void main() {
 
     test('incluye ventas de cualquier fecha del lote actual', () {
       final BatchSummary summary = BatchSummary.fromOperations(
+        catalog: _catalog,
         batchNumber: '000001',
         operations: [
           _operation(productCode: 'GARRAFA_10', amount: 5, date: _yesterday),
@@ -136,6 +153,7 @@ void main() {
 
     test('ordena los productos según el catálogo', () {
       final BatchSummary summary = BatchSummary.fromOperations(
+        catalog: _catalog,
         batchNumber: '000001',
         operations: [
           _operation(productCode: 'GRANEL', amount: 1, date: _todayMorning),
@@ -157,6 +175,7 @@ void main() {
 
     test('un producto fuera del catálogo usa kg 1:1 y queda al final', () {
       final BatchSummary summary = BatchSummary.fromOperations(
+        catalog: _catalog,
         batchNumber: '000001',
         operations: [
           _operation(productCode: 'OTRO', amount: 3, date: _todayMorning),
@@ -171,6 +190,7 @@ void main() {
 
     test('conserva el número de lote y la marca de resumen parcial', () {
       final BatchSummary summary = BatchSummary.fromOperations(
+        catalog: _catalog,
         batchNumber: '000007',
         isPartial: true,
         operations: [

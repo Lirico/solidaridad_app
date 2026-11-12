@@ -88,12 +88,15 @@ void main() {
       'card_last4': '7403',
       'status': 'DECLINED',
       'created_at': '2026-11-11T12:00:00Z',
+      'product_label': 'Garrafa de prueba',
       'receipt': null,
     });
 
     expect(approved.couponNumber, '00000042');
     expect(approved.authorizationCode, 'A99881');
+    expect(approved.productLabel, 'GARRAFA_10');
     expect(declined.couponNumber, isNull);
     expect(declined.authorizationCode, isNull);
+    expect(declined.productLabel, 'Garrafa de prueba');
   });
 }

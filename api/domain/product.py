@@ -3,6 +3,7 @@
 from solidaridad_catalog import Product, UnknownProduct, list_products
 from solidaridad_catalog import parse_product as _parse_product
 from solidaridad_catalog import processor_code as _processor_code
+from solidaridad_catalog import product_label as _product_label
 from solidaridad_catalog import requires_integer_quantity as _requires_integer_quantity
 
 from domain.exceptions import UnsupportedProduct
@@ -12,6 +13,7 @@ __all__ = [
     "list_products",
     "parse_product",
     "processor_product_code",
+    "product_label",
     "requires_integer_quantity",
 ]
 
@@ -25,6 +27,10 @@ def parse_product(value: str) -> Product:
 
 def processor_product_code(product: Product) -> str:
     return _processor_code(product)
+
+
+def product_label(product: Product) -> str:
+    return _product_label(product)
 
 
 def requires_integer_quantity(product: Product) -> bool:

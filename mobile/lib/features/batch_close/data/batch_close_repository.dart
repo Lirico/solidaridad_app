@@ -10,6 +10,7 @@ import '../../sales/domain/sale_model.dart';
 /// Resultado de la carga de operaciones para el resumen del lote.
 class BatchCloseLoadResult {
   final List<OperationModel> operations;
+  final List<ProductInfo> products;
 
   /// `true` si se alcanzó el tope de páginas y el resumen puede estar incompleto.
   final bool isPartial;
@@ -19,6 +20,7 @@ class BatchCloseLoadResult {
 
   const BatchCloseLoadResult({
     required this.operations,
+    this.products = const <ProductInfo>[],
     this.isPartial = false,
     this.sessionExpired = false,
     this.connectionError = false,
@@ -73,13 +75,46 @@ class BatchCloseRepository {
     : _httpClient = httpClient ?? http.Client(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
+  Future<List<ProductInfo>> _loadCatalog(String token) async {
+    final response = await _httpClient
+        .get(
+          Uri.parse('$_baseUrl/products'),
+          headers: <String, String>{
+            HttpHeaders.contentTypeHeader: 'application/json',
+            HttpHeaders.authorizationHeader: 'Bearer $token',
+          },
+        )
+        .timeout(_timeout);
+    if (response.statusCode == 401) {
+      throw const _CatalogRejected(
+        BatchCloseLoadResult(
+          operations: <OperationModel>[],
+          sessionExpired: true,
+        ),
+      );
+    }
+    if (response.statusCode != 200) {
+      throw _CatalogRejected(
+        BatchCloseLoadResult(
+          operations: const <OperationModel>[],
+          connectionError: true,
+          errorMessage:
+              'No se pudo obtener el resumen del lote '
+              '(HTTP ${response.statusCode}).',
+        ),
+      );
+    }
+    final List<dynamic> items = jsonDecode(response.body) as List<dynamic>;
+    return items
+        .map((item) => ProductInfo.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Carga las operaciones de la ventana del lote.
   ///
   /// La API devuelve únicamente el lote administrativo actual: las
   /// transacciones ya cerradas no aparecen en este listado.
-  Future<BatchCloseLoadResult> loadOperations({
-    required String token,
-  }) async {
+  Future<BatchCloseLoadResult> loadOperations({required String token}) async {
     final List<OperationModel> collected = <OperationModel>[];
 
     // La paginación por offset sobre una lista que crece (ventas nuevas) puede
@@ -90,6 +125,7 @@ class BatchCloseRepository {
     bool isPartial = false;
 
     try {
+      final List<ProductInfo> products = await _loadCatalog(token);
       for (int page = 0; page < maxPages; page++) {
         final response = await _httpClient
             .get(
@@ -148,7 +184,13 @@ class BatchCloseRepository {
         if (page == maxPages - 1) isPartial = true;
       }
 
-      return BatchCloseLoadResult(operations: collected, isPartial: isPartial);
+      return BatchCloseLoadResult(
+        operations: collected,
+        products: products,
+        isPartial: isPartial,
+      );
+    } on _CatalogRejected catch (rejected) {
+      return rejected.result;
     } on TimeoutException {
       return const BatchCloseLoadResult(
         operations: <OperationModel>[],
@@ -222,8 +264,8 @@ class BatchCloseRepository {
         );
       }
 
-      final List<dynamic> items = body?['items'] as List<dynamic>? ??
-          const <dynamic>[];
+      final List<dynamic> items =
+          body?['items'] as List<dynamic>? ?? const <dynamic>[];
       return BatchCloseSubmitResult(
         batchCloseId: (body?['batch_close_id'] as num?)?.toInt(),
         operations: items
@@ -267,4 +309,10 @@ class BatchCloseRepository {
       return null;
     }
   }
+}
+
+class _CatalogRejected implements Exception {
+  final BatchCloseLoadResult result;
+
+  const _CatalogRejected(this.result);
 }

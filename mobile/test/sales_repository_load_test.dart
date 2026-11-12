@@ -55,11 +55,13 @@ void main() {
             'code': 'GARRAFA_10',
             'label': 'Garrafa 10 kg',
             'unit': {'singular': 'unidad', 'plural': 'unidades'},
+            'kg_per_unit': 10,
           },
           {
             'code': 'GRANEL',
             'label': 'Granel',
             'unit': {'singular': 'm3', 'plural': 'm3'},
+            'kg_per_unit': 1,
           },
         ]),
       );
@@ -226,26 +228,29 @@ void main() {
     });
   });
 
-  test('interpreta 200 FAILED/UNDER_REVIEW de una anulación como handoff', () async {
-    stubPost(
-      () async => jsonMapResponse({
-        'transaction_number': 'OP-1',
-        'status': 'FAILED',
-        'reason': 'UNDER_REVIEW',
-        'user_message': 'Verifique con casa central',
-        'may_start_new_void': false,
-        'created_at': '2026-10-22T12:00:00Z',
-      }),
-    );
+  test(
+    'interpreta 200 FAILED/UNDER_REVIEW de una anulación como handoff',
+    () async {
+      stubPost(
+        () async => jsonMapResponse({
+          'transaction_number': 'OP-1',
+          'status': 'FAILED',
+          'reason': 'UNDER_REVIEW',
+          'user_message': 'Verifique con casa central',
+          'may_start_new_void': false,
+          'created_at': '2026-10-22T12:00:00Z',
+        }),
+      );
 
-    final result = await repository.voidTransaction(
-      token: 'token',
-      transactionNumber: 'OP-1',
-      cardNumber: '4111111111111111',
-    );
+      final result = await repository.voidTransaction(
+        token: 'token',
+        transactionNumber: 'OP-1',
+        cardNumber: '4111111111111111',
+      );
 
-    expect(result.isUnderReview, isTrue);
-    expect(result.isDeclined, isFalse);
-    expect(result.message, 'Verifique con casa central');
-  });
+      expect(result.isUnderReview, isTrue);
+      expect(result.isDeclined, isFalse);
+      expect(result.message, 'Verifique con casa central');
+    },
+  );
 }

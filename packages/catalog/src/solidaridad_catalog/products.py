@@ -34,6 +34,7 @@ class ProductInfo:
     processor_code: ProcessorCode
     label: str
     unit: ProductUnit
+    kg_per_unit: float
     active: bool = True
 
 
@@ -46,30 +47,35 @@ _CATALOG: tuple[ProductInfo, ...] = (
         ProcessorCode.CODE_993,
         "Garrafa 10 kg",
         _UNIT,
+        10,
     ),
     ProductInfo(
         Product.GARRAFA_15,
         ProcessorCode.CODE_994,
         "Garrafa 15 kg",
         _UNIT,
+        15,
     ),
     ProductInfo(
         Product.GARRAFA_30,
         ProcessorCode.CODE_995,
         "Garrafa 30 kg",
         _UNIT,
+        30,
     ),
     ProductInfo(
         Product.TUBO_45,
         ProcessorCode.CODE_996,
         "Tubo 45 kg",
         _UNIT,
+        45,
     ),
     ProductInfo(
         Product.GRANEL,
         ProcessorCode.CODE_997,
         "Granel",
         _CUBIC_METER,
+        1,
     ),
 )
 
@@ -94,6 +100,10 @@ def parse_product(value: str) -> Product:
 
 def processor_code(product: Product) -> str:
     return _BY_PRODUCT[product].processor_code.value
+
+
+def product_label(product: Product) -> str:
+    return _BY_PRODUCT[product].label
 
 
 def requires_integer_quantity(product: Product) -> bool:

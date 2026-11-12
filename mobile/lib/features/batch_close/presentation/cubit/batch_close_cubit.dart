@@ -44,6 +44,7 @@ class BatchCloseCubit extends Cubit<BatchCloseState> {
           operations: result.operations,
           batchNumber: currentBatchNumber,
           isPartial: result.isPartial,
+          catalog: result.products,
         ),
       ),
     );

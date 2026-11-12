@@ -10,26 +10,31 @@ _EXPECTED_PRODUCTS = [
         "code": "GARRAFA_10",
         "label": "Garrafa 10 kg",
         "unit": {"singular": "unidad", "plural": "unidades"},
+        "kg_per_unit": 10,
     },
     {
         "code": "GARRAFA_15",
         "label": "Garrafa 15 kg",
         "unit": {"singular": "unidad", "plural": "unidades"},
+        "kg_per_unit": 15,
     },
     {
         "code": "GARRAFA_30",
         "label": "Garrafa 30 kg",
         "unit": {"singular": "unidad", "plural": "unidades"},
+        "kg_per_unit": 30,
     },
     {
         "code": "TUBO_45",
         "label": "Tubo 45 kg",
         "unit": {"singular": "unidad", "plural": "unidades"},
+        "kg_per_unit": 45,
     },
     {
         "code": "GRANEL",
         "label": "Granel",
         "unit": {"singular": "m3", "plural": "m3"},
+        "kg_per_unit": 1,
     },
 ]
 

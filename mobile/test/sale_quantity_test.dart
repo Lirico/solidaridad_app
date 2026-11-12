@@ -27,11 +27,13 @@ void main() {
       'code': 'GRANEL',
       'label': 'Granel',
       'unit': {'singular': 'm3', 'plural': 'm3'},
+      'kg_per_unit': 1,
     });
     final cylinder = ProductInfo.fromJson({
       'code': 'GARRAFA_10',
       'label': 'Garrafa 10 kg',
       'unit': {'singular': 'unidad', 'plural': 'unidades'},
+      'kg_per_unit': 10,
     });
 
     expect(bulk.unit.allowsDecimals, isTrue);

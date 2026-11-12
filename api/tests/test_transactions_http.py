@@ -360,6 +360,7 @@ def test_close_batch_201_returns_receipt_operations() -> None:
     assert response.json()["batch_close_id"] == 3
     assert response.json()["total"] == 1
     assert response.json()["items"][0]["transaction_number"] == _tx().transaction_number
+    assert response.json()["items"][0]["product_label"] == "Garrafa 10 kg"
     use_case.execute.assert_called_once_with(
         installation_id="inst-1",
         user_id=1,
@@ -405,6 +406,7 @@ def test_list_transactions_200() -> None:
     item = data["items"][0]
     assert item["transaction_number"] == "OP-260716-00000001"
     assert item["product"] == "GARRAFA_10"
+    assert item["product_label"] == "Garrafa 10 kg"
     assert item["amount"] == "1.5"
     assert item["card_last4"] == "1111"
     assert item["status"] == "APPROVED"

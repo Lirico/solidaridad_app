@@ -177,6 +177,7 @@ def test_catalog_requires_auth_and_returns_complete_contract(
         "GRANEL",
     ]
     assert products[-1]["unit"] == {"singular": "m3", "plural": "m3"}
+    assert [item["kg_per_unit"] for item in products] == [10, 15, 30, 45, 1]
 
 
 def test_sale_approved_replay_and_public_history(

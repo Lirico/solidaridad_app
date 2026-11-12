@@ -142,3 +142,103 @@ int _orderIndex(String productCode) {
   final int index = _productOrder.indexOf(productCode);
   return index < 0 ? _productOrder.length : index;
 }
+
+/// Un producto del ticket de cierre: ventas y anulaciones de ese corte.
+class BatchCloseProductSlip {
+  final String code;
+  final String label;
+  final int salesCount;
+  final double salesKg;
+  final int voidCount;
+  final double voidKg;
+
+  const BatchCloseProductSlip({
+    required this.code,
+    required this.label,
+    required this.salesCount,
+    required this.salesKg,
+    required this.voidCount,
+    required this.voidKg,
+  });
+
+  int get totalCount => salesCount - voidCount;
+
+  double get totalKg => salesKg - voidKg;
+}
+
+/// Comprobante de un corte ya cerrado, agrupado por producto.
+///
+/// Las notas de crédito no existen en la API: esa línea queda en cero.
+/// Los kilos usan [batchKgPerUnit], la misma equivalencia de la pantalla.
+class BatchCloseTicket {
+  final List<BatchCloseProductSlip> products;
+
+  const BatchCloseTicket({required this.products});
+
+  int get salesCount =>
+      products.fold<int>(0, (sum, item) => sum + item.salesCount);
+
+  double get salesKg =>
+      products.fold<double>(0, (sum, item) => sum + item.salesKg);
+
+  int get voidCount =>
+      products.fold<int>(0, (sum, item) => sum + item.voidCount);
+
+  double get voidKg =>
+      products.fold<double>(0, (sum, item) => sum + item.voidKg);
+
+  int get totalCount => salesCount - voidCount;
+
+  double get totalKg => salesKg - voidKg;
+
+  factory BatchCloseTicket.fromOperations(List<OperationModel> operations) {
+    final Map<String, _ProductTally> byProduct = <String, _ProductTally>{};
+
+    for (final OperationModel operation in operations) {
+      final bool sale = operation.result == PaymentResult.approved;
+      final bool voided = operation.result == PaymentResult.voided;
+      if (!sale && !voided) continue;
+
+      final _ProductTally tally = byProduct.putIfAbsent(
+        operation.productCode,
+        () => _ProductTally(operation.productLabel),
+      );
+      final double kg =
+          operation.amount * (batchKgPerUnit[operation.productCode] ?? 1);
+      if (sale) {
+        tally.salesCount += 1;
+        tally.salesKg += kg;
+      } else {
+        tally.voidCount += 1;
+        tally.voidKg += kg;
+      }
+    }
+
+    final List<BatchCloseProductSlip> products =
+        byProduct.entries
+            .map(
+              (entry) => BatchCloseProductSlip(
+                code: entry.key,
+                label: entry.value.label,
+                salesCount: entry.value.salesCount,
+                salesKg: entry.value.salesKg,
+                voidCount: entry.value.voidCount,
+                voidKg: entry.value.voidKg,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => _orderIndex(a.code).compareTo(_orderIndex(b.code)));
+
+    return BatchCloseTicket(products: products);
+  }
+}
+
+class _ProductTally {
+  final String label;
+  int salesCount = 0;
+  double salesKg = 0;
+  int voidCount = 0;
+  double voidKg = 0;
+
+  _ProductTally(this.label);
+}

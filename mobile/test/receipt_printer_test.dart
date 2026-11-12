@@ -1,34 +1,12 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:solidaridad_app/features/sales/data/receipt_defaults_repository.dart';
 import 'package:solidaridad_app/features/sales/data/receipt_printer.dart';
+import 'package:solidaridad_app/features/sales/domain/receipt_defaults.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/psdk/psdk_bridge.dart';
 
 class MockPsdkBridge extends Mock implements PsdkBridge {}
-
-class _DefaultsBundle extends Fake implements AssetBundle {
-  @override
-  Future<String> loadString(String key, {bool cache = true}) async {
-    return '''
-{
-  "issuer_name": "Solidaridad",
-  "establishment_name": "GAS Terminal",
-  "establishment_address": "Av. San Martin 100",
-  "establishment_cuit": "30-00000000-0",
-  "establishment_code": "00000001",
-  "coupon_number": "00000001",
-  "batch_number": "000001",
-  "authorization_code": "MOCK01",
-  "currency": "ARS",
-  "installments": "1",
-  "installment_plan": "Contado",
-  "original_charge_number": "00000000"
-}
-''';
-  }
-}
 
 OperationModel _operation() {
   return OperationModel(
@@ -39,6 +17,19 @@ OperationModel _operation() {
     cardNumber: '6063007014007403',
     result: PaymentResult.approved,
     date: DateTime(2026, 10, 23, 12),
+    couponNumber: '00000042',
+    authorizationCode: 'A99881',
+  );
+}
+
+ReceiptDefaults _defaults() {
+  return ReceiptDefaults.forSale(
+    merchantCode: '014114',
+    merchantName: 'COMERCIO REAL',
+    merchantAddress: 'Alem 100',
+    merchantCity: 'Tolhuin',
+    merchantTaxId: '30-71234567-8',
+    operation: _operation(),
   );
 }
 
@@ -48,10 +39,7 @@ void main() {
 
   setUp(() {
     bridge = MockPsdkBridge();
-    printer = ReceiptPrinter(
-      psdk: bridge,
-      defaultsRepository: ReceiptDefaultsRepository(bundle: _DefaultsBundle()),
-    );
+    printer = ReceiptPrinter(psdk: bridge);
     when(
       () => bridge.initialize(),
     ).thenAnswer((_) async => <String, dynamic>{});
@@ -62,6 +50,7 @@ void main() {
   Future<PrintResult> printWithShortStartup() {
     return printer.printTicket(
       _operation(),
+      defaults: _defaults(),
       initAttempts: 2,
       initRetryDelay: Duration.zero,
       readyTimeoutSec: 1,
@@ -94,7 +83,14 @@ void main() {
       expect(result.message, 'Original y copia impresos');
       verify(() => bridge.initialize()).called(2);
       verify(() => bridge.tearDown()).called(1);
-      verify(() => bridge.printHtml(any())).called(2);
+      final captured = verify(() => bridge.printHtml(captureAny())).captured;
+      expect(captured, hasLength(2));
+      expect(captured.first as String, contains('COMERCIO REAL'));
+      expect(captured.first as String, contains('30-71234567-8'));
+      expect(captured.first as String, contains('00000042'));
+      expect(captured.first as String, contains('A99881'));
+      expect(captured.first as String, isNot(contains('Gas Austral')));
+      expect(captured.first as String, isNot(contains('MOCK01')));
     },
   );
 
@@ -116,6 +112,7 @@ void main() {
 
     final PrintResult result = await printer.printTicket(
       _operation(),
+      defaults: _defaults(),
       initRetryDelay: Duration.zero,
     );
 
@@ -150,7 +147,10 @@ void main() {
       (_) async => <String, dynamic>{'ok': false, 'result': 'ERR_PAPER'},
     );
 
-    final PrintResult result = await printer.printTicket(_operation());
+    final PrintResult result = await printer.printTicket(
+      _operation(),
+      defaults: _defaults(),
+    );
 
     expect(result.ok, isFalse);
     expect(result.message, 'La impresora no imprimió (código ERR_PAPER).');

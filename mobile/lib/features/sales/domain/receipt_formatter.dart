@@ -74,8 +74,11 @@ class ReceiptFormatter {
       ..writeln(defaults.establishmentCuit)
       ..writeln('--------------------------------')
       ..writeln('Cód. establecimiento: ${defaults.establishmentCode}')
-      ..writeln('Cupón: ${defaults.couponNumber}')
-      ..writeln('Lote: ${defaults.batchNumber}')
+      ..writeln('Cupón: ${defaults.couponNumber}');
+    if (defaults.batchNumber.trim().isNotEmpty) {
+      buf.writeln('Lote: ${defaults.batchNumber}');
+    }
+    buf
       ..writeln('Terminal: $terminalId')
       ..writeln('Tarjeta: ${maskPan(op.cardNumber)}')
       ..writeln('Autorización: ${defaults.authorizationCode}')
@@ -85,7 +88,8 @@ class ReceiptFormatter {
       ..writeln('Moneda: ${defaults.currency}')
       ..writeln('Cuotas: ${defaults.installments}')
       ..writeln('Plan: ${defaults.installmentPlan}');
-    if (op.result == PaymentResult.voided) {
+    if (op.result == PaymentResult.voided &&
+        defaults.originalChargeNumber.trim().isNotEmpty) {
       buf.writeln('Cargo original: ${defaults.originalChargeNumber}');
     }
     final message = op.userMessage?.trim() ?? '';
@@ -122,7 +126,8 @@ class ReceiptFormatter {
     final lines = <String>[
       _line('Cód. establecimiento', defaults.establishmentCode),
       _line('Cupón', defaults.couponNumber),
-      _line('Lote', defaults.batchNumber),
+      if (defaults.batchNumber.trim().isNotEmpty)
+        _line('Lote', defaults.batchNumber),
       _line('Terminal', terminalId),
       _line('Tarjeta', maskPan(op.cardNumber)),
       _line('Autorización', defaults.authorizationCode),
@@ -133,7 +138,8 @@ class ReceiptFormatter {
       _line('Cuotas', defaults.installments),
       _line('Plan', defaults.installmentPlan),
     ];
-    if (op.result == PaymentResult.voided) {
+    if (op.result == PaymentResult.voided &&
+        defaults.originalChargeNumber.trim().isNotEmpty) {
       lines.add(_line('Cargo original', defaults.originalChargeNumber));
     }
     final message = op.userMessage?.trim() ?? '';

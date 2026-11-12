@@ -1,9 +1,15 @@
-/// Datos del comprobante que la operación todavía no trae.
+import 'sale_model.dart';
+
+/// Datos del comprobante que no viajan en la operación.
 ///
-/// Hoy se cargan desde [assets/receipt_defaults.json]. Cuando el backend
-/// publique estos campos, se construye el mismo objeto desde la respuesta y
-/// el formatter no cambia.
+/// El comercio sale de la cuenta. El cupón y la autorización salen de
+/// [OperationModel]. El emisor, la moneda y el plan son fijos de este flujo.
 class ReceiptDefaults {
+  static const String issuer = 'Solidaridad';
+  static const String currencyCode = 'ARS';
+  static const String installmentCount = '1';
+  static const String planName = 'Contado';
+
   final String issuerName;
   final String establishmentName;
   final String establishmentAddress;
@@ -32,28 +38,39 @@ class ReceiptDefaults {
     required this.originalChargeNumber,
   });
 
-  factory ReceiptDefaults.fromJson(Map<String, dynamic> json) {
+  /// Arma el comprobante de [operation] con el comercio vigente de la cuenta.
+  ///
+  /// La ciudad se agrega a la dirección, en la misma línea. Sin `receipt`,
+  /// el cupón y la autorización quedan vacíos.
+  factory ReceiptDefaults.forSale({
+    required String merchantCode,
+    required String merchantName,
+    required String merchantAddress,
+    required String merchantCity,
+    required String merchantTaxId,
+    required OperationModel operation,
+  }) {
     return ReceiptDefaults(
-      issuerName: _string(json, 'issuer_name'),
-      establishmentName: _string(json, 'establishment_name'),
-      establishmentAddress: _string(json, 'establishment_address'),
-      establishmentCuit: _string(json, 'establishment_cuit'),
-      establishmentCode: _string(json, 'establishment_code'),
-      couponNumber: _string(json, 'coupon_number'),
-      batchNumber: _string(json, 'batch_number'),
-      authorizationCode: _string(json, 'authorization_code'),
-      currency: _string(json, 'currency'),
-      installments: _string(json, 'installments'),
-      installmentPlan: _string(json, 'installment_plan'),
-      originalChargeNumber: _string(json, 'original_charge_number'),
+      issuerName: issuer,
+      establishmentName: merchantName,
+      establishmentAddress: printedAddress(merchantAddress, merchantCity),
+      establishmentCuit: merchantTaxId,
+      establishmentCode: merchantCode,
+      couponNumber: operation.couponNumber ?? '',
+      batchNumber: '',
+      authorizationCode: operation.authorizationCode ?? '',
+      currency: currencyCode,
+      installments: installmentCount,
+      installmentPlan: planName,
+      originalChargeNumber: '',
     );
   }
 
-  static String _string(Map<String, dynamic> json, String key) {
-    final value = json[key];
-    if (value is! String || value.trim().isEmpty) {
-      throw FormatException('receipt_defaults.$key debe ser un texto');
-    }
-    return value;
+  static String printedAddress(String address, String city) {
+    final street = address.trim();
+    final locality = city.trim();
+    if (street.isEmpty) return locality;
+    if (locality.isEmpty) return street;
+    return '$street, $locality';
   }
 }

@@ -50,10 +50,14 @@ impresión de ticket.
 - Login de usuario y cambio de contraseña.
 - El alta de cuentas es manual en la base de datos, con comercio asignado;
   no existe registro público.
-- El comercio pertenece obligatoriamente a la cuenta: login entrega sus datos actuales y
-  `GET /v1/me/merchant` permite refrescarlos. Los datos se administran
-  manualmente en la API y no se guardan como instantánea en cada venta. La
-  actualización de la app para consumirlos queda pendiente.
+- El comercio pertenece obligatoriamente a la cuenta: el login entrega sus
+  datos actuales y mobile los conserva en un store local en memoria durante la
+  sesión. Ventas, comprobantes e impresión leen ese store y no hacen una
+  consulta de comercio en línea. Cada 15 minutos, mobile refresca el store con
+  `GET /v1/me/merchant`; ante un fallo transitorio reintenta hasta tres veces,
+  conserva el último valor y espera la ventana siguiente sin mostrar un error
+  al operador (solo lo registra en logs). Los datos se administran manualmente
+  en la API y no se guardan como instantánea en cada venta.
 - La API envía el código de comercio asociado a la cuenta al gateway para
   ventas y consultas de saldo. El gateway lo transmite en ISO DE42; las
   anulaciones y reversos consultan el comercio asociado a la cuenta de la venta.

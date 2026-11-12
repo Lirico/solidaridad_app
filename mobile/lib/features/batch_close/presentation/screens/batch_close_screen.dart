@@ -9,6 +9,9 @@ import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
+import '../../../sales/data/receipt_printer.dart';
+import '../../../sales/domain/receipt_defaults.dart';
+import '../../../sales/domain/receipt_formatter.dart';
 import '../../domain/batch_close_model.dart';
 import '../cubit/batch_close_cubit.dart';
 import '../cubit/batch_close_state.dart';
@@ -23,7 +26,9 @@ class BatchCloseScreen extends StatefulWidget {
 }
 
 class _BatchCloseScreenState extends State<BatchCloseScreen> {
+  final ReceiptPrinter _printer = ReceiptPrinter();
   String? _closeIdempotencyKey;
+  bool _printing = false;
   @override
   void initState() {
     super.initState();
@@ -72,6 +77,48 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
     );
   }
 
+  Future<void> _printClosedTicket(BatchCloseClosed closed) async {
+    if (_printing) return;
+    final merchant = context.read<AuthCubit>().merchant;
+    if (merchant == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La cuenta no tiene un comercio configurado.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _printing = true);
+    final PrintResult result = await _printer.printBatchClose(
+      ReceiptFormatter.batchCloseToHtml(
+        date: DateTime.now(),
+        defaults: ReceiptDefaults.forMerchant(
+          merchantCode: merchant.code,
+          merchantName: merchant.name,
+          merchantAddress: merchant.address,
+          merchantCity: merchant.city,
+          merchantTaxId: merchant.taxId,
+        ),
+        batchNumber: closed.batchCloseId?.toString() ?? '',
+        ticket: BatchCloseTicket.fromOperations(closed.operations),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _printing = false);
+    if (!result.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          action: SnackBarAction(
+            label: 'REIMPRIMIR',
+            onPressed: () => _printClosedTicket(closed),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -94,19 +141,13 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
             }
             if (state is BatchCloseClosed) {
               _closeIdempotencyKey = null;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Lote cerrado: ${state.operations.length} operaciones incluidas.',
-                  ),
-                ),
-              );
+              _printClosedTicket(state);
               _loadCurrentBatch();
             }
             if (state is BatchCloseCloseFailed) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message)),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.message)));
             }
           },
           child: BlocBuilder<BatchCloseCubit, BatchCloseState>(

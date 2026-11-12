@@ -3,9 +3,35 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:solidaridad_app/features/auth/data/auth_repository.dart';
+import 'package:solidaridad_app/features/auth/data/merchant_store.dart';
+import 'package:solidaridad_app/features/auth/domain/auth_model.dart';
 import 'package:solidaridad_app/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:solidaridad_app/features/auth/presentation/cubit/auth_state.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 import 'package:solidaridad_app/features/sales/presentation/screens/sale_status_screen.dart';
+
+class _MerchantCubit extends AuthCubit {
+  _MerchantCubit()
+    : super(
+        authRepository: AuthRepository(),
+        merchantStore: MerchantStore()..replace(_merchant),
+      ) {
+    emit(
+      const AuthSuccess(
+        user: User(name: 'Ana', email: 'ana@comercio.test', token: 'tok'),
+        merchant: _merchant,
+      ),
+    );
+  }
+}
+
+const _merchant = Merchant(
+  code: '014114',
+  name: 'COMERCIO REAL',
+  address: 'Alem 100',
+  city: 'Tolhuin',
+  taxId: '30-71234567-8',
+);
 
 void main() {
   testWidgets('sin datos no muestra la venta como aprobada y vuelve atrás', (
@@ -58,6 +84,7 @@ void main() {
 
     await _openStatus(
       tester,
+      cubit: _MerchantCubit(),
       arguments: OperationModel(
         id: 'OP-1',
         productCode: 'GARRAFA_10',
@@ -78,10 +105,14 @@ void main() {
   });
 }
 
-Future<void> _openStatus(WidgetTester tester, {Object? arguments}) async {
+Future<void> _openStatus(
+  WidgetTester tester, {
+  Object? arguments,
+  AuthCubit? cubit,
+}) async {
   await tester.pumpWidget(
     BlocProvider(
-      create: (_) => AuthCubit(authRepository: AuthRepository()),
+      create: (_) => cubit ?? AuthCubit(authRepository: AuthRepository()),
       child: MaterialApp(
         home: Builder(
           builder: (context) {

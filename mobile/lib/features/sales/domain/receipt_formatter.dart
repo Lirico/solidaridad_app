@@ -157,6 +157,113 @@ class ReceiptFormatter {
         ? '<div class="firma">ORIGINAL COMERCIO</div>'
         : '';
 
+    return _document(
+      body:
+          '''
+  <table>
+    <tr>
+      <td class="l">${_esc(_formatDate(op.date))}</td>
+      <td class="c b">${_esc(defaults.issuerName)}<br/><span>${_esc(operationTypeLabel(op.result))}</span></td>
+      <td class="r">${_esc(_formatTime(op.date))}</td>
+    </tr>
+  </table>
+  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
+  <div class="c">${_esc(defaults.establishmentAddress)}</div>
+  <div class="c">${_esc(defaults.establishmentCuit)}</div>
+  <div class="detail">
+    ${lines.join('\n    ')}
+  </div>
+  <div class="c big status">${_esc(_statusLabel(op))}</div>
+  $declineReason
+  $verificationWarning
+  $signature
+  $customerLegend
+  $merchantLegend
+  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+''',
+    );
+  }
+
+  /// Una consulta de saldo aprobada: un solo ticket, copia cliente.
+  ///
+  /// El encabezado, el comercio y los márgenes son los de [toHtml]. La línea
+  /// de saldo ocupa el lugar del resultado y queda a la izquierda, en negrita.
+  static String balanceToHtml({
+    required DateTime date,
+    required ReceiptDefaults defaults,
+    required String cardNumber,
+    required String expirationDate,
+    required double kilograms,
+  }) {
+    final lines = <String>[
+      _line('Terminal', terminalId),
+      _line('Comercio', defaults.establishmentCode),
+      _line('Lote', defaults.batchNumber),
+      _line('Tarjeta', maskPan(cardNumber)),
+      _line('Vencimiento', formatCardExpiry(expirationDate)),
+    ];
+    return _document(
+      body:
+          '''
+  <table>
+    <tr>
+      <td class="l">${_esc(_formatDate(date))}</td>
+      <td class="c b">${_esc(defaults.issuerName)}<br/><span>CONSULTA SALDO</span></td>
+      <td class="r">${_esc(_formatTime(date))}</td>
+    </tr>
+  </table>
+  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
+  <div class="c">${_esc(defaults.establishmentAddress)}</div>
+  <div class="c">${_esc(defaults.establishmentCuit)}</div>
+  <div class="detail">
+    ${lines.join('\n    ')}
+  </div>
+  <div class="b status">${_esc(balanceAmountLine(kilograms))}</div>
+  <div class="c b">COPIA CLIENTE</div>
+  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+''',
+    );
+  }
+
+  /// Texto de la consulta de saldo, para pruebas y registro.
+  static String balanceToPlainText({
+    required DateTime date,
+    required ReceiptDefaults defaults,
+    required String cardNumber,
+    required String expirationDate,
+    required double kilograms,
+  }) {
+    return [
+      '${_formatDate(date)}  ${defaults.issuerName}  ${_formatTime(date)}',
+      'CONSULTA SALDO',
+      defaults.establishmentName,
+      defaults.establishmentAddress,
+      defaults.establishmentCuit,
+      'Terminal: $terminalId',
+      'Comercio: ${defaults.establishmentCode}',
+      'Lote: ${defaults.batchNumber}',
+      'Tarjeta: ${maskPan(cardNumber)}',
+      'Vencimiento: ${formatCardExpiry(expirationDate)}',
+      balanceAmountLine(kilograms),
+      'COPIA CLIENTE',
+    ].join('\n');
+  }
+
+  /// `SALDO:` más diecisiete puntos, como en el comprobante aprobado.
+  static String balanceAmountLine(double kilograms) {
+    return 'SALDO:${'.' * 17} KG ${kilograms.toStringAsFixed(2)}';
+  }
+
+  /// El vencimiento de la tarjeta llega como `YYMM`. En el papel se lee `MM/YY`.
+  static String formatCardExpiry(String value) {
+    final trimmed = value.trim();
+    if (RegExp(r'^\d{4}$').hasMatch(trimmed)) {
+      return '${trimmed.substring(2)}/${trimmed.substring(0, 2)}';
+    }
+    return trimmed;
+  }
+
+  static String _document({required String body}) {
     return '''
 <!DOCTYPE html>
 <html>
@@ -180,27 +287,7 @@ class ReceiptFormatter {
 </style>
 </head>
 <body>
-  <table>
-    <tr>
-      <td class="l">${_esc(_formatDate(op.date))}</td>
-      <td class="c b">${_esc(defaults.issuerName)}<br/><span>${_esc(operationTypeLabel(op.result))}</span></td>
-      <td class="r">${_esc(_formatTime(op.date))}</td>
-    </tr>
-  </table>
-  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
-  <div class="c">${_esc(defaults.establishmentAddress)}</div>
-  <div class="c">${_esc(defaults.establishmentCuit)}</div>
-  <div class="detail">
-    ${lines.join('\n    ')}
-  </div>
-  <div class="c big status">${_esc(_statusLabel(op))}</div>
-  $declineReason
-  $verificationWarning
-  $signature
-  $customerLegend
-  $merchantLegend
-  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
-</body>
+$body</body>
 </html>
 ''';
   }

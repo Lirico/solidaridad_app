@@ -276,11 +276,16 @@ Principios:
 | `JWT_SECRET` | Firma HS256 (secreto fuerte, no commitear) | valor largo solo para local |
 | `JWT_ALGORITHM` | Default `HS256` | `HS256` |
 | `JWT_EXPIRE_MINUTES` | TTL del access token | `1440` |
-| `APP_ENV` | `local` / `dev` / `prod` | `local` |
+| `APP_ENV` | Obligatorio: `local`, `dev`, `test`, `staging`, `prod` o `production` | `local` |
 | `POSTGRES_USER` | Usuario del container Compose | `solidaridad` |
-| `POSTGRES_PASSWORD` | Password del container Compose | `solidaridad` |
+| `POSTGRES_PASSWORD` | Password del container Compose; sin default | `solidaridad` |
 | `POSTGRES_DB` | Nombre de DB del container | `solidaridad` |
 | `POSTGRES_PORT` | Puerto publicado en host | `5434` (default del example; cambiar si el puerto está libre o ocupado) |
+
+El arranque exige `APP_ENV` explícito. Fuera de `local` no sirven el JWT de
+laboratorio, un secreto de menos de 32 caracteres ni la clave
+`solidaridad:solidaridad` en `DATABASE_URL`. Compose no publica un default
+para `POSTGRES_PASSWORD`.
 
 Detalle de archivos y flujo local: Fase 0 (§8).
 

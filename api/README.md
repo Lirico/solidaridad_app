@@ -139,6 +139,13 @@ Copy `.env.example` → `.env` (`.env` is gitignored).
 | `JWT_EXPIRE_MINUTES` | Access token TTL | `1440` |
 | `EMBEDDED_RECOVERY_WORKER_ENABLED` | Worker durable embebido; desactivar sólo para mantenimiento/tests deterministas | `true` |
 
+`APP_ENV` es obligatorio (`local`, `dev`, `test`, `staging`, `prod` o
+`production`). Si no está definido, el proceso no arranca y no asume `local`.
+Fuera de `local` se rechazan el `JWT_SECRET` de laboratorio, cualquier secreto
+de menos de 32 caracteres y una `DATABASE_URL` con usuario y contraseña
+`solidaridad` / `solidaridad`. `POSTGRES_PASSWORD` no tiene default en Compose:
+si falta, el contenedor no levanta.
+
 ### Hitting the API from a device / emulator
 
 - Host machine / iOS simulator: `http://127.0.0.1:8000/v1`

@@ -5,6 +5,7 @@ API_BASE_URL ?= http://127.0.0.1:8000
 INTEGRATION_GATEWAY_CONTROL_URL ?= http://127.0.0.1:8011
 E2E_API_BASE_URL ?= http://127.0.0.1:8000
 E2E_DATABASE_URL ?= postgresql+psycopg://solidaridad_e2e:solidaridad_e2e@127.0.0.1:5435/solidaridad_e2e
+E2E_APP_ENV ?= local
 
 .PHONY: help env setup dev up down e2e-db-up e2e-db-down e2e-db-reset e2e-test integ-test-controlled test-all \
 	catalog-install catalog-check \
@@ -172,8 +173,8 @@ e2e-db-reset:
 
 e2e-test: setup processor-integration-reset
 	$(MAKE) e2e-db-reset
-	DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api migrate
-	DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api db-seed
+	APP_ENV="$(E2E_APP_ENV)" DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api migrate
+	APP_ENV="$(E2E_APP_ENV)" DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api db-seed
 	@set -Eeuo pipefail; \
 		gateway_pid=""; \
 		api_pid=""; \
@@ -211,7 +212,7 @@ e2e-test: setup processor-integration-reset
 		ISO_TRANSPORT=tcp $(MAKE) -C payment-gateway run-once HOST=127.0.0.1 & gateway_pid="$$!"; \
 		wait_for_port "payment gateway E2E" 127.0.0.1 8001 "$$gateway_pid"; \
 		echo "Iniciando API E2E con PostgreSQL dedicado..."; \
-		DATABASE_URL="$(E2E_DATABASE_URL)" PAYMENT_GATEWAY_URL=http://127.0.0.1:8001 $(MAKE) -C api run-once HOST=127.0.0.1 & api_pid="$$!"; \
+		APP_ENV="$(E2E_APP_ENV)" DATABASE_URL="$(E2E_DATABASE_URL)" PAYMENT_GATEWAY_URL=http://127.0.0.1:8001 $(MAKE) -C api run-once HOST=127.0.0.1 & api_pid="$$!"; \
 		wait_for_port "API E2E" 127.0.0.1 8000 "$$api_pid"; \
 		INTEGRATION_DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api integ-test-processor API_BASE_URL="$(E2E_API_BASE_URL)"
 
@@ -220,8 +221,8 @@ e2e-test: setup processor-integration-reset
 # single source of truth for timeout, retry and ambiguous-response coverage.
 integ-test-controlled: setup
 	$(MAKE) e2e-db-reset
-	DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api migrate
-	DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api db-seed
+	APP_ENV="$(E2E_APP_ENV)" DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api migrate
+	APP_ENV="$(E2E_APP_ENV)" DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) -C api db-seed
 	@set -Eeuo pipefail; \
 		stub_pid=""; \
 		api_pid=""; \
@@ -258,7 +259,7 @@ integ-test-controlled: setup
 		$(MAKE) -C api integ-stub HOST=127.0.0.1 & stub_pid="$$!"; \
 		wait_for_port "gateway stub" 127.0.0.1 8011 "$$stub_pid"; \
 		echo "Iniciando API para integración controlada..."; \
-		DATABASE_URL="$(E2E_DATABASE_URL)" PAYMENT_GATEWAY_URL=http://127.0.0.1:8011 $(MAKE) -C api run-once HOST=127.0.0.1 & api_pid="$$!"; \
+		APP_ENV="$(E2E_APP_ENV)" DATABASE_URL="$(E2E_DATABASE_URL)" PAYMENT_GATEWAY_URL=http://127.0.0.1:8011 $(MAKE) -C api run-once HOST=127.0.0.1 & api_pid="$$!"; \
 		wait_for_port "API integration" 127.0.0.1 8000 "$$api_pid"; \
 		INTEGRATION_DATABASE_URL="$(E2E_DATABASE_URL)" $(MAKE) integ-test API_BASE_URL="$(E2E_API_BASE_URL)" INTEGRATION_GATEWAY_CONTROL_URL=http://127.0.0.1:8011
 

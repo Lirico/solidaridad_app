@@ -76,7 +76,7 @@ recovery-concurrency-test:
 
 # Reset the dedicated disposable DB, migrate it and run the race matrix.
 recovery-concurrency-local: e2e-db-reset
-	DATABASE_URL="$(E2E_DATABASE_URL)" uv run alembic upgrade head
+	APP_ENV=local DATABASE_URL="$(E2E_DATABASE_URL)" uv run alembic upgrade head
 	$(MAKE) recovery-concurrency-test
 
 dev: db-up migrate run

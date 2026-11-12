@@ -38,7 +38,7 @@ def test_create_access_token_includes_required_claims() -> None:
     assert payload["installation_id"] == "inst-1"
     assert "jti" in payload
     assert "iat" in payload
-    assert "exp" not in payload
+    assert payload["exp"] - payload["iat"] == 90 * 24 * 60 * 60
     assert service.verify(token)["sub"] == str(user_id)
 
 

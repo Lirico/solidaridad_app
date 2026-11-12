@@ -40,7 +40,7 @@ Un usuario puede operar desde **más de un client** (p. ej. varias V660p, y a fu
 |----------|----------------------|---------|
 | `User` (`sub`) | ¿Quién es? | Cajero / operador |
 | `installation_id` | ¿Desde qué instalación de la app? | Instancia en una V660p o en un mobile |
-| Sesión JWT (`jti`) | ¿Esta autenticación concreta sigue vigente? | Access token sin `exp`. Si el token trae `exp`, la API lo rechaza al vencer |
+| Sesión JWT (`jti` / `exp`) | ¿Esta autenticación concreta sigue vigente? | Access token con `exp` a 90 días |
 
 **Por qué no `terminal_id`:** el nombre ata el dominio a hardware POS. La app también puede vivir en mobile; el concepto real es “esta instalación del client”, no “esta terminal Verifone”.
 
@@ -213,11 +213,10 @@ surrogado; el procesador valida que la terminal funcional esté dada de alta.
 | `installation_id` | instalación del client (§3) |
 | `jti` | id único de esta sesión |
 | `iat` | emisión |
-| `exp` | opcional. Los tokens actuales no lo incluyen. Si está, `verify` lo hace valer |
+| `exp` | emisión más 90 días (`JWT_EXPIRE_DAYS`) |
 
-El access token no vence por tiempo. No hay refresh token. Mobile guarda el
-token y, si en el futuro vuelve a traer `exp`, no restaura una sesión ya
-vencida.
+El access token vence a los 90 días. No hay refresh token. Mobile guarda el
+token y no restaura la sesión si `exp` ya se cumplió.
 
 ## 6. Diseño por capas (top-down)
 
@@ -280,6 +279,7 @@ Principios:
 | `DATABASE_URL` | Conexión Postgres | `postgresql+psycopg://solidaridad:solidaridad@localhost:5434/solidaridad` |
 | `JWT_SECRET` | Firma HS256 (secreto fuerte, no commitear) | valor largo solo para local |
 | `JWT_ALGORITHM` | Default `HS256` | `HS256` |
+| `JWT_EXPIRE_DAYS` | Vida del access token | `90` |
 | `APP_ENV` | Obligatorio: `local`, `dev`, `test`, `staging`, `prod` o `production` | `local` |
 | `POSTGRES_USER` | Usuario del container Compose | `solidaridad` |
 | `POSTGRES_PASSWORD` | Password del container Compose; sin default | `solidaridad` |
@@ -423,7 +423,7 @@ Objetivo: un developer puede clonar, levantar Postgres, migrar, seedear y correr
 - [ ] `installation_id` requerido y acotado (longitud máx.); string opaco, sin confiar en su formato
 - [ ] HTTPS en entornos desplegados (infra, no app)
 - [ ] Validación de input con Pydantic en todos los endpoints auth
-- [ ] Tokens sin `exp` por ahora; si el claim viene, rechazarlo vencido; rechazar firmas inválidas; claim `installation_id` presente
+- [ ] Tokens con `exp` a 90 días; rechazarlos vencidos y con firma inválida; claim `installation_id` presente
 
 ## 10. Pruebas sugeridas
 

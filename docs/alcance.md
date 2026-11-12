@@ -52,8 +52,8 @@ impresión de ticket.
   no existe registro público.
 - El comercio pertenece obligatoriamente a la cuenta: el login entrega sus
   datos actuales y mobile los conserva, junto con el token y el usuario, en el
-  almacenamiento seguro del dispositivo. La sesión no vence por tiempo. Si el
-  token trae un `exp` ya cumplido, el arranque no la restaura. Ventas,
+  almacenamiento seguro del dispositivo. El access token vence a los 90 días.
+  Si ese `exp` ya se cumplió, el arranque no restaura la sesión. Ventas,
   comprobantes e impresión leen el store en memoria y no hacen una consulta de
   comercio en línea. Cada 15 minutos, mobile refresca ese store con
   `GET /v1/me/merchant`; ante un fallo transitorio reintenta hasta tres veces,

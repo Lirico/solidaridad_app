@@ -2,8 +2,8 @@ import 'dart:convert';
 
 /// Vigencia local de un access token, sin validar la firma.
 ///
-/// La API actual omite `exp`. Si más adelante lo incluye, [accessTokenStatus]
-/// trata vencido a un token cuyo `exp` ya llegó.
+/// La API envía `exp` a 90 días. [accessTokenStatus] trata vencido a un token
+/// cuyo `exp` ya llegó. Si el claim no viene, la sesión sigue vigente.
 enum AccessTokenStatus { valid, expired, unreadable }
 
 AccessTokenStatus accessTokenStatus(String token, {DateTime? now}) {

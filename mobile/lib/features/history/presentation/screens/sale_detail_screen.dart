@@ -6,7 +6,6 @@ import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
-import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/data/receipt_printer.dart';
 import '../../../sales/domain/receipt_defaults.dart';
@@ -36,16 +35,8 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     _loadedDefaults = true;
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is! OperationModel) return;
-    _loadDefaults(args);
-  }
-
-  Future<void> _loadDefaults(OperationModel operation) async {
-    final defaults = await _defaultsFor(operation);
-    if (!mounted) return;
-    setState(() {
-      _defaults = defaults;
-      _defaultsFailed = defaults == null;
-    });
+    _defaults = _defaultsFor(args);
+    _defaultsFailed = _defaults == null;
   }
 
   @override
@@ -146,9 +137,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     );
   }
 
-  Future<ReceiptDefaults?> _defaultsFor(OperationModel operation) async {
-    final merchant = await context.read<AuthCubit>().refreshMerchant();
-    if (!mounted || merchant == null) return null;
+  ReceiptDefaults? _defaultsFor(OperationModel operation) {
+    final merchant = context.read<AuthCubit>().merchant;
+    if (merchant == null) return null;
     return ReceiptDefaults.forSale(
       merchantCode: merchant.code,
       merchantName: merchant.name,
@@ -159,18 +150,12 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     );
   }
 
-  String _missingMerchantMessage() {
-    final auth = context.read<AuthCubit>().state;
-    if (auth is AuthSessionExpired && (auth.message ?? '').isNotEmpty) {
-      return auth.message!;
-    }
-    return 'La cuenta no tiene un comercio configurado.';
-  }
+  String _missingMerchantMessage() =>
+      'La cuenta no tiene un comercio configurado.';
 
   Future<void> _printTicket(OperationModel operation) async {
     setState(() => _printing = true);
-    final defaults = await _defaultsFor(operation);
-    if (!mounted) return;
+    final defaults = _defaultsFor(operation);
     if (defaults == null) {
       setState(() => _printing = false);
       ScaffoldMessenger.of(context).showSnackBar(

@@ -58,9 +58,9 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     Navigator.pushNamed(context, AppRoutes.saleProcessing);
   }
 
-  Future<ReceiptDefaults?> _defaultsFor(OperationModel operation) async {
-    final merchant = await context.read<AuthCubit>().refreshMerchant();
-    if (!mounted || merchant == null) return null;
+  ReceiptDefaults? _defaultsFor(OperationModel operation) {
+    final merchant = context.read<AuthCubit>().merchant;
+    if (merchant == null) return null;
     return ReceiptDefaults.forSale(
       merchantCode: merchant.code,
       merchantName: merchant.name,
@@ -71,13 +71,8 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
     );
   }
 
-  String _missingMerchantMessage() {
-    final auth = context.read<AuthCubit>().state;
-    if (auth is AuthSessionExpired && (auth.message ?? '').isNotEmpty) {
-      return auth.message!;
-    }
-    return 'La cuenta no tiene un comercio configurado.';
-  }
+  String _missingMerchantMessage() =>
+      'La cuenta no tiene un comercio configurado.';
 
   bool _printsTicket(PaymentResult result) {
     return result == PaymentResult.approved ||
@@ -94,8 +89,7 @@ class _SaleStatusScreenState extends State<SaleStatusScreen> {
       _printMessage = '';
     });
 
-    final defaults = await _defaultsFor(operation);
-    if (!mounted) return;
+    final defaults = _defaultsFor(operation);
     if (defaults == null) {
       setState(() {
         _printStatus = PrintStatus.error;

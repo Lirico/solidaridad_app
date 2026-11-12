@@ -8,3 +8,4 @@ class ProductResponse(BaseModel):
     code: Product
     label: str
     unit: ProductUnit
+    kg_per_unit: float

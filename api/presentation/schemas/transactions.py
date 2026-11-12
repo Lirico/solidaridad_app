@@ -62,6 +62,7 @@ class TransactionItemResponse(BaseModel):
 
     transaction_number: str
     product: str
+    product_label: str
     amount: str
     card_last4: str
     status: str

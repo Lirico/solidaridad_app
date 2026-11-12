@@ -1,31 +1,5 @@
 import '../../sales/domain/sale_model.dart';
 
-/// Equivalencia en kg por unidad vendida.
-///
-/// El catálogo (`packages/catalog`) expone código, etiqueta y unidad
-/// (`unidades` / `m3`) pero **no** el peso por producto. Este mapa replica la
-/// equivalencia que usa el mockup del cliente (15 garrafas de 10 kg = 150 Kg).
-/// `GRANEL` se mide en m³ y el mockup lo muestra en Kg, así que vale 1:1.
-/// **Pendiente:** cuando se confirme el endpoint del backend que expone el peso
-/// por producto, este mapa se reemplaza por el valor del catálogo. Ver
-/// `docs/gaps.md` (G-P2-10).
-const Map<String, double> batchKgPerUnit = <String, double>{
-  'GARRAFA_10': 10,
-  'GARRAFA_15': 15,
-  'GARRAFA_30': 30,
-  'TUBO_45': 45,
-  'GRANEL': 1,
-};
-
-/// Orden de las filas de "Ventas por Producto" (mismo orden del catálogo).
-const List<String> _productOrder = <String>[
-  'GARRAFA_10',
-  'GARRAFA_15',
-  'GARRAFA_30',
-  'TUBO_45',
-  'GRANEL',
-];
-
 /// Fila de "Ventas por Producto": cantidad vendida y su equivalente en kg.
 class BatchProductItem {
   final String productCode;
@@ -48,19 +22,33 @@ class BatchProductItem {
     required this.unitLabel,
   });
 
-  factory BatchProductItem.fromCode({
+  factory BatchProductItem.fromCatalog({
     required String productCode,
     required String label,
     required double quantity,
+    required List<ProductInfo> catalog,
   }) {
+    ProductInfo? info;
+    for (final ProductInfo item in catalog) {
+      if (item.code == productCode) {
+        info = item;
+        break;
+      }
+    }
     return BatchProductItem(
       productCode: productCode,
       label: label,
       quantity: quantity,
-      kg: quantity * (batchKgPerUnit[productCode] ?? 1),
-      unitLabel: productCode == 'GRANEL' ? 'm³' : 'unidades',
+      kg: quantity * (info?.kgPerUnit ?? 1),
+      unitLabel: _unitLabel(info?.unit),
     );
   }
+}
+
+String _unitLabel(ProductUnit? unit) {
+  if (unit == null) return 'unidades';
+  if (unit.singular == 'm3') return 'm³';
+  return unit.plural;
 }
 
 /// Resumen del lote actual: lo que la pantalla de Cierre de Lote muestra.
@@ -103,6 +91,7 @@ class BatchSummary {
   factory BatchSummary.fromOperations({
     required List<OperationModel> operations,
     required String batchNumber,
+    required List<ProductInfo> catalog,
     bool isPartial = false,
   }) {
     final Map<String, BatchProductItem> byProduct =
@@ -115,17 +104,23 @@ class BatchSummary {
       salesCount++;
       final double quantity =
           (byProduct[operation.productCode]?.quantity ?? 0) + operation.amount;
-      byProduct[operation.productCode] = BatchProductItem.fromCode(
+      byProduct[operation.productCode] = BatchProductItem.fromCatalog(
         productCode: operation.productCode,
         label: operation.productLabel,
         quantity: quantity,
+        catalog: catalog,
       );
     }
 
+    final List<String> order = <String>[
+      for (final ProductInfo item in catalog) item.code,
+    ];
     final List<BatchProductItem> products = byProduct.values.toList()
       ..sort(
-        (a, b) =>
-            _orderIndex(a.productCode).compareTo(_orderIndex(b.productCode)),
+        (a, b) => _orderIndex(
+          order,
+          a.productCode,
+        ).compareTo(_orderIndex(order, b.productCode)),
       );
 
     return BatchSummary(
@@ -138,7 +133,7 @@ class BatchSummary {
   }
 }
 
-int _orderIndex(String productCode) {
-  final int index = _productOrder.indexOf(productCode);
-  return index < 0 ? _productOrder.length : index;
+int _orderIndex(List<String> order, String productCode) {
+  final int index = order.indexOf(productCode);
+  return index < 0 ? order.length : index;
 }

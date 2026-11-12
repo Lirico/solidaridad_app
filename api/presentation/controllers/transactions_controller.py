@@ -36,6 +36,7 @@ from domain.exceptions import (
     VoidOperationNotFound,
 )
 from domain.money import AMOUNT_EXPONENT
+from domain.product import product_label
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
 from domain.void_operation import VoidOperation, VoidOperationStatus
@@ -72,6 +73,21 @@ def _receipt(transaction: Transaction) -> ReceiptData | None:
     return ReceiptData(
         coupon_number=transaction.processor_ticket,
         authorization_code=transaction.auth_id,
+    )
+
+
+def _transaction_item(transaction: Transaction) -> TransactionItemResponse:
+    return TransactionItemResponse(
+        transaction_number=transaction.transaction_number,
+        product=transaction.product.value,
+        product_label=product_label(transaction.product),
+        amount=str(Decimal(transaction.amount_minor) / (10**AMOUNT_EXPONENT)),
+        card_last4=transaction.card_last4,
+        status=transaction.status.value,
+        user_message=transaction.user_message or "",
+        created_at=transaction.created_at,
+        response_code=transaction.processor_response_code,
+        receipt=_receipt(transaction),
     )
 
 
@@ -136,17 +152,7 @@ def list_transactions(
         offset=offset,
     )
     items = [
-        TransactionItemResponse(
-            transaction_number=t.transaction_number,
-            product=t.product.value,
-            amount=str(Decimal(t.amount_minor) / (10**AMOUNT_EXPONENT)),
-            card_last4=t.card_last4,
-            status=t.status.value,
-            user_message=t.user_message or "",
-            created_at=t.created_at,
-            response_code=t.processor_response_code,
-            receipt=_receipt(t),
-        )
+        _transaction_item(t)
         for t in result.transactions
     ]
     return TransactionListResponse(items=items, total=result.total)
@@ -343,17 +349,7 @@ def close_batch(
         )
 
     items = [
-        TransactionItemResponse(
-            transaction_number=t.transaction_number,
-            product=t.product.value,
-            amount=str(Decimal(t.amount_minor) / (10**AMOUNT_EXPONENT)),
-            card_last4=t.card_last4,
-            status=t.status.value,
-            user_message=t.user_message or "",
-            created_at=t.created_at,
-            response_code=t.processor_response_code,
-            receipt=_receipt(t),
-        )
+        _transaction_item(t)
         for t in result.transactions
     ]
     return BatchCloseResponse(

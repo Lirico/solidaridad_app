@@ -72,7 +72,7 @@ class OperationModel {
     return OperationModel(
       id: json['transaction_number'] as String? ?? '',
       productCode: code,
-      productLabel: _labelForProductCode(code),
+      productLabel: _productLabel(json),
       amount: double.tryParse(json['amount'] as String? ?? '0') ?? 0.0,
       cardNumber: '•••• ${json['card_last4'] as String? ?? '0000'}',
       result: _resultForStatus(
@@ -96,21 +96,10 @@ class OperationModel {
     );
   }
 
-  static String _labelForProductCode(String code) {
-    switch (code) {
-      case 'GARRAFA_10':
-        return 'Garrafa 10 kg';
-      case 'GARRAFA_15':
-        return 'Garrafa 15 kg';
-      case 'GARRAFA_30':
-        return 'Garrafa 30 kg';
-      case 'TUBO_45':
-        return 'Tubo 45 kg';
-      case 'GRANEL':
-        return 'Granel';
-      default:
-        return code;
-    }
+  static String _productLabel(Map<String, dynamic> json) {
+    final raw = json['product_label'];
+    if (raw is String && raw.trim().isNotEmpty) return raw.trim();
+    return json['product'] as String? ?? '';
   }
 
   static SaleAuthorizationStatus _parseAuthorizationStatus(String status) {
@@ -319,10 +308,12 @@ class ProductInfo {
   final String code;
   final String label;
   final ProductUnit unit;
+  final double kgPerUnit;
 
   const ProductInfo({
     required this.code,
     required this.label,
+    required this.kgPerUnit,
     this.unit = ProductUnit.unidades,
   });
 
@@ -338,7 +329,13 @@ class ProductInfo {
     } else {
       unit = ProductUnit.forProductCode(code);
     }
-    return ProductInfo(code: code, label: json['label'] as String, unit: unit);
+    final rawKg = json['kg_per_unit'];
+    return ProductInfo(
+      code: code,
+      label: json['label'] as String,
+      unit: unit,
+      kgPerUnit: rawKg is num ? rawKg.toDouble() : 1,
+    );
   }
 }
 

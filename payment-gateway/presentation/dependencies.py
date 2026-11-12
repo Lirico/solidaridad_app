@@ -20,7 +20,11 @@ def get_iso_processor(
     transport = settings.iso_transport.lower().strip()
     if transport == "tcp":
         return TcpIsoProcessor(settings)
-    return MockIsoProcessor()
+    if transport == "mock":
+        return MockIsoProcessor()
+    raise RuntimeError(
+        f"ISO_TRANSPORT inválido: {settings.iso_transport!r}. Use mock o tcp."
+    )
 
 
 def get_authorize_payment(

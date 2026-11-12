@@ -5,6 +5,7 @@ import pytest
 from config.settings import (
     LAB_DATABASE_CREDENTIALS,
     LAB_JWT_SECRET,
+    MIN_NON_LOCAL_JWT_SECRET_LENGTH,
     LabSecretsError,
     Settings,
     ensure_explicit_lab_secrets,
@@ -112,3 +113,101 @@ def test_settings_object_keeps_lab_defaults(monkeypatch: pytest.MonkeyPatch) -> 
     assert settings.business_timezone == "America/Argentina/Buenos_Aires"
     with pytest.raises(LabSecretsError, match="no está definido"):
         ensure_explicit_lab_secrets(settings)
+
+
+def test_blank_app_env_refuses_startup(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "   ")
+
+    with pytest.raises(LabSecretsError, match="está vacío"):
+        get_settings()
+
+
+def test_unknown_app_env_refuses_startup(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "qa")
+
+    with pytest.raises(LabSecretsError, match="no es un ambiente conocido"):
+        get_settings()
+
+
+def test_short_jwt_refused_outside_local(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", "x" * (MIN_NON_LOCAL_JWT_SECRET_LENGTH - 1))
+    monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+
+    with pytest.raises(LabSecretsError, match="demasiado corto"):
+        get_settings()
+
+
+def test_minimum_length_jwt_starts_outside_local(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    secret = "y" * MIN_NON_LOCAL_JWT_SECRET_LENGTH
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", secret)
+    monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+
+    settings = get_settings()
+
+    assert settings.jwt_secret == secret
+
+
+def test_similar_database_credentials_are_not_lab_secrets(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    database_url = (
+        "postgresql+psycopg://solidaridad:solidaridad-extra@localhost:5434/solidaridad"
+    )
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
+    monkeypatch.setenv("DATABASE_URL", database_url)
+
+    settings = get_settings()
+
+    assert settings.database_url == database_url
+
+
+def test_lab_credentials_outside_userinfo_do_not_block_startup(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    database_url = (
+        "postgresql+psycopg://app:real-secret@db.internal:5432/solidaridad"
+        "?application_name=solidaridad:solidaridad"
+    )
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
+    monkeypatch.setenv("DATABASE_URL", database_url)
+
+    settings = get_settings()
+
+    assert settings.database_url == database_url
+
+
+def test_unparseable_database_url_refuses_startup(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
+    monkeypatch.setenv("DATABASE_URL", "not a url")
+
+    with pytest.raises(LabSecretsError, match="no se puede interpretar"):
+        get_settings()

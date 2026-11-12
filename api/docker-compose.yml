@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-solidaridad}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definí POSTGRES_PASSWORD en api/.env}
       POSTGRES_DB: ${POSTGRES_DB:-solidaridad}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"

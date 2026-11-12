@@ -241,6 +241,14 @@ App Flutter (Verifone)
 ```
 
 - La app no habla directo con el procesador.
+- La terminal se comunica con la API pública mediante HTTPS en builds release.
+  `API_BASE_URL` es obligatoria en compilación, debe ser una URL HTTPS válida y
+  no puede incluir credenciales, query ni fragmento. Si falta o es inválida, la
+  app queda bloqueada en una pantalla de configuración antes de crear clientes
+  HTTP o mostrar el login.
+- Debug y profile conservan HTTP únicamente para laboratorio. El manifest de
+  release prohíbe cleartext mediante Android Network Security Configuration;
+  los manifests de debug/profile lo habilitan de forma explícita.
 - Conectividad segura cloud → on-prem (p. ej. salida con IP fija autorizada).
 
 ---

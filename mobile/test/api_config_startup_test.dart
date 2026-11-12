@@ -41,6 +41,19 @@ void main() {
     expect(find.text('ejemplo@gas.com'), findsNothing);
   });
 
+  testWidgets(
+    'release con HTTPS inválido muestra el error y no abre el login',
+    (tester) async {
+      startApp(releaseDecision('https://'));
+      await tester.pump();
+
+      expect(find.text(ApiConfig.releaseInvalidUrlError), findsOneWidget);
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.text('INGRESAR'), findsNothing);
+    },
+  );
+
   testWidgets('con URL https el arranque sigue al splash', (tester) async {
     startApp(releaseDecision('https://api.example/v1'));
     await tester.pump();
@@ -50,6 +63,7 @@ void main() {
     expect(find.text('INGRESAR'), findsNothing);
     expect(find.text(ApiConfig.releaseMissingUrlError), findsNothing);
     expect(find.text(ApiConfig.releaseHttpError), findsNothing);
+    expect(find.text(ApiConfig.releaseInvalidUrlError), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 3));

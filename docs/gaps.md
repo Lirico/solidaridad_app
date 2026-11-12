@@ -4,7 +4,18 @@ Inventario de brechas entre el [alcance](alcance.md) y el estado del
 repositorio. **Actualizar este documento en cada cambio implementado** (ver
 `AGENTS.md` en la raíz).
 
-Última revisión: 2026-11-10
+Última revisión: 2026-11-12
+
+> ✅ **2026-11-12 — URL de API segura en release (G-P0-09 / G-P0-10 /
+> G-P1-05):** un build release ya no cae al loopback del emulador cuando falta
+> `API_BASE_URL`. Exige una URL HTTPS con autoridad y host, sin credenciales,
+> query ni fragmento; normaliza barras finales y bloquea el arranque antes de
+> crear repositorios si la configuración falta o es inválida. El manifest
+> principal dejó de habilitar cleartext: debug/profile lo habilitan para el
+> laboratorio y release lo prohíbe con Network Security Configuration.
+> Evidencia: `mobile/lib/core/config/api_config.dart`, overlays Android en
+> `mobile/android/app/src/{debug,profile,release}` y
+> `mobile/test/api_config_{test,startup_test,manifest_test}.dart`.
 
 > ✅ **2026-11-10 — timeouts independientes, worker activo y carreras reales
 > (G-P1-09):** la migración `20261110_0018` reemplaza el timeout compartido por
@@ -671,8 +682,8 @@ Verifone (banda + térmica).
 
 | G-P0-07 | Impresión de ticket en térmica (Verifone) | partial | **2026-08-14:** impresión automática al aprobar la venta + reimpresión desde el detalle del historial. `ReceiptFormatter` (HTML térmico) en `mobile/lib/features/sales/domain/receipt_formatter.dart`; facade `ReceiptPrinter` (inicializa PSDK + `PsdkBridge.printHtml`) en `mobile/lib/features/sales/data/receipt_printer.dart`; disparo automático en `sale_status_screen.dart` (con estado imprimiendo/impreso/error + REIMPRIMIR) y botón IMPRIMIR TICKET en `sale_detail_screen.dart`. **2026-08-15:** fix de crash en `SaleStatusScreen` — `ModalRoute.of(context)` se llamaba en `initState()` (prohibido: usa `dependOnInheritedWidgetOfExactType`); se movió la lectura de argumentos y el disparo de impresión a `didChangeDependencies()` con flag `_initialized`. `flutter analyze` OK. Pendiente: verificación física en V660P. **2026-09-28 (VE-12):** el lector suelta el PSDK al terminar la lectura, antes de que `ReceiptPrinter` vuelva a inicializar para el ticket. TC-V-013 y TC-V-018 (impresión tras banda, y tres ventas seguidas) siguen pendientes de prueba en el equipo. **2026-11-06:** la impresora reutiliza la sesión del lector. El arranque se reintenta hasta tres veces y un `printHTML` ya ejecutado no se reenvía. Una venta aprobada imprime original y copia. |
 | G-P0-08 | `installation_id` desde config de terminal | partial | Se inyecta vía `--dart-define=INSTALLATION_ID=...` en build. **2026-08-08:** default de `dev-term` → `05000001` en `mobile/lib/features/auth/data/auth_repository.dart` (terminal real GOBIERNO del demo; `dev-term` no existe en `terminales` → código 89). Pendiente: lectura runtime desde config del device. |
-| G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | Faltaban `INTERNET` permission y `usesCleartextTraffic="true"` en `AndroidManifest.xml` de main. También se agregó CORS (`CORSMiddleware`) en API para compatibilidad web futura. |
-| G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` ahora usa `ApiConfig.baseUrl` igual que `AuthRepository`. URL hardcodeada a prod reemplazada por la configuración de ambiente (`--dart-define` o detección de plataforma). Ver `mobile/lib/features/sales/data/sales_repository.dart`. |
+| G-P0-09 | Android bloquea conexiones HTTP / red a backend local | done | `INTERNET` permanece en el manifest principal. **2026-11-12:** cleartext se habilita solo en los overlays debug/profile para el backend de laboratorio; release usa `networkSecurityConfig` con `cleartextTrafficPermitted="false"`. También existe CORS (`CORSMiddleware`) en API para compatibilidad web futura. Última revisión: 2026-11-12. |
+| G-P0-10 | ApiConfig usaba IP fija `10.0.2.2` incompatible con web y dispositivos reales | done | `SalesRepository` usa `ApiConfig.baseUrl` igual que los demás repositorios. **2026-11-12:** `10.0.2.2` queda exclusivamente como default de laboratorio Android en debug/profile. Release no tiene fallback y bloquea el arranque si no recibe una URL HTTPS válida por `--dart-define`. Última revisión: 2026-11-12. |
 | G-P0-11 | Política de contraseñas débil (solo valida longitud, no complejidad) | open | TC-010: contraseña `"12345678"` (solo números) fue aceptada en registro. La política solo valida mínimo 8 caracteres. No requiere mayúsculas, minúsculas, números ni símbolos. Ver hallazgo #8 en `docs/test_cases_index.md`. |
 | G-P0-16 | `must_change_password` no se forzaba en registros nuevos | done | **Histórico:** el endpoint de registro fue eliminado el 2026-11-05; el alta manual debe establecer `must_change_password`. **Fix anterior (2026-08-03):** `register_user.py` seteaba `must_change_password=False` siempre, impidiendo forzar el cambio de contraseña en el primer login. Se corrigió a `True` en `api/application/auth/register_user.py` línea 62. Tests actualizados en `test_register_user.py` y `test_auth_register_http.py`. Ver hallazgo #6 en `docs/test_cases_index.md`. |
 | G-P0-12 | Endpoint de detalle de transacción no implementado | done | **2026-10-14 (RA-08):** `GET /v1/transactions/{transaction_number}` quedó aislado a la terminal autenticada y proyecta el estado público de recuperación (`PENDING / PROCESSING` o `PENDING / UNDER_REVIEW`) sin exponer jobs ni datos sensibles. Pruebas de contrato, aislamiento y OpenAPI en `api/tests/test_get_transaction_status.py`. Última revisión: 2026-10-22. |
@@ -698,7 +709,7 @@ Verifone (banda + térmica).
 | G-P1-03 | Logs de auditoría en gateway (sin datos sensibles) | open | Falta capa de audit/masking de request-response. |
 | G-P1-07 | Fallback silencioso en errores de red de mobile | done | **2026-09-28 (VE-14):** `fetchProducts()` y `fetchHistory()` lanzan `DataLoadException` ante timeout, red o HTTP distinto de 200. El formulario (`sale_form_screen.dart`) y el historial (`sales_history_screen.dart`) muestran aviso con **REINTENTAR**. Una página siguiente fallida no borra las ventas ya cargadas. Un historial 200 vacío sigue diciendo «No hay transacciones registradas.». Los textos de cantidad usan `unit.plural` del catálogo. Ver hallazgo #23 en `docs/test_cases_index.md`. |
 | G-P1-04 | Deploy AWS + conectividad on-prem | open | Solo stack local (`make dev`). Sin IaC/deploy ni IP fija documentada en repo. |
-| G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` con `--dart-define=API_BASE_URL=...`; default apunta a localhost. |
+| G-P1-05 | Base URL / ambientes en mobile | done | `ApiConfig` usa `--dart-define=API_BASE_URL=...`. **2026-11-12:** debug/profile conservan los defaults locales; release exige HTTPS, autoridad y host, rechaza credenciales/query/fragmento, normaliza barras finales y muestra un error de configuración antes de crear repositorios cuando el valor falta o es inválido. Tests unitarios, de startup y de manifests en `mobile/test/api_config_*.dart`. Última revisión: 2026-11-12. |
 | G-P1-06 | Captura de tarjeta y layout ISO | done | **2026-10-05:** se descartó el diseño de `entry_mode`/Track 2 dinámicos porque adaptaba el C legacy al cliente. La banda y el ingreso manual comparten el contrato API de PAN + vencimiento `YYMM`; el CVV queda opcional por compatibilidad y no se reenvía. El gateway siempre arma el formato histórico (`DE22=0012`, DE2/DE14, sin DE35) y el procesador queda sin adaptaciones de captura. |
 
 

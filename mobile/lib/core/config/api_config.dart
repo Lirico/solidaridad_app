@@ -39,6 +39,10 @@ class ApiConfig {
       'Este APK de release no puede usar HTTP. '
       'Recompilá con --dart-define=API_BASE_URL=https://<servidor>/v1';
 
+  static const String releaseInvalidUrlError =
+      'Este APK de release no tiene una URL HTTPS válida. '
+      'Recompilá con --dart-define=API_BASE_URL=https://<servidor>/v1';
+
   static ApiConfigResolution resolve({
     required String fromDefine,
     required bool releaseMode,
@@ -50,10 +54,21 @@ class ApiConfig {
       if (configured.isEmpty) {
         return const ApiConfigResolution._(error: releaseMissingUrlError);
       }
-      if (!_isHttps(configured)) {
+      final uri = Uri.tryParse(configured);
+      if (uri == null) {
+        return const ApiConfigResolution._(error: releaseInvalidUrlError);
+      }
+      if (uri.scheme.toLowerCase() != 'https') {
         return const ApiConfigResolution._(error: releaseHttpError);
       }
-      return ApiConfigResolution._(baseUrl: configured);
+      if (!uri.hasAuthority ||
+          uri.host.isEmpty ||
+          uri.userInfo.isNotEmpty ||
+          uri.hasQuery ||
+          uri.hasFragment) {
+        return const ApiConfigResolution._(error: releaseInvalidUrlError);
+      }
+      return ApiConfigResolution._(baseUrl: _withoutTrailingSlash(configured));
     }
 
     if (configured.isNotEmpty) {
@@ -97,7 +112,7 @@ class ApiConfig {
     return url;
   }
 
-  static bool _isHttps(String url) {
-    return url.toLowerCase().startsWith('https://');
+  static String _withoutTrailingSlash(String url) {
+    return url.replaceFirst(RegExp(r'/+$'), '');
   }
 }

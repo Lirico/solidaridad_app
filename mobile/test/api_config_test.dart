@@ -46,6 +46,16 @@ void main() {
     expect(decision.baseUrl, 'https://api.example/v1');
   });
 
+  test('release normaliza las barras finales de la URL', () {
+    final decision = resolve(
+      releaseMode: true,
+      fromDefine: 'https://api.example/v1///',
+    );
+
+    expect(decision.isOk, isTrue);
+    expect(decision.baseUrl, 'https://api.example/v1');
+  });
+
   test('debug Android sin URL sigue en el emulador', () {
     final decision = resolve(isAndroid: true);
 
@@ -100,17 +110,50 @@ void main() {
     expect(decision.baseUrl, 'HTTPS://api.example/v1');
   });
 
-  test('release rechaza un esquema que no es https://', () {
+  test('release rechaza esquemas no HTTPS y URLs sin autoridad', () {
     final missingSlash = resolve(
       releaseMode: true,
       fromDefine: 'https:api.example',
     );
     final ftp = resolve(releaseMode: true, fromDefine: 'ftp://api.example/v1');
 
-    expect(missingSlash.error, ApiConfig.releaseHttpError);
+    expect(missingSlash.error, ApiConfig.releaseInvalidUrlError);
     expect(missingSlash.baseUrl, isNull);
     expect(ftp.error, ApiConfig.releaseHttpError);
     expect(ftp.baseUrl, isNull);
+  });
+
+  test('release rechaza HTTPS sin host o malformado', () {
+    final withoutHost = resolve(releaseMode: true, fromDefine: 'https://');
+    final malformed = resolve(
+      releaseMode: true,
+      fromDefine: 'https://[servidor/v1',
+    );
+
+    expect(withoutHost.error, ApiConfig.releaseInvalidUrlError);
+    expect(withoutHost.baseUrl, isNull);
+    expect(malformed.error, ApiConfig.releaseInvalidUrlError);
+    expect(malformed.baseUrl, isNull);
+  });
+
+  test('release rechaza credenciales, query y fragmento en la URL base', () {
+    final withCredentials = resolve(
+      releaseMode: true,
+      fromDefine: 'https://usuario:clave@api.example/v1',
+    );
+    final withQuery = resolve(
+      releaseMode: true,
+      fromDefine: 'https://api.example/v1?terminal=1',
+    );
+    final withFragment = resolve(
+      releaseMode: true,
+      fromDefine: 'https://api.example/v1#config',
+    );
+
+    for (final decision in [withCredentials, withQuery, withFragment]) {
+      expect(decision.error, ApiConfig.releaseInvalidUrlError);
+      expect(decision.baseUrl, isNull);
+    }
   });
 
   test('release en Android usa la URL https y no el emulador', () {

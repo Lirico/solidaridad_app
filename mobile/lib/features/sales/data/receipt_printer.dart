@@ -53,31 +53,9 @@ class ReceiptPrinter {
     int initAttempts = 3,
     Duration initRetryDelay = const Duration(milliseconds: 400),
     int readyTimeoutSec = 8,
-  }) async {
-    final int attempts = initAttempts < 1 ? 1 : initAttempts;
-
-    for (var attempt = 0; attempt < attempts; attempt++) {
-      final bool willRetry = attempt < attempts - 1;
-      try {
-        final bool ready = await _reader.ensureReady(
-          initializeIfNeeded: true,
-          timeoutSec: readyTimeoutSec,
-        );
-        if (!ready) {
-          if (!await _releaseForRetry()) {
-            return const PrintResult.failure(
-              'No se pudo recuperar la conexión de la impresora.',
-            );
-          }
-          if (willRetry) {
-            await Future<void>.delayed(initRetryDelay);
-            continue;
-          }
-          return const PrintResult.failure(
-            'No se pudo inicializar la impresora. Reintente.',
-          );
-        }
-
+  }) {
+    return _printWhenReady(
+      () async {
         if (operation.result == PaymentResult.approved) {
           final PrintResult original = await _printHtml(
             ReceiptFormatter.toHtml(
@@ -111,7 +89,60 @@ class ReceiptPrinter {
           );
         }
 
-        return await _printHtml(ReceiptFormatter.toHtml(operation, defaults));
+        return _printHtml(ReceiptFormatter.toHtml(operation, defaults));
+      },
+      initAttempts: initAttempts,
+      initRetryDelay: initRetryDelay,
+      readyTimeoutSec: readyTimeoutSec,
+    );
+  }
+
+  /// Un solo ticket de cierre de lote.
+  Future<PrintResult> printBatchClose(
+    String html, {
+    int initAttempts = 3,
+    Duration initRetryDelay = const Duration(milliseconds: 400),
+    int readyTimeoutSec = 8,
+  }) {
+    return _printWhenReady(
+      () => _printHtml(html),
+      initAttempts: initAttempts,
+      initRetryDelay: initRetryDelay,
+      readyTimeoutSec: readyTimeoutSec,
+    );
+  }
+
+  Future<PrintResult> _printWhenReady(
+    Future<PrintResult> Function() print, {
+    required int initAttempts,
+    required Duration initRetryDelay,
+    required int readyTimeoutSec,
+  }) async {
+    final int attempts = initAttempts < 1 ? 1 : initAttempts;
+
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      final bool willRetry = attempt < attempts - 1;
+      try {
+        final bool ready = await _reader.ensureReady(
+          initializeIfNeeded: true,
+          timeoutSec: readyTimeoutSec,
+        );
+        if (!ready) {
+          if (!await _releaseForRetry()) {
+            return const PrintResult.failure(
+              'No se pudo recuperar la conexión de la impresora.',
+            );
+          }
+          if (willRetry) {
+            await Future<void>.delayed(initRetryDelay);
+            continue;
+          }
+          return const PrintResult.failure(
+            'No se pudo inicializar la impresora. Reintente.',
+          );
+        }
+
+        return await print();
       } on PlatformException catch (error) {
         if (error.code != 'PSDK_NOT_READY' &&
             error.code != 'PSDK_INVALID_STATE' &&

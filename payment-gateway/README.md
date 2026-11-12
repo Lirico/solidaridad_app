@@ -21,7 +21,18 @@ make run
 
 Gateway: `http://127.0.0.1:8001`
 
-Por defecto `ISO_TRANSPORT=mock` (no necesita el procesador).
+El transporte no tiene un default operativo: `ISO_TRANSPORT` debe estar
+definido explícitamente o el gateway no arranca. `.env.example` configura el
+desarrollo aislado con:
+
+```env
+APP_ENV=local
+ISO_TRANSPORT=mock
+```
+
+El transporte `mock` no necesita el procesador y solo está permitido con
+`APP_ENV=local`. Cualquier otro valor, incluido uno vacío, se rechaza al
+arrancar.
 
 ### Contra el procesador real (local)
 
@@ -61,7 +72,7 @@ ISO_PORT=4452
 |----------|---------|---------------|
 | `APP_ENV` | Environment | `local` |
 | `ISO_TIMEZONE` | Zona IANA usada en DE12/DE13 | `America/Argentina/Buenos_Aires` |
-| `ISO_TRANSPORT` | `mock` or `tcp` | `mock` |
+| `ISO_TRANSPORT` | Obligatorio: `mock` o `tcp`; `mock` solo con `APP_ENV=local` | `mock` |
 | `ISO_HOST` | authkig host | `127.0.0.1` |
 | `ISO_PORT` | authkig port | `4452` |
 | `ISO_CONNECT_TIMEOUT_SECONDS` | TCP connect timeout | `5` |

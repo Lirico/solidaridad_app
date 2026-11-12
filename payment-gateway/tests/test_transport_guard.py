@@ -1,4 +1,5 @@
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from config.settings import (
@@ -7,6 +8,7 @@ from config.settings import (
     ensure_explicit_transport,
     get_settings,
 )
+from main import app
 from presentation.dependencies import get_iso_processor
 
 
@@ -27,7 +29,8 @@ def test_missing_transport_refuses_startup(monkeypatch: pytest.MonkeyPatch) -> N
     _without_env_file(monkeypatch)
 
     with pytest.raises(TransportNotConfiguredError):
-        get_settings()
+        with TestClient(app):
+            pass
 
 
 def test_default_settings_object_stays_available_for_iso_builders(

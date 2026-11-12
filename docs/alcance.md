@@ -186,6 +186,10 @@ carrito/"VENTA" blancos, contenido dentro del menú de 64dp.
 ### 2.3 Gateway de pagos / mensajería ISO
 
 - Construcción y envío del mensaje ISO de venta al procesador.
+- El transporte ISO se elige explícitamente por ambiente: `tcp` conecta con el
+  autorizador y `mock` se reserva al desarrollo local (`APP_ENV=local`). Una
+  configuración ausente, vacía o desconocida impide que el gateway arranque;
+  nunca selecciona el mock como fallback.
 - DE12/DE13 se generan en la zona horaria operativa argentina, configurable por
   ambiente, y deben permanecer alineados con el autorizador y su cierre forzado.
 - Construcción y envío del mensaje ISO de anulación (`0200` / `020000`).

@@ -1,6 +1,6 @@
 """JWT access token issuance and verification."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -13,7 +13,6 @@ class TokenService:
     def __init__(self, settings: Settings) -> None:
         self._secret = settings.jwt_secret
         self._algorithm = settings.jwt_algorithm
-        self._expire_minutes = settings.jwt_expire_minutes
 
     def create_access_token(
         self,
@@ -29,7 +28,6 @@ class TokenService:
             "installation_id": installation_id,
             "jti": str(uuid4()),
             "iat": now,
-            "exp": now + timedelta(minutes=self._expire_minutes),
         }
         return jwt.encode(payload, self._secret, algorithm=self._algorithm)
 

@@ -11,7 +11,9 @@ import 'features/balance/presentation/cubit/balance_cubit.dart';
 import 'features/batch_close/data/batch_close_repository.dart';
 import 'features/batch_close/presentation/cubit/batch_close_cubit.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/auth/data/secure_session_store.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
+import 'features/auth/presentation/widgets/session_expiry_redirect.dart';
 
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
@@ -37,6 +39,7 @@ import 'core/widgets/loading_screen.dart';
 import 'core/widgets/splash_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   startApp(ApiConfig.resolution);
 }
 
@@ -66,7 +69,10 @@ void startApp(ApiConfigResolution config) {
               BatchCloseCubit(repository: batchCloseRepository),
         ),
         BlocProvider<AuthCubit>(
-          create: (context) => AuthCubit(authRepository: authRepository),
+          create: (context) => AuthCubit(
+            authRepository: authRepository,
+            sessionStore: SecureSessionStore(),
+          ),
         ),
       ],
       child: const MyApp(),
@@ -103,15 +109,24 @@ class MisconfiguredApp extends StatelessWidget {
   }
 }
 
+final _navigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'GAS Terminal',
       debugShowCheckedModeBanner: false,
       theme: appTheme,
+      builder: (context, child) {
+        return SessionExpiryRedirect(
+          navigatorKey: _navigatorKey,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       initialRoute: AppRoutes.splash,
       routes: {
         AppRoutes.login: (context) => const LoginScreen(),

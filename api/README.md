@@ -136,7 +136,6 @@ Copy `.env.example` → `.env` (`.env` is gitignored).
 | `DATABASE_URL` | SQLAlchemy URL | `postgresql+psycopg://solidaridad:solidaridad@localhost:5434/solidaridad` |
 | `JWT_SECRET` | JWT signing secret | long local-only string |
 | `JWT_ALGORITHM` | JWT algorithm | `HS256` |
-| `JWT_EXPIRE_MINUTES` | Access token TTL | `1440` |
 | `EMBEDDED_RECOVERY_WORKER_ENABLED` | Worker durable embebido; desactivar sólo para mantenimiento/tests deterministas | `true` |
 
 `APP_ENV` es obligatorio (`local`, `dev`, `test`, `staging`, `prod` o

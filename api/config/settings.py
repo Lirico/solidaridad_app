@@ -4,6 +4,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+LAB_JWT_SECRET = "change-me-local-dev-only-use-a-long-random-string"
+LAB_DATABASE_CREDENTIALS = "solidaridad:solidaridad"
+
+
+class LabSecretsError(RuntimeError):
+    """La API no arranca con secretos de laboratorio implícitos."""
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -15,9 +22,9 @@ class Settings(BaseSettings):
     app_env: str = "local"
     business_timezone: str = "America/Argentina/Buenos_Aires"
     database_url: str = (
-        "postgresql+psycopg://solidaridad:solidaridad@localhost:5434/solidaridad"
+        f"postgresql+psycopg://{LAB_DATABASE_CREDENTIALS}@localhost:5434/solidaridad"
     )
-    jwt_secret: str = "change-me-local-dev-only-use-a-long-random-string"
+    jwt_secret: str = LAB_JWT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440
     postgres_user: str = "solidaridad"
@@ -40,6 +47,25 @@ class Settings(BaseSettings):
         return value
 
 
+def ensure_explicit_lab_secrets(settings: Settings) -> Settings:
+    env = settings.app_env.strip().lower()
+    if "app_env" not in settings.model_fields_set:
+        raise LabSecretsError(
+            "APP_ENV no está definido. La API no arranca como local implícito."
+        )
+    if env != "local":
+        if settings.jwt_secret == LAB_JWT_SECRET:
+            raise LabSecretsError(
+                "JWT_SECRET de laboratorio no vale fuera de APP_ENV=local."
+            )
+        if LAB_DATABASE_CREDENTIALS in settings.database_url:
+            raise LabSecretsError(
+                "La clave de base de laboratorio no vale fuera de APP_ENV=local."
+            )
+    settings.app_env = env
+    return settings
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return ensure_explicit_lab_secrets(Settings())

@@ -1,8 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/services.dart';
 
-import 'psdk_msr_mock.dart';
+import 'psdk_msr_source.dart';
 
 /// Habilita el mock de lectura MSR para lab sin hardware.
 ///
@@ -80,11 +81,11 @@ class PsdkBridge {
   /// Returns unmasked POC fields under `msr` (direct SDK response) and `tags`
   /// (`fetchTxnTags`, often clearer when the terminal obfuscates `msr`).
   ///
-  /// When [kUseMsrMock] is true (lab sin hardware), devuelve datos de prueba
-  /// con la misma forma que el bridge nativo en lugar de invocar el canal.
+  /// Con [kUseMsrMock] y fuera de release, devuelve el fixture de laboratorio.
+  /// Un APK de release no trae esa tarjeta: el flag lanza [StateError].
   Future<Map<String, dynamic>> readMsr({int timeoutSec = 30}) async {
-    if (kUseMsrMock) {
-      return PsdkMsrMock.readMsrSuccess(timeoutSec: timeoutSec);
+    if (labMsrEnabled(useMock: kUseMsrMock, releaseMode: kReleaseMode)) {
+      return labReadMsr(timeoutSec: timeoutSec);
     }
     final result = await _methods.invokeMethod<dynamic>(
       'readMsr',
@@ -98,7 +99,7 @@ class PsdkBridge {
   /// Debe llamarse antes de [tearDown] cuando hay un [readMsr] pendiente, para
   /// no apagar el SDK con la lectura todavía activa.
   Future<Map<String, dynamic>> cancelReadMsr() async {
-    if (kUseMsrMock) {
+    if (labMsrEnabled(useMock: kUseMsrMock, releaseMode: kReleaseMode)) {
       return <String, dynamic>{'ok': true, 'mocked': true};
     }
     final result = await _methods.invokeMethod<dynamic>(

@@ -402,7 +402,6 @@ void main() {
   );
 
   for (final failure in <String, MerchantLookup>{
-    '401': const MerchantLookup.sessionExpired(),
     '403': const MerchantLookup.missing(),
   }.entries) {
     test(

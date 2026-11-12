@@ -45,6 +45,14 @@ class Merchant {
       taxId: taxId,
     );
   }
+
+  Map<String, String> toJson() => {
+    'code': code,
+    'name': name,
+    'address': address,
+    'city': city,
+    'tax_id': taxId,
+  };
 }
 
 /// Resultado de `GET /v1/me/merchant`.

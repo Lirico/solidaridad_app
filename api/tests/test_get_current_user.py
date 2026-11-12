@@ -18,7 +18,6 @@ def _settings() -> Settings:
     return Settings(
         jwt_secret="test-secret-key-for-unit-tests-32b!",
         jwt_algorithm="HS256",
-        jwt_expire_minutes=60,
     )
 
 

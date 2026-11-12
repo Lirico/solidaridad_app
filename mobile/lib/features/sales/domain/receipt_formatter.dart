@@ -1,4 +1,6 @@
 import '../../../core/formatters/amount_formatter.dart';
+import '../../../core/formatters/quantity_formatter.dart';
+import '../../batch_close/domain/batch_close_model.dart';
 import 'receipt_defaults.dart';
 import 'sale_model.dart';
 
@@ -209,6 +211,102 @@ class ReceiptFormatter {
 </body>
 </html>
 ''';
+  }
+
+  /// Ticket de un corte cerrado. Un solo comprobante, sin firma.
+  static String batchCloseToHtml({
+    required DateTime date,
+    required ReceiptDefaults defaults,
+    required String batchNumber,
+    required BatchCloseTicket ticket,
+  }) {
+    final StringBuffer products = StringBuffer();
+    for (final BatchCloseProductSlip product in ticket.products) {
+      products
+        ..write('<div class="band">${_esc(product.label.toUpperCase())}</div>')
+        ..write('<div class="rows">')
+        ..write(_batchRow('VENTAS', product.salesCount, product.salesKg))
+        ..write(_batchRow('N. CREDITO', 0, 0))
+        ..write(_batchRow('ANULACIONES', product.voidCount, product.voidKg))
+        ..write(
+          _batchRow(
+            'TOTAL',
+            product.totalCount,
+            product.totalKg,
+            emphasize: true,
+          ),
+        )
+        ..write('</div>');
+    }
+
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  * { font: 18px monospace, monospace; }
+  body { margin: 0; padding: 8px; width: 100%; }
+  .c { text-align: center; }
+  .b { font-weight: bold; }
+  .big { font-size: 22px; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; padding: 2px 0; width: 33%; }
+  .l { text-align: left; }
+  .r { text-align: right; }
+  .merchant { margin-top: 22px; }
+  .detail { text-align: left; padding-top: 28px; }
+  .status { margin-top: 32px; margin-bottom: 44px; }
+  .firma { text-align: left; white-space: nowrap; }
+  hr { border: none; border-top: 1px dashed #000; margin: 22px 0 8px; }
+  .band { margin-top: 22px; padding: 6px 8px; background: #000; color: #fff; text-align: center; font-weight: bold; }
+  .rows { text-align: left; padding-top: 8px; }
+  .issuer { text-align: left; font-weight: bold; padding-bottom: 28px; }
+  .ok { text-align: center; font-weight: bold; margin-top: 32px; }
+</style>
+</head>
+<body>
+  <table>
+    <tr>
+      <td class="l">${_esc(_formatDate(date))}</td>
+      <td class="c b">${_esc(defaults.issuerName)}<br/><span>CIERRE DE LOTE</span></td>
+      <td class="r">${_esc(_formatTime(date))}</td>
+    </tr>
+  </table>
+  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
+  <div class="c">${_esc(defaults.establishmentAddress)}</div>
+  <div class="c">${_esc(defaults.establishmentCuit)}</div>
+  <div class="detail">
+    ${_line('Terminal', terminalId)}
+    ${_line('Comercio', defaults.establishmentCode)}
+    ${_line('Lote', batchNumber)}
+  </div>
+  $products
+  <hr/>
+  <div class="issuer">TOTALES POR EMISOR</div>
+  <div class="rows">
+    ${_batchRow('VENTAS', ticket.salesCount, ticket.salesKg)}
+    ${_batchRow('N. CREDITO', 0, 0)}
+    ${_batchRow('ANULACIONES', ticket.voidCount, ticket.voidKg)}
+    ${_batchRow('TOTAL', ticket.totalCount, ticket.totalKg, emphasize: true)}
+  </div>
+  <div class="ok">Cierre de lote OK</div>
+  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+</body>
+</html>
+''';
+  }
+
+  static String _batchRow(
+    String label,
+    int count,
+    double kilograms, {
+    bool emphasize = false,
+  }) {
+    final String css = emphasize ? ' class="b"' : '';
+    final String countText = count.toString().padLeft(3, '0');
+    final String kg = '${formatQuantityEs(kilograms, decimals: 2)} kg';
+    return '<div$css>${_esc(label)} $countText - ${_esc(kg)}</div>';
   }
 
   static String _line(String label, String value, {bool emphasize = false}) {

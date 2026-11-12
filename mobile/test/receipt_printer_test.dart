@@ -157,4 +157,28 @@ void main() {
     verify(() => bridge.printHtml(any())).called(1);
     verifyNever(() => bridge.tearDown());
   });
+
+  test('la consulta de saldo imprime una sola copia cliente', () async {
+    when(
+      () => bridge.getStatus(),
+    ).thenAnswer((_) async => <String, dynamic>{'sdiReady': true});
+    when(
+      () => bridge.printHtml(any()),
+    ).thenAnswer((_) async => <String, dynamic>{'ok': true});
+
+    final PrintResult result = await printer.printBalanceTicket(
+      date: DateTime(2026, 11, 12, 17, 27, 4),
+      cardNumber: '6063007014007403',
+      expirationDate: '2808',
+      kilograms: 101,
+    );
+
+    expect(result.ok, isTrue);
+    final String html =
+        verify(() => bridge.printHtml(captureAny())).captured.single as String;
+    expect(html, contains('CONSULTA SALDO'));
+    expect(html, contains('COPIA CLIENTE'));
+    expect(html, contains('SALDO:${'.' * 17} KG 101.00'));
+    expect(html, isNot(contains('ORIGINAL COMERCIO')));
+  });
 }

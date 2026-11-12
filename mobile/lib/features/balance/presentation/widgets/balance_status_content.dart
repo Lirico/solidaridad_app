@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../sales/domain/sale_model.dart';
 import '../../domain/balance_model.dart';
 
 class BalanceStatusContent extends StatelessWidget {
   final BalanceResult result;
   final VoidCallback onFinalize;
+  final PrintStatus printStatus;
+  final String printMessage;
+  final VoidCallback? onRetryPrint;
 
   const BalanceStatusContent({
     super.key,
     required this.result,
     required this.onFinalize,
+    this.printStatus = PrintStatus.idle,
+    this.printMessage = '',
+    this.onRetryPrint,
   });
 
   @override
@@ -52,6 +59,8 @@ class BalanceStatusContent extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        _buildPrintStatus(),
+        const SizedBox(height: 12),
         ElevatedButton(
           onPressed: onFinalize,
           style: ElevatedButton.styleFrom(
@@ -72,14 +81,82 @@ class BalanceStatusContent extends StatelessWidget {
     );
   }
 
+  Widget _buildPrintStatus() {
+    switch (printStatus) {
+      case PrintStatus.idle:
+        return const SizedBox.shrink();
+      case PrintStatus.printing:
+        return const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Imprimiendo ticket...',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ],
+        );
+      case PrintStatus.printed:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              printMessage.isEmpty ? 'Ticket impreso' : printMessage,
+              style: const TextStyle(fontSize: 13, color: Colors.green),
+            ),
+          ],
+        );
+      case PrintStatus.error:
+        return Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    printMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13, color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+            if (onRetryPrint != null) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: onRetryPrint,
+                icon: const Icon(Icons.print, size: 18),
+                label: const Text('REIMPRIMIR'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primaryOrange,
+                ),
+              ),
+            ],
+          ],
+        );
+    }
+  }
+
   Widget _buildError(BuildContext context) {
     final bool isConnection = result.status == BalanceStatus.connectionError;
-    final Color color =
-        isConnection ? const Color(0xFFFF8C00) : const Color(0xFFE74C3C);
-    final IconData icon =
-        isConnection ? Icons.wifi_off_outlined : Icons.error_outline;
-    final String title =
-        isConnection ? 'Error de Conexión' : 'Consulta Rechazada';
+    final Color color = isConnection
+        ? const Color(0xFFFF8C00)
+        : const Color(0xFFE74C3C);
+    final IconData icon = isConnection
+        ? Icons.wifi_off_outlined
+        : Icons.error_outline;
+    final String title = isConnection
+        ? 'Error de Conexión'
+        : 'Consulta Rechazada';
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -91,7 +168,11 @@ class BalanceStatusContent extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -133,11 +214,19 @@ class _BalanceHeaderRow extends StatelessWidget {
         children: [
           Text(
             'Producto',
-            style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           Text(
             'Cantidad',
-            style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

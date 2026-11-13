@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Protocol
 
@@ -54,13 +54,21 @@ def _http_exception_message(exc: HTTPException) -> str:
     return str(detail)
 
 
+def _reencrypt_stored_cards() -> None:
+    from persistence.reencrypt_card_data import reencrypt_stored_cards
+
+    reencrypt_stored_cards()
+
+
 def create_app(
     router: APIRouter,
     *,
     settings: Settings | None = None,
     recovery_worker: ManagedRecoveryWorker | None = None,
+    reencrypt_cards: Callable[[], None] | None = None,
 ) -> FastAPI:
     runtime_settings = settings or get_settings()
+    seal_cards = _reencrypt_stored_cards if reencrypt_cards is None else reencrypt_cards
     worker = recovery_worker or EmbeddedRecoveryWorker(
         run_iteration=create_embedded_recovery_iteration(settings=runtime_settings),
         enabled=runtime_settings.embedded_recovery_worker_enabled,
@@ -68,8 +76,10 @@ def create_app(
             runtime_settings.recovery_worker_max_iteration_age_seconds
         ),
     )
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        seal_cards()
         if runtime_settings.embedded_recovery_worker_enabled:
             worker.start()
         try:

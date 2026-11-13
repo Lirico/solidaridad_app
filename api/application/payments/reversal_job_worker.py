@@ -54,6 +54,8 @@ class ReversalJobWorker:
         random_value: Callable[[], float] = random.random,
         claim_token_factory: Callable[[], UUID] = uuid4,
         should_stop: Callable[[], bool] = lambda: False,
+        webhook_url: str = "",
+        webhook_timeout_seconds: float = 2.0,
     ) -> None:
         if not worker_id.strip():
             raise ValueError("worker_id must not be empty")
@@ -68,6 +70,8 @@ class ReversalJobWorker:
         self._random_value = random_value
         self._claim_token_factory = claim_token_factory
         self._should_stop = should_stop
+        self._webhook_url = webhook_url
+        self._webhook_timeout_seconds = webhook_timeout_seconds
 
     def run_once(self) -> bool:
         """Process one job, returning whether this worker claimed any work."""
@@ -305,6 +309,8 @@ class ReversalJobWorker:
                     processor_job_id=claimed.id,
                     transaction_number=resolved_transaction_number,
                     cause=error_code,
+                    webhook_url=self._webhook_url,
+                    webhook_timeout_seconds=self._webhook_timeout_seconds,
                 )
         else:
             self._session.rollback()

@@ -1,9 +1,10 @@
 """Persistence operations for durable processor jobs."""
 
 from datetime import UTC, datetime
+from typing import NamedTuple
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from domain.processor_job import (
@@ -13,6 +14,14 @@ from domain.processor_job import (
     validate_processor_job_transition,
 )
 from persistence.models.processor_job import ProcessorJob as ProcessorJobModel
+
+
+class RecoveryStateAggregate(NamedTuple):
+    state: str
+    job_count: int
+    oldest_created_at: datetime | None
+    max_attempt_count: int
+    max_resolution_seconds: float | None
 
 
 def _to_domain(row: ProcessorJobModel) -> ProcessorJob:
@@ -295,3 +304,39 @@ class ProcessorJobRepository:
         row.last_error_detail_sanitized = last_error_detail_sanitized
         self._session.flush()
         return _to_domain(row)
+
+    def recovery_state_aggregates(self) -> list[RecoveryStateAggregate]:
+        """Count jobs by state, with age, attempts and resolution time."""
+        resolution_seconds = func.extract(
+            "epoch",
+            ProcessorJobModel.completed_at - ProcessorJobModel.created_at,
+        )
+        rows = self._session.execute(
+            select(
+                ProcessorJobModel.state,
+                func.count(),
+                func.min(ProcessorJobModel.created_at),
+                func.max(ProcessorJobModel.attempt_count),
+                func.max(resolution_seconds),
+            ).group_by(ProcessorJobModel.state)
+        ).all()
+        return [
+            RecoveryStateAggregate(
+                state=str(state),
+                job_count=int(count),
+                oldest_created_at=oldest_created_at,
+                max_attempt_count=(
+                    0 if max_attempt_count is None else int(max_attempt_count)
+                ),
+                max_resolution_seconds=(
+                    None if max_resolution is None else float(max_resolution)
+                ),
+            )
+            for (
+                state,
+                count,
+                oldest_created_at,
+                max_attempt_count,
+                max_resolution,
+            ) in rows
+        ]

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -35,3 +36,11 @@ class RecoveryAlertRepository:
             .returning(RecoveryAlert.id)
         )
         return outcome.scalar_one_or_none() is not None
+
+    def count_open(self) -> int:
+        total = self._session.scalar(
+            select(func.count())
+            .select_from(RecoveryAlert)
+            .where(RecoveryAlert.state == RecoveryAlertState.OPEN.value)
+        )
+        return 0 if total is None else int(total)

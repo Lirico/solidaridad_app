@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import UUID
 
@@ -93,6 +94,7 @@ def _config(**overrides: object) -> PaymentProcessingConfig:
         "jitter_percentage": 0,
         "authorization_budget_seconds": 60,
         "stale_pending_authorization_seconds": 50,
+        "stale_pending_batch_limit": 50,
         "reversal_grace_seconds": 45,
         "reversal_processing_timeout_seconds": 60,
         "worker_poll_interval_seconds": Decimal("1"),
@@ -128,6 +130,9 @@ def _build(
     jobs.finalize_claim.return_value = True
     transactions.get_by_id.return_value = transaction or _transaction()
     transactions.list_stale_pending_without_reverse_job.return_value = []
+    transactions.summarize_stale_pending_without_reverse_job.return_value = (
+        SimpleNamespace(count=0, oldest_attempt_at=None)
+    )
     configs.get_default.return_value = _config()
     gateway.reverse.return_value = ReverseResult(outcome=outcome, response_code="00")
     worker = ReversalJobWorker(
@@ -329,6 +334,7 @@ def test_run_once_enqueues_one_stale_pending_before_claim() -> None:
         nonlocal listed
         listed += 1
         assert kwargs["attempted_before"] == NOW - timedelta(seconds=50)
+        assert kwargs["limit"] == 50
         return [pending] if listed == 1 else []
 
     order: list[str] = []

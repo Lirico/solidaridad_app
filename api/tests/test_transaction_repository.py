@@ -521,7 +521,8 @@ def test_stale_pending_filter_uses_last_authorization_attempt() -> None:
 
     repository = TransactionRepository(session)
     transactions = repository.list_stale_pending_without_reverse_job(
-        attempted_before=attempted_before
+        attempted_before=attempted_before,
+        limit=25,
     )
 
     assert transactions == []
@@ -534,7 +535,44 @@ def test_stale_pending_filter_uses_last_authorization_attempt() -> None:
     )
     assert "authorization_last_attempt_at <=" in sql
     assert "transactions.created_at <=" not in sql
+    assert "ORDER BY transactions.authorization_last_attempt_at, transactions.id" in sql
+    assert "LIMIT 25" in sql
     assert "FOR UPDATE SKIP LOCKED" in sql
+
+
+def test_stale_pending_summary_counts_without_locking() -> None:
+    session = MagicMock()
+    oldest = datetime(2026, 11, 10, 11, tzinfo=UTC)
+    session.execute.return_value.one.return_value = (2, oldest)
+    attempted_before = datetime(2026, 11, 10, 12, tzinfo=UTC)
+
+    repository = TransactionRepository(session)
+    backlog = repository.summarize_stale_pending_without_reverse_job(
+        attempted_before=attempted_before
+    )
+
+    assert backlog.count == 2
+    assert backlog.oldest_attempt_at == oldest
+    statement = session.execute.call_args.args[0]
+    sql = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "count(" in sql.lower()
+    assert "min(transactions.authorization_last_attempt_at)" in sql
+    assert "FOR UPDATE" not in sql
+
+
+def test_stale_pending_selection_requires_a_positive_limit() -> None:
+    repository = TransactionRepository(MagicMock())
+
+    with pytest.raises(ValueError, match="limit must be positive"):
+        repository.list_stale_pending_without_reverse_job(
+            attempted_before=datetime(2026, 11, 10, tzinfo=UTC),
+            limit=0,
+        )
 
 
 @pytest.mark.parametrize(

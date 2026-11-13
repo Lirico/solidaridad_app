@@ -26,6 +26,7 @@ def _to_domain(row: PaymentProcessingConfigModel) -> PaymentProcessingConfig:
         stale_pending_authorization_seconds=(
             row.stale_pending_authorization_seconds
         ),
+        stale_pending_batch_limit=row.stale_pending_batch_limit,
         reversal_grace_seconds=row.reversal_grace_seconds,
         reversal_processing_timeout_seconds=(
             row.reversal_processing_timeout_seconds

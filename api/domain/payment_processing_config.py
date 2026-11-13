@@ -20,6 +20,7 @@ class PaymentProcessingConfig:
     jitter_percentage: int
     authorization_budget_seconds: int
     stale_pending_authorization_seconds: int
+    stale_pending_batch_limit: int
     reversal_grace_seconds: int
     reversal_processing_timeout_seconds: int
     worker_poll_interval_seconds: Decimal
@@ -57,6 +58,8 @@ class PaymentProcessingConfig:
             raise ValueError(
                 "stale_pending_authorization_seconds must be positive"
             )
+        if self.stale_pending_batch_limit < 1:
+            raise ValueError("stale_pending_batch_limit must be at least 1")
         if self.reversal_grace_seconds <= 0:
             raise ValueError("reversal_grace_seconds must be positive")
         if (

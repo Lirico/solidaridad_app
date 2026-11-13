@@ -163,6 +163,7 @@ class ReversalJobWorker:
             stale_after=timedelta(
                 seconds=config.stale_pending_authorization_seconds
             ),
+            batch_limit=config.stale_pending_batch_limit,
             now=self._now,
         ).execute()
 

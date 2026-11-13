@@ -1,9 +1,11 @@
 """Transaction persistence repository."""
 
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from domain.authorization_outcome import AuthorizationOutcome
 from domain.batch_close import BatchClose
@@ -27,6 +29,35 @@ from persistence.models.void_operation import VoidOperation as VoidOperationMode
 def ticket_from_transaction_number(transaction_number: str) -> str:
     """Extract numeric DE62 ticket from OP-YYMMDD-NNNNNNNN."""
     return transaction_number.rsplit("-", 1)[-1]
+
+
+@dataclass(frozen=True, slots=True)
+class StalePendingBacklog:
+    """How many recoverable pending sales are waiting, and since when."""
+
+    count: int
+    oldest_attempt_at: datetime | None
+
+
+def _recoverable_stale_pending(
+    attempted_before: datetime,
+) -> tuple[ColumnElement[bool], ...]:
+    reverse_job_exists = exists(
+        select(ProcessorJobModel.id).where(
+            ProcessorJobModel.transaction_id == TransactionModel.id,
+            ProcessorJobModel.operation_type
+            == ProcessorOperationType.REVERSE.value,
+        )
+    )
+    return (
+        TransactionModel.status == TransactionStatus.PENDING.value,
+        TransactionModel.authorization_outcome
+        == AuthorizationOutcome.PENDING.value,
+        TransactionModel.authorization_last_attempt_at <= attempted_before,
+        TransactionModel.stan.is_not(None),
+        TransactionModel.processor_ticket.is_not(None),
+        ~reverse_job_exists,
+    )
 
 
 def _to_domain(row: TransactionModel) -> Transaction:
@@ -200,35 +231,46 @@ class TransactionRepository:
             return None
         return _to_domain(row)
 
+    def summarize_stale_pending_without_reverse_job(
+        self,
+        *,
+        attempted_before: datetime,
+    ) -> StalePendingBacklog:
+        """Count recoverable pending payments without locking them."""
+        count, oldest_attempt_at = self._session.execute(
+            select(
+                func.count(),
+                func.min(TransactionModel.authorization_last_attempt_at),
+            ).where(*_recoverable_stale_pending(attempted_before))
+        ).one()
+        return StalePendingBacklog(
+            count=int(count),
+            oldest_attempt_at=oldest_attempt_at,
+        )
+
     def list_stale_pending_without_reverse_job(
         self,
         *,
         attempted_before: datetime,
+        limit: int,
     ) -> list[Transaction]:
-        """Lock recoverable pending payments stranded before classification.
+        """Lock the oldest recoverable pending payments, up to ``limit``.
 
         A row is selected only when no reversal job exists.  The row lock makes
         the subsequent status update and job insert safe against a concurrent
-        request or watchdog instance.
+        request or watchdog instance.  Oldest attempts go first so a cap does
+        not starve a sale that has already been waiting.
         """
-        reverse_job_exists = exists(
-            select(ProcessorJobModel.id).where(
-                ProcessorJobModel.transaction_id == TransactionModel.id,
-                ProcessorJobModel.operation_type
-                == ProcessorOperationType.REVERSE.value,
-            )
-        )
+        if limit < 1:
+            raise ValueError("limit must be positive")
         stmt = (
             select(TransactionModel)
-            .where(
-                TransactionModel.status == TransactionStatus.PENDING.value,
-                TransactionModel.authorization_outcome
-                == AuthorizationOutcome.PENDING.value,
-                TransactionModel.authorization_last_attempt_at <= attempted_before,
-                TransactionModel.stan.is_not(None),
-                TransactionModel.processor_ticket.is_not(None),
-                ~reverse_job_exists,
+            .where(*_recoverable_stale_pending(attempted_before))
+            .order_by(
+                TransactionModel.authorization_last_attempt_at,
+                TransactionModel.id,
             )
+            .limit(limit)
             .with_for_update(skip_locked=True)
         )
         return [_to_domain(row) for row in self._session.scalars(stmt).all()]

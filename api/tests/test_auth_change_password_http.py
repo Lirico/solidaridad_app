@@ -41,7 +41,15 @@ def _override_auth(
 
 def test_change_password_returns_200() -> None:
     use_case = MagicMock(spec=ChangePassword)
-    current = _override_auth(use_case=use_case)
+    current = _override_auth(
+        use_case=use_case,
+        current_user=CurrentUser(
+            user_id=1,
+            email="ada@example.com",
+            installation_id="inst-1",
+            must_change_password=True,
+        ),
+    )
 
     try:
         response = client.post(

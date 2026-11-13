@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from persistence.repositories.user_repository import UserRepository
-from presentation.dependencies import CurrentUser, get_current_user, get_db
+from presentation.dependencies import CurrentUser, get_db, require_operable_session
 from presentation.schemas.auth import CurrentMerchantResponse, MerchantResponse
 
 router = APIRouter()
@@ -23,7 +23,7 @@ router = APIRouter()
     },
 )
 def current_merchant(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     db: Annotated[Session, Depends(get_db)],
 ) -> CurrentMerchantResponse:
     merchant = UserRepository(db).get_merchant(current_user.user_id)

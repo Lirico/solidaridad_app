@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from domain.product import list_products
-from presentation.dependencies import CurrentUser, get_current_user
+from presentation.dependencies import CurrentUser, require_operable_session
 from presentation.schemas.products import ProductResponse
 
 router = APIRouter()
@@ -22,7 +22,7 @@ router = APIRouter()
     },
 )
 def get_products(
-    _current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    _current_user: Annotated[CurrentUser, Depends(require_operable_session)],
 ) -> list[ProductResponse]:
     return [
         ProductResponse(code=item.code, label=item.label, unit=item.unit)

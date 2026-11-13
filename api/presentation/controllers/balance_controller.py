@@ -12,7 +12,7 @@ from domain.money import AMOUNT_EXPONENT
 from presentation.dependencies import (
     CurrentUser,
     get_check_balance,
-    get_current_user,
+    require_operable_session,
 )
 from presentation.schemas.balance import (
     BalanceInquiryRequest,
@@ -38,7 +38,7 @@ router = APIRouter()
 )
 def check_balance(
     body: BalanceInquiryRequest,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     use_case: Annotated[CheckBalance, Depends(get_check_balance)],
 ) -> BalanceInquiryResponse | JSONResponse:
     try:

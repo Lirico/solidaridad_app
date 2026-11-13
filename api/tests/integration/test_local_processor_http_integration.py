@@ -112,7 +112,7 @@ def test_real_stack_authentication_merchant_and_catalog(
 def test_real_stack_change_password(
     local_processor_operator: Operator, api: httpx.Client
 ) -> None:
-    new_password = "changed-integration-password-123"
+    new_password = "Changed-integration-password-123"
     changed = api.post(
         "/v1/auth/change-password",
         headers=local_processor_operator.headers,

@@ -91,7 +91,7 @@ def test_auth_login_change_password_and_rejections(
         headers=operator.headers,
         json={
             "current_password": operator.password,
-            "new_password": "new-integration-password-123",
+            "new_password": "New-integration-password-123",
         },
     )
     assert changed.status_code == 200
@@ -109,7 +109,7 @@ def test_auth_login_change_password_and_rejections(
         "/v1/auth/login",
         json={
             "username": operator.email,
-            "password": "new-integration-password-123",
+            "password": "New-integration-password-123",
             "installation_id": operator.installation_id,
         },
     )

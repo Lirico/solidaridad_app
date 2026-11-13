@@ -45,6 +45,9 @@ String? validatePassword(String? value) {
   if (!value.contains(RegExp(r'[A-Z]'))) {
     return 'Debe contener al menos una mayúscula';
   }
+  if (!value.contains(RegExp(r'[a-z]'))) {
+    return 'Debe contener al menos una minúscula';
+  }
   if (!value.contains(RegExp(r'[0-9]'))) {
     return 'Debe contener al menos un número';
   }

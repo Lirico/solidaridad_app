@@ -171,6 +171,31 @@ def _batch_close() -> BatchClose:
     )
 
 
+def test_create_transaction_403_when_password_change_pending() -> None:
+    use_case = MagicMock(spec=CreateTransaction)
+    app.dependency_overrides[get_create_transaction] = lambda: use_case
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        user_id=1,
+        email="mustchange@solidaridad.local",
+        installation_id="inst-1",
+        must_change_password=True,
+    )
+    try:
+        response = client.post(
+            "/v1/transactions",
+            json=_payload(),
+            headers={"Idempotency-Key": "k1"},
+        )
+    finally:
+        _clear()
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "message": "Debe cambiar la contraseña antes de operar",
+    }
+    use_case.execute.assert_not_called()
+
+
 def test_create_transaction_201() -> None:
     use_case = MagicMock(spec=CreateTransaction)
     use_case.execute.return_value = CreateTransactionResult(

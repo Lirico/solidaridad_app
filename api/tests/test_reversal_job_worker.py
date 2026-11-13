@@ -109,6 +109,7 @@ def _build(
     transaction: Transaction | None = None,
     outcome: ReversalOutcome = ReversalOutcome.REVERSED_CONFIRMED,
     should_stop: Callable[[], bool] = lambda: False,
+    webhook_url: str = "",
 ) -> tuple[
     ReversalJobWorker,
     MagicMock,
@@ -142,6 +143,7 @@ def _build(
         random_value=lambda: 0.5,
         claim_token_factory=lambda: TOKEN,
         should_stop=should_stop,
+        webhook_url=webhook_url,
     )
     return worker, session, transactions, jobs, alerts, gateway
 

@@ -27,6 +27,8 @@ class StaleProcessingJobMonitor:
         transactions: TransactionRepository,
         configs: PaymentProcessingConfigRepository,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        webhook_url: str = "",
+        webhook_timeout_seconds: float = 2.0,
     ) -> None:
         self._session = session
         self._jobs = jobs
@@ -34,6 +36,8 @@ class StaleProcessingJobMonitor:
         self._transactions = transactions
         self._configs = configs
         self._now = now
+        self._webhook_url = webhook_url
+        self._webhook_timeout_seconds = webhook_timeout_seconds
 
     def run_once(self) -> bool:
         """Quarantine one timed-out job and return whether one was found."""
@@ -74,5 +78,7 @@ class StaleProcessingJobMonitor:
                 processor_job_id=job.id,
                 transaction_number=transaction_number,
                 cause="PROCESSING_TIMEOUT",
+                webhook_url=self._webhook_url,
+                webhook_timeout_seconds=self._webhook_timeout_seconds,
             )
         return job is not None

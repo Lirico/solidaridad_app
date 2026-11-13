@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     embedded_recovery_worker_enabled: bool = True
     embedded_recovery_worker_shutdown_grace_seconds: float = 40.0
     recovery_worker_max_iteration_age_seconds: float = Field(default=30.0, gt=0)
+    recovery_alert_webhook_url: str = ""
+    recovery_alert_webhook_timeout_seconds: float = Field(default=2.0, gt=0)
 
     @field_validator("business_timezone")
     @classmethod

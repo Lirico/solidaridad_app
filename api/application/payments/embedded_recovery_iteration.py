@@ -55,6 +55,10 @@ def create_embedded_recovery_iteration(
                     configs=configs,
                     gateway=gateway,
                     should_stop=should_stop,
+                    webhook_url=settings.recovery_alert_webhook_url,
+                    webhook_timeout_seconds=(
+                        settings.recovery_alert_webhook_timeout_seconds
+                    ),
                 ).run_once()
             if not should_stop():
                 StaleProcessingJobMonitor(
@@ -63,6 +67,10 @@ def create_embedded_recovery_iteration(
                     alerts=RecoveryAlertRepository(session),
                     transactions=TransactionRepository(session),
                     configs=configs,
+                    webhook_url=settings.recovery_alert_webhook_url,
+                    webhook_timeout_seconds=(
+                        settings.recovery_alert_webhook_timeout_seconds
+                    ),
                 ).run_once()
             poll_interval = configs.get_default().worker_poll_interval_seconds
             return _positive_seconds(poll_interval)

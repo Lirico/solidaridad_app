@@ -21,7 +21,11 @@ def _settings() -> Settings:
     )
 
 
-def _user(*, user_id: int = 1) -> User:
+def _user(
+    *,
+    user_id: int = 1,
+    sessions_revoked_at: datetime | None = None,
+) -> User:
     now = datetime.now(UTC)
     return User(
         id=user_id,
@@ -31,6 +35,7 @@ def _user(*, user_id: int = 1) -> User:
         must_change_password=False,
         created_at=now,
         updated_at=now,
+        sessions_revoked_at=sessions_revoked_at,
     )
 
 
@@ -64,6 +69,79 @@ def test_get_current_user_returns_claims_from_valid_token(
     assert current.user_id == user.id
     assert current.email == user.email
     assert current.installation_id == "inst-1"
+
+
+def test_get_current_user_rejects_token_issued_before_revocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tokens = TokenService(_settings())
+    user = _user()
+    token = tokens.create_access_token(
+        user_id=user.id,
+        email=user.email,
+        installation_id="inst-1",
+    )
+    revoked = user.__class__(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        password_hash=user.password_hash,
+        must_change_password=user.must_change_password,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        sessions_revoked_at=datetime.now(UTC) + timedelta(minutes=1),
+    )
+    repo = MagicMock()
+    repo.get_by_id.return_value = revoked
+    monkeypatch.setattr(
+        "presentation.dependencies.UserRepository",
+        lambda _db: repo,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_current_user(
+            credentials=HTTPAuthorizationCredentials(
+                scheme="Bearer",
+                credentials=token,
+            ),
+            tokens=tokens,
+            db=MagicMock(),
+        )
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Token inválido o expirado"
+
+
+def test_get_current_user_accepts_token_issued_after_revocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tokens = TokenService(_settings())
+    user = _user(
+        sessions_revoked_at=datetime.now(UTC) - timedelta(days=1),
+    )
+    token = tokens.create_access_token(
+        user_id=user.id,
+        email=user.email,
+        installation_id="inst-1",
+        issued_at=datetime.now(UTC),
+    )
+    repo = MagicMock()
+    repo.get_by_id.return_value = user
+    monkeypatch.setattr(
+        "presentation.dependencies.UserRepository",
+        lambda _db: repo,
+    )
+
+    current = get_current_user(
+        credentials=HTTPAuthorizationCredentials(
+            scheme="Bearer",
+            credentials=token,
+        ),
+        tokens=tokens,
+        db=MagicMock(),
+    )
+
+    assert current.user_id == user.id
 
 
 def test_get_current_user_rejects_missing_credentials() -> None:

@@ -1,5 +1,7 @@
 """User persistence repository."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,7 @@ def _to_domain(row: UserModel) -> User:
         must_change_password=row.must_change_password,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        sessions_revoked_at=row.sessions_revoked_at,
     )
 
 
@@ -67,3 +70,12 @@ class UserRepository:
         row.must_change_password = must_change_password
         self._session.flush()
         return _to_domain(row)
+
+    def revoke_sessions(self, user_id: int) -> datetime | None:
+        row = self._session.get(UserModel, user_id)
+        if row is None:
+            return None
+        cutoff = datetime.now(UTC).replace(microsecond=0)
+        row.sessions_revoked_at = cutoff
+        self._session.flush()
+        return cutoff

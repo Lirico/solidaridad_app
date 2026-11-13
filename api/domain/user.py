@@ -13,3 +13,4 @@ class User:
     must_change_password: bool
     created_at: datetime
     updated_at: datetime
+    sessions_revoked_at: datetime | None = None

@@ -178,8 +178,17 @@ class AuthRepository {
     }
   }
 
-  Future<void> logout() async {
-    // En un entorno real aquí se invalidaría el token en backend
+  Future<void> logout({String? token}) async {
+    if (token == null || token.isEmpty) return;
+    final url = Uri.parse('$_baseUrl/auth/logout');
+    try {
+      await _httpClient
+          .post(
+            url,
+            headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {}
   }
 
   Future<AuthResponse> changePassword({
@@ -215,9 +224,16 @@ class AuthRepository {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
-        return const AuthResponse(
+        final rawToken = data['token'];
+        final tokenValue = rawToken is String ? rawToken : '';
+        return AuthResponse(
           isSuccess: true,
-          message: 'Contraseña actualizada correctamente',
+          message: data['message'] is String
+              ? data['message'] as String
+              : 'Contraseña actualizada correctamente',
+          user: tokenValue.isEmpty
+              ? null
+              : User(name: '', email: '', token: tokenValue),
         );
       } else {
         return AuthResponse(

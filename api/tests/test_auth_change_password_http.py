@@ -41,6 +41,7 @@ def _override_auth(
 
 def test_change_password_returns_200() -> None:
     use_case = MagicMock(spec=ChangePassword)
+    use_case.execute.return_value = "new-token"
     current = _override_auth(use_case=use_case)
 
     try:
@@ -56,9 +57,14 @@ def test_change_password_returns_200() -> None:
         _clear_overrides()
 
     assert response.status_code == 200
-    assert response.json() == {"message": "Contraseña actualizada correctamente"}
+    assert response.json() == {
+        "message": "Contraseña actualizada correctamente",
+        "token": "new-token",
+    }
     use_case.execute.assert_called_once_with(
         user_id=current.user_id,
+        email=current.email,
+        installation_id=current.installation_id,
         current_password="current12",
         new_password="newpass12",
     )

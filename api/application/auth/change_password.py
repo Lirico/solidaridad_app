@@ -1,8 +1,11 @@
 """Change password for an authenticated user."""
 
+from datetime import timedelta
+
 from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 
+from application.auth.token_service import TokenService
 from domain.exceptions import InvalidCurrentPassword, WeakPassword
 from persistence.repositories.user_repository import UserRepository
 
@@ -16,19 +19,23 @@ class ChangePassword:
         self,
         session: Session,
         users: UserRepository,
+        tokens: TokenService,
         hasher: PasswordHash | None = None,
     ) -> None:
         self._session = session
         self._users = users
+        self._tokens = tokens
         self._hasher = hasher or password_hasher
 
     def execute(
         self,
         *,
         user_id: int,
+        email: str,
+        installation_id: str,
         current_password: str,
         new_password: str,
-    ) -> None:
+    ) -> str:
         self._validate_new_password(new_password, current_password)
 
         user = self._users.get_by_id(user_id)
@@ -46,7 +53,17 @@ class ChangePassword:
         if updated is None:
             raise InvalidCurrentPassword()
 
+        cutoff = self._users.revoke_sessions(user_id)
+        if cutoff is None:
+            raise InvalidCurrentPassword()
+
         self._session.commit()
+        return self._tokens.create_access_token(
+            user_id=user_id,
+            email=email,
+            installation_id=installation_id,
+            issued_at=cutoff + timedelta(seconds=1),
+        )
 
     @staticmethod
     def _validate_new_password(new_password: str, current_password: str) -> None:

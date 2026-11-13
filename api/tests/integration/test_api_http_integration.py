@@ -95,7 +95,9 @@ def test_auth_login_change_password_and_rejections(
         },
     )
     assert changed.status_code == 200
-    assert changed.json() == {"message": "Contraseña actualizada correctamente"}
+    changed_body = changed.json()
+    assert changed_body["message"] == "Contraseña actualizada correctamente"
+    assert changed_body["token"]
     old_password = api.post(
         "/v1/auth/login",
         json={

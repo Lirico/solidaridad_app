@@ -21,8 +21,12 @@ class TokenService:
         user_id: int,
         email: str,
         installation_id: str,
+        issued_at: datetime | None = None,
     ) -> str:
-        now = datetime.now(UTC)
+        now = issued_at or datetime.now(UTC)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=UTC)
+        now = now.astimezone(UTC).replace(microsecond=0)
         payload: dict[str, Any] = {
             "sub": str(user_id),
             "email": email,

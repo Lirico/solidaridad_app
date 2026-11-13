@@ -5,16 +5,32 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from application.auth.login_user import LoginResult, LoginUser
-from domain.exceptions import InvalidCredentials, MerchantNotConfigured
+from domain.exceptions import (
+    InvalidCredentials,
+    MerchantNotConfigured,
+    TooManyLoginAttempts,
+)
 from domain.merchant import Merchant
 from main import app
-from presentation.dependencies import get_login_user
+from presentation.dependencies import get_login_rate_limit, get_login_user
 
 client = TestClient(app)
 
 
+class _OpenLoginRateLimit:
+    def ensure_allowed(self, username: str) -> None:
+        del username
+
+    def record_failure(self, username: str) -> None:
+        del username
+
+    def clear(self, username: str) -> None:
+        del username
+
+
 def _override_login_user(use_case: LoginUser) -> None:
     app.dependency_overrides[get_login_user] = lambda: use_case
+    app.dependency_overrides[get_login_rate_limit] = _OpenLoginRateLimit
 
 
 def _clear_overrides() -> None:
@@ -65,6 +81,32 @@ def test_login_returns_200_and_token_shape() -> None:
         password="password1",
         installation_id="inst-1",
     )
+
+
+def test_login_returns_429_when_attempts_are_exhausted() -> None:
+    use_case = MagicMock(spec=LoginUser)
+    rate_limit = MagicMock()
+    rate_limit.ensure_allowed.side_effect = TooManyLoginAttempts()
+    _override_login_user(use_case)
+    app.dependency_overrides[get_login_rate_limit] = lambda: rate_limit
+
+    try:
+        response = client.post(
+            "/v1/auth/login",
+            json={
+                "username": "ada@example.com",
+                "password": "wrong-pass",
+                "installation_id": "inst-1",
+            },
+        )
+    finally:
+        _clear_overrides()
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "message": "Demasiados intentos. Probá de nuevo más tarde.",
+    }
+    use_case.execute.assert_not_called()
 
 
 def test_login_returns_401_on_invalid_credentials() -> None:

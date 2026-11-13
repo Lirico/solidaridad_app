@@ -1,6 +1,7 @@
 from persistence.models.base import Base
 from persistence.models.batch_close import BatchClose
 from persistence.models.installation import Installation
+from persistence.models.login_attempt import LoginAttempt
 from persistence.models.merchant import Merchant
 from persistence.models.payment_processing_config import PaymentProcessingConfig
 from persistence.models.processor_job import ProcessorJob
@@ -14,6 +15,7 @@ __all__ = [
     "Base",
     "BatchClose",
     "Installation",
+    "LoginAttempt",
     "Merchant",
     "PaymentProcessingConfig",
     "ProcessorJob",

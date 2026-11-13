@@ -10,7 +10,7 @@ class WeakPassword(DomainError):
 
     def __init__(
         self,
-        message: str = "La contraseña debe tener al menos 8 caracteres",
+        message: str = "La contraseña debe tener entre 8 y 128 caracteres",
     ) -> None:
         super().__init__(message)
 

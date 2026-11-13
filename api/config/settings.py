@@ -14,6 +14,7 @@ LAB_DATABASE_PASSWORD = "solidaridad"
 LAB_DATABASE_CREDENTIALS = f"{LAB_DATABASE_USER}:{LAB_DATABASE_PASSWORD}"
 MIN_NON_LOCAL_JWT_SECRET_LENGTH = 32
 KNOWN_APP_ENVS = frozenset({"dev", "local", "prod", "production", "staging", "test"})
+DOCS_ENVS = frozenset({"dev", "local", "test"})
 
 
 class LabSecretsError(RuntimeError):
@@ -85,6 +86,10 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_app_env(cls, value: str) -> str:
         return value.strip().lower()
+
+
+def docs_enabled(settings: Settings) -> bool:
+    return settings.app_env in DOCS_ENVS
 
 
 def _reject_invalid_origin(origin: str) -> None:

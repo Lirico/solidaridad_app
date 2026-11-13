@@ -15,7 +15,7 @@ from application.payments.embedded_recovery_worker import (
     EmbeddedRecoveryWorker,
     RecoveryWorkerHealth,
 )
-from config import Settings, get_settings
+from config import Settings, docs_enabled, get_settings
 from presentation import create_router
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,14 @@ def create_app(
                 if not stopped:
                     logger.error("embedded_recovery_worker_did_not_stop")
 
-    app = FastAPI(title="Solidaridad API", lifespan=lifespan)
+    publish_docs = docs_enabled(runtime_settings)
+    app = FastAPI(
+        title="Solidaridad API",
+        lifespan=lifespan,
+        docs_url="/docs" if publish_docs else None,
+        redoc_url="/redoc" if publish_docs else None,
+        openapi_url="/openapi.json" if publish_docs else None,
+    )
 
     if runtime_settings.cors_origins:
         app.add_middleware(

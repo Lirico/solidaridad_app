@@ -1,3 +1,3 @@
-from config.settings import Settings, get_settings
+from config.settings import Settings, docs_enabled, get_settings
 
-__all__ = ["Settings", "get_settings"]
+__all__ = ["Settings", "docs_enabled", "get_settings"]

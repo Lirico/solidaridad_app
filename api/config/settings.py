@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     jwt_secret: str = LAB_JWT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 90
+    login_max_failures: int = Field(default=5, gt=0)
+    login_failure_window_minutes: int = Field(default=15, gt=0)
     # Espejo del Compose local. El proceso conecta con database_url.
     # postgres_password no se lee en runtime: Compose exige POSTGRES_PASSWORD.
     postgres_user: str = "solidaridad"

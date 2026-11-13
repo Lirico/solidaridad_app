@@ -32,6 +32,16 @@ class MerchantNotConfigured(DomainError):
         super().__init__("La cuenta no tiene un comercio configurado")
 
 
+class TooManyLoginAttempts(DomainError):
+    """Raised when login failures for one account exceed the window."""
+
+    def __init__(
+        self,
+        message: str = "Demasiados intentos. Probá de nuevo más tarde.",
+    ) -> None:
+        super().__init__(message)
+
+
 class InvalidCurrentPassword(DomainError):
     """Raised when change-password current_password does not match."""
 

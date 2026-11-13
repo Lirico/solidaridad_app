@@ -6,18 +6,21 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
 from application.auth.change_password import ChangePassword
+from application.auth.login_rate_limit import LoginRateLimit
 from application.auth.login_user import LoginUser
 from application.auth.logout_user import LogoutUser
 from domain.exceptions import (
     InvalidCredentials,
     InvalidCurrentPassword,
     MerchantNotConfigured,
+    TooManyLoginAttempts,
     WeakPassword,
 )
 from presentation.dependencies import (
     CurrentUser,
     get_change_password,
     get_current_user,
+    get_login_rate_limit,
     get_login_user,
     get_logout_user,
 )
@@ -55,28 +58,41 @@ router = APIRouter()
         status.HTTP_403_FORBIDDEN: {
             "description": "Account has no merchant configured",
         },
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "description": "Too many failed login attempts",
+        },
     },
 )
 def login(
     body: LoginRequest,
     use_case: Annotated[LoginUser, Depends(get_login_user)],
+    rate_limit: Annotated[LoginRateLimit, Depends(get_login_rate_limit)],
 ) -> LoginTokenResponse | JSONResponse:
     try:
+        rate_limit.ensure_allowed(body.username)
         result = use_case.execute(
             username=body.username,
             password=body.password,
             installation_id=body.installation_id,
         )
+    except TooManyLoginAttempts as exc:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"message": str(exc)},
+        )
     except InvalidCredentials as exc:
+        rate_limit.record_failure(body.username)
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"message": str(exc)},
         )
     except MerchantNotConfigured as exc:
+        rate_limit.clear(body.username)
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
             content={"message": str(exc)},
         )
+    rate_limit.clear(body.username)
     return LoginTokenResponse(
         name=result.name,
         email=result.email,

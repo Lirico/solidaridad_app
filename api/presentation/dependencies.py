@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from application.auth.change_password import ChangePassword
+from application.auth.login_rate_limit import LoginRateLimit
 from application.auth.login_user import LoginUser
 from application.auth.logout_user import LogoutUser
 from application.auth.token_service import TokenService
@@ -26,6 +27,7 @@ from config import Settings, get_settings
 from infrastructure.payments.http_gateway import HttpPaymentGateway
 from persistence.database import get_db as _get_db
 from persistence.repositories.installation_repository import InstallationRepository
+from persistence.repositories.login_attempt_repository import LoginAttemptRepository
 from persistence.repositories.payment_processing_config_repository import (
     PaymentProcessingConfigRepository,
 )
@@ -99,6 +101,17 @@ def get_logout_user(
     db: Annotated[Session, Depends(get_db)],
 ) -> LogoutUser:
     return LogoutUser(session=db, users=UserRepository(db))
+
+
+def get_login_rate_limit(
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> LoginRateLimit:
+    return LoginRateLimit(
+        session=db,
+        attempts=LoginAttemptRepository(db),
+        settings=settings,
+    )
 
 
 def get_payment_gateway(

@@ -412,6 +412,14 @@ def test_create_pending_and_update_result() -> None:
     assert created.status == TransactionStatus.PENDING
     assert created.card_number == "4111111111111111"
     assert created.expiration_date == "3012"
+    stored = next(obj for obj in added if isinstance(obj, TransactionModel))
+    assert stored.card_number is not None
+    assert stored.expiration_date is not None
+    assert stored.card_number.startswith("v1.")
+    assert stored.expiration_date.startswith("v1.")
+    assert "4111111111111111" not in stored.card_number
+    assert "3012" not in stored.expiration_date
+    assert stored.card_number != stored.expiration_date
     assert created.authorization_outcome == AuthorizationOutcome.PENDING
     assert created.authorization_attempt_count == 1
     assert created.authorization_last_attempt_at is not None
@@ -474,6 +482,34 @@ def test_create_pending_and_update_result() -> None:
     assert gateway_events[0].from_status == TransactionStatus.PENDING.value
     assert gateway_events[0].to_status == TransactionStatus.APPROVED.value
     assert gateway_events[0].actor_type == TransactionStatusActorType.SYSTEM.value
+
+
+def test_create_pending_keeps_a_missing_expiry_empty() -> None:
+    session, added = _session_with_identity()
+
+    created = TransactionRepository(session).create_pending(
+        transaction_number="OP-260716-00000002",
+        user_id=1,
+        installation_id=10,
+        terminal_id="05000001",
+        product=Product.GARRAFA_10,
+        processor_product_code="993",
+        amount_minor=150,
+        card_last4="1111",
+        card_number="4111111111111111",
+        expiration_date=None,
+        stan="000001",
+        processor_ticket="00000002",
+        idempotency_key="k2",
+        request_fingerprint="fp",
+        user_message="pending",
+    )
+
+    stored = next(obj for obj in added if isinstance(obj, TransactionModel))
+    assert created.expiration_date is None
+    assert stored.expiration_date is None
+    assert stored.card_number is not None
+    assert stored.card_number.startswith("v1.")
 
 
 def test_records_authorization_retry_and_sanitized_attempt_outcome() -> None:

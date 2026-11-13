@@ -69,8 +69,8 @@ class Transaction(Base):
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     card_last4: Mapped[str] = mapped_column(String(4), nullable=False)
-    card_number: Mapped[str | None] = mapped_column(String(19), nullable=True)
-    expiration_date: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    card_number: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    expiration_date: Mapped[str | None] = mapped_column(String(255), nullable=True)
     authorization_outcome: Mapped[str | None] = mapped_column(
         String(16),
         nullable=True,

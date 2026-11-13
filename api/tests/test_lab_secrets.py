@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Generator
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from config.settings import (
     LAB_DATABASE_CREDENTIALS,
     LAB_JWT_SECRET,
+    LAB_PAN_ENCRYPTION_KEY,
     MIN_NON_LOCAL_JWT_SECRET_LENGTH,
     LabSecretsError,
     Settings,
@@ -13,6 +15,7 @@ from config.settings import (
 )
 
 _REAL_JWT = "prod-jwt-secret-not-the-lab-value"
+_REAL_PAN_KEY = base64.b64encode(b"p" * 32).decode()
 _REAL_DATABASE_URL = "postgresql+psycopg://app:real-secret@db.internal:5432/solidaridad"
 _LAB_DATABASE_URL = (
     f"postgresql+psycopg://{LAB_DATABASE_CREDENTIALS}@localhost:5434/solidaridad"
@@ -20,7 +23,7 @@ _LAB_DATABASE_URL = (
 
 
 def _without_env_file(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("APP_ENV", "JWT_SECRET", "DATABASE_URL"):
+    for name in ("APP_ENV", "JWT_SECRET", "DATABASE_URL", "PAN_ENCRYPTION_KEY"):
         monkeypatch.delenv(name, raising=False)
     original = Settings
 
@@ -79,12 +82,14 @@ def test_production_with_own_secrets_starts(
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
     monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", _REAL_PAN_KEY)
 
     settings = get_settings()
 
     assert settings.app_env == "production"
     assert settings.jwt_secret == _REAL_JWT
     assert settings.database_url == _REAL_DATABASE_URL
+    assert settings.pan_encryption_key == _REAL_PAN_KEY
 
 
 def test_explicit_local_keeps_lab_secrets(
@@ -98,17 +103,19 @@ def test_explicit_local_keeps_lab_secrets(
 
     assert settings.app_env == "local"
     assert settings.jwt_secret == LAB_JWT_SECRET
+    assert settings.pan_encryption_key == LAB_PAN_ENCRYPTION_KEY
     assert LAB_DATABASE_CREDENTIALS in settings.database_url
 
 
 def test_settings_object_keeps_lab_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("APP_ENV", "JWT_SECRET", "DATABASE_URL"):
+    for name in ("APP_ENV", "JWT_SECRET", "DATABASE_URL", "PAN_ENCRYPTION_KEY"):
         monkeypatch.delenv(name, raising=False)
 
     settings = Settings(_env_file=None)
 
     assert settings.app_env == "local"
     assert settings.jwt_secret == LAB_JWT_SECRET
+    assert settings.pan_encryption_key == LAB_PAN_ENCRYPTION_KEY
     assert LAB_DATABASE_CREDENTIALS in settings.database_url
     assert settings.business_timezone == "America/Argentina/Buenos_Aires"
     with pytest.raises(LabSecretsError, match="no está definido"):
@@ -159,6 +166,7 @@ def test_minimum_length_jwt_starts_outside_local(
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET", secret)
     monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", _REAL_PAN_KEY)
 
     settings = get_settings()
 
@@ -176,6 +184,7 @@ def test_similar_database_credentials_are_not_lab_secrets(
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
     monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", _REAL_PAN_KEY)
 
     settings = get_settings()
 
@@ -194,6 +203,7 @@ def test_lab_credentials_outside_userinfo_do_not_block_startup(
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
     monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", _REAL_PAN_KEY)
 
     settings = get_settings()
 
@@ -210,4 +220,71 @@ def test_unparseable_database_url_refuses_startup(
     monkeypatch.setenv("DATABASE_URL", "not a url")
 
     with pytest.raises(LabSecretsError, match="no se puede interpretar"):
+        get_settings()
+
+
+def test_missing_pan_key_refused_outside_local(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
+    monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+
+    with pytest.raises(LabSecretsError, match="PAN_ENCRYPTION_KEY ausente"):
+        get_settings()
+
+
+def test_lab_pan_key_refused_outside_local(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
+    monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", LAB_PAN_ENCRYPTION_KEY)
+
+    with pytest.raises(LabSecretsError, match="de laboratorio"):
+        get_settings()
+
+
+def test_pan_key_must_decode_to_32_bytes(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
+    monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", base64.b64encode(b"short").decode())
+
+    with pytest.raises(LabSecretsError, match="32 bytes"):
+        get_settings()
+
+
+def test_pan_key_must_be_base64(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", _REAL_JWT)
+    monkeypatch.setenv("DATABASE_URL", _REAL_DATABASE_URL)
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", "not base64 !!!")
+
+    with pytest.raises(LabSecretsError, match="base64"):
+        get_settings()
+
+
+def test_local_rejects_a_pan_key_that_is_not_32_bytes(
+    isolated_settings: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del isolated_settings
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("PAN_ENCRYPTION_KEY", base64.b64encode(b"short").decode())
+
+    with pytest.raises(LabSecretsError, match="32 bytes"):
         get_settings()

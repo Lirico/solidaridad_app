@@ -1,10 +1,13 @@
 """Transaction persistence repository."""
 
 from datetime import UTC, date, datetime
+from functools import lru_cache
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
+from config.settings import decode_pan_encryption_key, get_settings
 from domain.authorization_outcome import AuthorizationOutcome
 from domain.batch_close import BatchClose
 from domain.processor_job import ProcessorJobState, ProcessorOperationType
@@ -16,6 +19,7 @@ from domain.transaction_status_event import (
     TransactionStatusEventType,
 )
 from domain.void_operation import VoidOperationStatus
+from persistence.card_cipher import CardCipher, is_legacy_plaintext
 from persistence.models.batch_close import BatchClose as BatchCloseModel
 from persistence.models.processor_job import ProcessorJob as ProcessorJobModel
 from persistence.models.transaction import Transaction as TransactionModel
@@ -27,6 +31,48 @@ from persistence.models.void_operation import VoidOperation as VoidOperationMode
 def ticket_from_transaction_number(transaction_number: str) -> str:
     """Extract numeric DE62 ticket from OP-YYMMDD-NNNNNNNN."""
     return transaction_number.rsplit("-", 1)[-1]
+
+
+_REENCRYPT_BATCH = 200
+
+
+@lru_cache
+def _card_cipher(key_material: str) -> CardCipher:
+    return CardCipher(decode_pan_encryption_key(key_material))
+
+
+def _cipher() -> CardCipher:
+    return _card_cipher(get_settings().pan_encryption_key)
+
+
+def _encrypt_optional(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _cipher().encrypt(value)
+
+
+def _reveal(value: str | None) -> str | None:
+    if not isinstance(value, str) or is_legacy_plaintext(value):
+        return value
+    return _cipher().decrypt(value)
+
+
+def _legacy_card_filter(dialect_name: str) -> ColumnElement[bool]:
+    if dialect_name == "postgresql":
+        return or_(
+            TransactionModel.card_number.op("~")(r"^[0-9]{13,19}$"),
+            TransactionModel.expiration_date.op("~")(r"^[0-9]{4}$"),
+        )
+    return or_(
+        and_(
+            TransactionModel.card_number.is_not(None),
+            TransactionModel.card_number.not_like("v1.%"),
+        ),
+        and_(
+            TransactionModel.expiration_date.is_not(None),
+            TransactionModel.expiration_date.not_like("v1.%"),
+        ),
+    )
 
 
 def _to_domain(row: TransactionModel) -> Transaction:
@@ -41,8 +87,8 @@ def _to_domain(row: TransactionModel) -> Transaction:
         amount_minor=row.amount_minor,
         status=TransactionStatus(row.status),
         card_last4=row.card_last4,
-        card_number=row.card_number,
-        expiration_date=row.expiration_date,
+        card_number=_reveal(row.card_number),
+        expiration_date=_reveal(row.expiration_date),
         authorization_outcome=(
             AuthorizationOutcome(row.authorization_outcome)
             if row.authorization_outcome is not None
@@ -79,6 +125,37 @@ def _to_batch_close(row: BatchCloseModel) -> BatchClose:
 class TransactionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def _seal_legacy(self, row: TransactionModel) -> bool:
+        changed = False
+        card_number = row.card_number
+        if isinstance(card_number, str) and is_legacy_plaintext(card_number):
+            row.card_number = _cipher().encrypt(card_number)
+            changed = True
+        expiration_date = row.expiration_date
+        if isinstance(expiration_date, str) and is_legacy_plaintext(expiration_date):
+            row.expiration_date = _cipher().encrypt(expiration_date)
+            changed = True
+        if changed:
+            self._session.flush()
+        return changed
+
+    def _map(self, row: TransactionModel) -> Transaction:
+        self._seal_legacy(row)
+        return _to_domain(row)
+
+    def reencrypt_plaintext_cards(self) -> int:
+        """Encrypt one batch of PAN or expiry values still stored in the clear."""
+        dialect_name = self._session.get_bind().dialect.name
+        stmt = (
+            select(TransactionModel)
+            .where(_legacy_card_filter(dialect_name))
+            .limit(_REENCRYPT_BATCH)
+        )
+        if dialect_name == "postgresql":
+            stmt = stmt.with_for_update()
+        rows = list(self._session.scalars(stmt).all())
+        return sum(1 for row in rows if self._seal_legacy(row))
 
     def _append_status_event(
         self,
@@ -129,11 +206,11 @@ class TransactionRepository:
         row = self._session.scalars(stmt).first()
         if row is None:
             return None
-        return _to_domain(row)
+        return self._map(row)
 
     def get_by_id(self, *, transaction_id: int) -> Transaction | None:
         row = self._session.get(TransactionModel, transaction_id)
-        return _to_domain(row) if row is not None else None
+        return self._map(row) if row is not None else None
 
     def get_by_id_for_update(self, *, transaction_id: int) -> Transaction:
         """Lock one transaction before attaching recovery work to it."""
@@ -144,7 +221,7 @@ class TransactionRepository:
         )
         if row is None:
             raise LookupError(f"transaction {transaction_id} not found")
-        return _to_domain(row)
+        return self._map(row)
 
     def start_authorization_retry(self, *, transaction_id: int) -> int:
         """Persist the next attempt number before its external effect."""
@@ -198,7 +275,7 @@ class TransactionRepository:
         row = self._session.scalars(stmt).first()
         if row is None:
             return None
-        return _to_domain(row)
+        return self._map(row)
 
     def list_stale_pending_without_reverse_job(
         self,
@@ -231,7 +308,7 @@ class TransactionRepository:
             )
             .with_for_update(skip_locked=True)
         )
-        return [_to_domain(row) for row in self._session.scalars(stmt).all()]
+        return [self._map(row) for row in self._session.scalars(stmt).all()]
 
     def next_transaction_number(self, business_date: date) -> str:
         """Atomically allocate OP-YYMMDD-NNNNNNNN for the business date.
@@ -289,8 +366,8 @@ class TransactionRepository:
             amount_minor=amount_minor,
             status=TransactionStatus.PENDING.value,
             card_last4=card_last4,
-            card_number=card_number,
-            expiration_date=expiration_date,
+            card_number=_encrypt_optional(card_number),
+            expiration_date=_encrypt_optional(expiration_date),
             authorization_outcome=AuthorizationOutcome.PENDING.value,
             authorization_attempt_count=1,
             authorization_last_attempt_at=now,
@@ -315,7 +392,7 @@ class TransactionRepository:
             idempotency_key=idempotency_key,
         )
         self._session.flush()
-        return _to_domain(row)
+        return self._map(row)
 
     def list_by_terminal_id(
         self,
@@ -337,13 +414,17 @@ class TransactionRepository:
         )
         rows = list(self._session.scalars(stmt).all())
 
-        count_stmt = select(func.count()).select_from(TransactionModel).where(
-            TransactionModel.terminal_id == terminal_id,
-            TransactionModel.batch_close_id.is_(None),
+        count_stmt = (
+            select(func.count())
+            .select_from(TransactionModel)
+            .where(
+                TransactionModel.terminal_id == terminal_id,
+                TransactionModel.batch_close_id.is_(None),
+            )
         )
         total = self._session.scalar(count_stmt) or 0
 
-        return [_to_domain(r) for r in rows], total
+        return [self._map(r) for r in rows], total
 
     def close_current_batch(
         self,
@@ -377,7 +458,7 @@ class TransactionRepository:
                     )
                 ).all()
             )
-            return _to_batch_close(existing), [_to_domain(row) for row in rows]
+            return _to_batch_close(existing), [self._map(row) for row in rows]
 
         current = list(
             self._session.scalars(
@@ -460,7 +541,7 @@ class TransactionRepository:
                     )
                 ).all()
             )
-            return _to_batch_close(existing), [_to_domain(row) for row in rows]
+            return _to_batch_close(existing), [self._map(row) for row in rows]
 
         close = BatchCloseModel(
             installation_id=installation_id,
@@ -474,7 +555,7 @@ class TransactionRepository:
         for row in current:
             row.batch_close_id = close.id
         self._session.flush()
-        return _to_batch_close(close), [_to_domain(row) for row in current]
+        return _to_batch_close(close), [self._map(row) for row in current]
 
     def update_result(
         self,
@@ -511,7 +592,7 @@ class TransactionRepository:
             idempotency_key=row.idempotency_key,
         )
         self._session.flush()
-        return _to_domain(row)
+        return self._map(row)
 
     def record_reversal_enqueued(self, *, transaction_id: int) -> None:
         """Audit creation of the durable compensation work item."""
@@ -563,7 +644,7 @@ class TransactionRepository:
             idempotency_key=void_idempotency_key,
         )
         self._session.flush()
-        return _to_domain(row)
+        return self._map(row)
 
     def record_idempotent_hit(
         self,

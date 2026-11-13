@@ -1,3 +1,5 @@
+import base64
+import binascii
 from functools import lru_cache
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -10,7 +12,10 @@ LAB_JWT_SECRET = "change-me-local-dev-only-use-a-long-random-string"
 LAB_DATABASE_USER = "solidaridad"
 LAB_DATABASE_PASSWORD = "solidaridad"
 LAB_DATABASE_CREDENTIALS = f"{LAB_DATABASE_USER}:{LAB_DATABASE_PASSWORD}"
+# base64 of the 32-byte lab value "local-lab-pan-key-not-for-prod!!"
+LAB_PAN_ENCRYPTION_KEY = "bG9jYWwtbGFiLXBhbi1rZXktbm90LWZvci1wcm9kISE="
 MIN_NON_LOCAL_JWT_SECRET_LENGTH = 32
+PAN_ENCRYPTION_KEY_BYTES = 32
 KNOWN_APP_ENVS = frozenset({"dev", "local", "prod", "production", "staging", "test"})
 
 
@@ -31,6 +36,7 @@ class Settings(BaseSettings):
         f"postgresql+psycopg://{LAB_DATABASE_CREDENTIALS}@localhost:5434/solidaridad"
     )
     jwt_secret: str = LAB_JWT_SECRET
+    pan_encryption_key: str = LAB_PAN_ENCRYPTION_KEY
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 90
     # Espejo del Compose local. El proceso conecta con database_url.
@@ -74,6 +80,7 @@ def ensure_explicit_lab_secrets(settings: Settings) -> Settings:
         )
     if settings.app_env != "local":
         _reject_non_local_lab_secrets(settings)
+    decode_pan_encryption_key(settings.pan_encryption_key)
     return settings
 
 
@@ -90,6 +97,22 @@ def _reject_non_local_lab_secrets(settings: Settings) -> None:
         raise LabSecretsError(
             "La clave de base de laboratorio no vale fuera de APP_ENV=local."
         )
+    if settings.pan_encryption_key == LAB_PAN_ENCRYPTION_KEY:
+        raise LabSecretsError(
+            "PAN_ENCRYPTION_KEY ausente o de laboratorio "
+            "no vale fuera de APP_ENV=local."
+        )
+    decode_pan_encryption_key(settings.pan_encryption_key)
+
+
+def decode_pan_encryption_key(value: str) -> bytes:
+    try:
+        key = base64.b64decode(value, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise LabSecretsError("PAN_ENCRYPTION_KEY no es base64 válido.") from exc
+    if len(key) != PAN_ENCRYPTION_KEY_BYTES:
+        raise LabSecretsError("PAN_ENCRYPTION_KEY debe decodificar a 32 bytes.")
+    return key
 
 
 def database_credentials(database_url: str) -> tuple[str, str]:

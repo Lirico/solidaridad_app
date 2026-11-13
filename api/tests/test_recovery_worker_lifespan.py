@@ -22,6 +22,24 @@ def _health(*, alive: bool, last_error: str | None = None) -> RecoveryWorkerHeal
     )
 
 
+def test_lifespan_seals_stored_cards_before_the_worker_starts() -> None:
+    worker = MagicMock()
+    worker.health.return_value = _health(alive=True)
+    order: list[str] = []
+    worker.start.side_effect = lambda: order.append("start")
+    app = create_app(
+        create_router(),
+        settings=Settings(embedded_recovery_worker_enabled=True),
+        recovery_worker=worker,
+        reencrypt_cards=lambda: order.append("reencrypt"),
+    )
+
+    with TestClient(app):
+        pass
+
+    assert order == ["reencrypt", "start"]
+
+
 def test_lifespan_starts_and_stops_one_embedded_worker() -> None:
     worker = MagicMock()
     worker.health.return_value = _health(alive=True)
@@ -29,6 +47,7 @@ def test_lifespan_starts_and_stops_one_embedded_worker() -> None:
         create_router(),
         settings=Settings(embedded_recovery_worker_enabled=True),
         recovery_worker=worker,
+        reencrypt_cards=lambda: None,
     )
 
     with TestClient(app) as client:
@@ -48,6 +67,7 @@ def test_readiness_is_degraded_after_a_fatal_worker_error() -> None:
         create_router(),
         settings=Settings(embedded_recovery_worker_enabled=True),
         recovery_worker=worker,
+        reencrypt_cards=lambda: None,
     )
 
     with TestClient(app) as client:
@@ -82,6 +102,7 @@ def test_disabled_worker_is_ready_before_operational_activation() -> None:
         create_router(),
         settings=Settings(embedded_recovery_worker_enabled=False),
         recovery_worker=worker,
+        reencrypt_cards=lambda: None,
     )
 
     with TestClient(app) as client:
@@ -108,6 +129,7 @@ def test_readiness_is_degraded_when_a_worker_is_stale() -> None:
         create_router(),
         settings=Settings(embedded_recovery_worker_enabled=True),
         recovery_worker=worker,
+        reencrypt_cards=lambda: None,
     )
 
     with TestClient(app) as client:

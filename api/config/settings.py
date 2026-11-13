@@ -1,8 +1,10 @@
 from functools import lru_cache
+from typing import Annotated
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import ArgumentError
 
@@ -12,6 +14,7 @@ LAB_DATABASE_PASSWORD = "solidaridad"
 LAB_DATABASE_CREDENTIALS = f"{LAB_DATABASE_USER}:{LAB_DATABASE_PASSWORD}"
 MIN_NON_LOCAL_JWT_SECRET_LENGTH = 32
 KNOWN_APP_ENVS = frozenset({"dev", "local", "prod", "production", "staging", "test"})
+DOCS_ENVS = frozenset({"dev", "local", "test"})
 
 
 class LabSecretsError(RuntimeError):
@@ -44,6 +47,31 @@ class Settings(BaseSettings):
     embedded_recovery_worker_enabled: bool = True
     embedded_recovery_worker_shutdown_grace_seconds: float = 40.0
     recovery_worker_max_iteration_age_seconds: float = Field(default=30.0, gt=0)
+    cors_origins: Annotated[tuple[str, ...], NoDecode] = ()
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: object) -> tuple[str, ...]:
+        if value is None:
+            return ()
+        if isinstance(value, str):
+            if not value.strip():
+                return ()
+            raw_parts: list[object] = list(value.split(","))
+        elif isinstance(value, (list, tuple)):
+            raw_parts = list(value)
+        else:
+            raise ValueError(
+                "CORS_ORIGINS debe ser una lista de orígenes separada por comas."
+            )
+        origins: list[str] = []
+        for part in raw_parts:
+            origin = str(part).strip()
+            if not origin:
+                raise ValueError("CORS_ORIGINS no acepta un origen vacío.")
+            _reject_invalid_origin(origin)
+            origins.append(origin)
+        return tuple(origins)
 
     @field_validator("business_timezone")
     @classmethod
@@ -58,6 +86,26 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_app_env(cls, value: str) -> str:
         return value.strip().lower()
+
+
+def docs_enabled(settings: Settings) -> bool:
+    return settings.app_env in DOCS_ENVS
+
+
+def _reject_invalid_origin(origin: str) -> None:
+    if origin == "*":
+        raise ValueError("CORS_ORIGINS no acepta *.")
+    parts = urlsplit(origin)
+    if (
+        parts.scheme not in {"http", "https"}
+        or parts.hostname is None
+        or parts.username is not None
+        or parts.password is not None
+        or parts.path not in {"",}
+        or parts.query
+        or parts.fragment
+    ):
+        raise ValueError("CORS_ORIGINS solo acepta orígenes http o https sin path.")
 
 
 def ensure_explicit_lab_secrets(settings: Settings) -> Settings:

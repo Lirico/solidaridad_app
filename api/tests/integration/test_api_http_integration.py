@@ -31,8 +31,8 @@ def test_health_cors_and_error_shape(api: httpx.Client) -> None:
             "Access-Control-Request-Method": "POST",
         },
     )
-    assert preflight.status_code == 200
-    assert preflight.headers["access-control-allow-origin"] == "https://terminal.example.test"
+    assert "access-control-allow-origin" not in preflight.headers
+    assert "access-control-allow-credentials" not in preflight.headers
     invalid = api.post("/v1/auth/login", content="{")
     assert invalid.status_code == 400
     assert set(invalid.json()) == {"message"}

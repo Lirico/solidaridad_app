@@ -425,11 +425,14 @@ void* auth_thread(void* data)
             time( &ltime );
             stm = localtime( &ltime );
 
-            if (stm->tm_hour == 23 && stm->tm_min < 30)
+            if (stm->tm_hour == 23)
             {
+                if (stm->tm_min < 30)
+                {
                    printf("HORARIO DE ATENCION <23 && >00 : %d\n", stm->tm_hour);
                    sleep(5);
                    strcpy(iso->respcode_39,"05");
+								}
             } else {
                 if ((atoi(iso->procode_3) == 20000) || (atoi(iso->procode_3) == 50000)) // ANULACION
                 {

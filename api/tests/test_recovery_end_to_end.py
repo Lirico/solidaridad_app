@@ -36,6 +36,7 @@ from domain.processor_job import (
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
+from persistence.repositories.transaction_repository import StalePendingBacklog
 
 
 @pytest.fixture(autouse=True)
@@ -165,7 +166,7 @@ class _Transactions:
             None,
         )
 
-    def list_stale_pending_without_reverse_job(
+    def _recoverable_stale_pending(
         self, *, attempted_before: datetime
     ) -> list[Transaction]:
         selected: list[Transaction] = []
@@ -191,7 +192,26 @@ class _Transactions:
             ):
                 continue
             selected.append(row)
+        selected.sort(
+            key=lambda row: (row.authorization_last_attempt_at, row.id)
+        )
         return selected
+
+    def summarize_stale_pending_without_reverse_job(
+        self, *, attempted_before: datetime
+    ) -> StalePendingBacklog:
+        selected = self._recoverable_stale_pending(
+            attempted_before=attempted_before
+        )
+        oldest = selected[0].authorization_last_attempt_at if selected else None
+        return StalePendingBacklog(count=len(selected), oldest_attempt_at=oldest)
+
+    def list_stale_pending_without_reverse_job(
+        self, *, attempted_before: datetime, limit: int
+    ) -> list[Transaction]:
+        return self._recoverable_stale_pending(attempted_before=attempted_before)[
+            :limit
+        ]
 
 
 class _Jobs:
@@ -398,6 +418,7 @@ class _Configs:
             jitter_percentage=0,
             authorization_budget_seconds=60,
             stale_pending_authorization_seconds=45,
+            stale_pending_batch_limit=50,
             reversal_grace_seconds=45,
             reversal_processing_timeout_seconds=60,
             worker_poll_interval_seconds=Decimal("1"),

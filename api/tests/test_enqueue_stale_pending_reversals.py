@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -9,6 +10,7 @@ from application.payments.enqueue_stale_pending_reversals import (
 from domain.product import Product
 from domain.transaction import Transaction
 from domain.transaction_status import TransactionStatus
+from persistence.repositories.transaction_repository import StalePendingBacklog
 
 
 def _pending(**overrides: object) -> Transaction:
@@ -41,17 +43,28 @@ def _pending(**overrides: object) -> Transaction:
 
 def _build(
     candidates: list[Transaction],
+    *,
+    backlog: int | None = None,
+    batch_limit: int = 50,
 ) -> tuple[EnqueueStalePendingReversals, MagicMock, MagicMock, MagicMock]:
     session = MagicMock()
     transactions = MagicMock()
     jobs = MagicMock()
     transactions.list_stale_pending_without_reverse_job.return_value = candidates
     now = datetime(2026, 10, 14, 12, tzinfo=UTC)
+    waiting = backlog if backlog is not None else len(candidates)
+    transactions.summarize_stale_pending_without_reverse_job.return_value = (
+        StalePendingBacklog(
+            count=waiting,
+            oldest_attempt_at=None if waiting == 0 else now - timedelta(seconds=90),
+        )
+    )
     use_case = EnqueueStalePendingReversals(
         session=session,
         transactions=transactions,
         jobs=jobs,
         stale_after=timedelta(seconds=60),
+        batch_limit=batch_limit,
         now=lambda: now,
     )
     return use_case, session, transactions, jobs
@@ -65,7 +78,8 @@ def test_enqueues_each_stale_pending_transaction_once() -> None:
 
     assert recovered == [transaction]
     transactions.list_stale_pending_without_reverse_job.assert_called_once_with(
-        attempted_before=datetime(2026, 10, 14, 11, 59, tzinfo=UTC)
+        attempted_before=datetime(2026, 10, 14, 11, 59, tzinfo=UTC),
+        limit=50,
     )
     jobs.create_reverse.assert_called_once()
     kwargs = jobs.create_reverse.call_args.kwargs
@@ -96,4 +110,50 @@ def test_watchdog_requires_a_positive_staleness_window() -> None:
             transactions=MagicMock(),
             jobs=MagicMock(),
             stale_after=timedelta(0),
+            batch_limit=50,
         )
+
+
+def test_watchdog_requires_a_positive_batch_limit() -> None:
+    with pytest.raises(ValueError, match="batch_limit must be positive"):
+        EnqueueStalePendingReversals(
+            session=MagicMock(),
+            transactions=MagicMock(),
+            jobs=MagicMock(),
+            stale_after=timedelta(seconds=60),
+            batch_limit=0,
+        )
+
+
+def test_watchdog_logs_backlog_without_sale_data(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    use_case, _, transactions, _ = _build([_pending()], backlog=4, batch_limit=2)
+
+    with caplog.at_level(logging.INFO):
+        use_case.execute()
+
+    transactions.list_stale_pending_without_reverse_job.assert_called_once_with(
+        attempted_before=datetime(2026, 10, 14, 11, 59, tzinfo=UTC),
+        limit=2,
+    )
+    record = next(
+        item for item in caplog.records if item.message == "stale_pending_backlog"
+    )
+    assert record.__dict__["event_name"] == "stale_pending_backlog"
+    assert record.__dict__["backlog"] == 4
+    assert record.__dict__["oldest_age_seconds"] == 90
+    assert record.__dict__["selected"] == 1
+    assert record.__dict__["limit"] == 2
+    assert "000111" not in str(record.__dict__)
+
+
+def test_watchdog_stays_quiet_when_nothing_is_waiting(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    use_case, _, _, _ = _build([])
+
+    with caplog.at_level(logging.INFO):
+        assert use_case.execute() == []
+
+    assert "stale_pending_backlog" not in caplog.text

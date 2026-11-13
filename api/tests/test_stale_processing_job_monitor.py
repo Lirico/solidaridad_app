@@ -25,6 +25,7 @@ def _config() -> PaymentProcessingConfig:
         jitter_percentage=0,
         authorization_budget_seconds=60,
         stale_pending_authorization_seconds=45,
+        stale_pending_batch_limit=50,
         reversal_grace_seconds=45,
         reversal_processing_timeout_seconds=75,
         worker_poll_interval_seconds=Decimal("1"),

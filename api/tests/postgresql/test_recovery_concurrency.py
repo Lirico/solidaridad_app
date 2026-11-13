@@ -154,7 +154,8 @@ def recovery_case(postgres_engine: Engine) -> RecoveryCase:
 
 def _stale_candidates(session: Session) -> list[object]:
     return TransactionRepository(session).list_stale_pending_without_reverse_job(
-        attempted_before=NOW - timedelta(seconds=45)
+        attempted_before=NOW - timedelta(seconds=45),
+        limit=50,
     )
 
 

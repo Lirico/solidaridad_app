@@ -145,6 +145,7 @@ def _build(
         jitter_percentage=0,
         authorization_budget_seconds=authorization_budget_seconds,
         stale_pending_authorization_seconds=45,
+        stale_pending_batch_limit=50,
         reversal_grace_seconds=reversal_grace_seconds,
         reversal_processing_timeout_seconds=60,
         worker_poll_interval_seconds=Decimal("1"),

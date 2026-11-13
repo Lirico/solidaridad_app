@@ -29,6 +29,7 @@ def _values() -> dict[str, object]:
         "jitter_percentage": 20,
         "authorization_budget_seconds": 60,
         "stale_pending_authorization_seconds": 45,
+        "stale_pending_batch_limit": 50,
         "reversal_grace_seconds": 45,
         "reversal_processing_timeout_seconds": 60,
         "worker_poll_interval_seconds": Decimal("1"),
@@ -55,6 +56,7 @@ def test_repository_reads_consistent_default_snapshot() -> None:
     assert config.max_reversal_attempts == 5
     assert config.authorization_budget_seconds == 60
     assert config.stale_pending_authorization_seconds == 45
+    assert config.stale_pending_batch_limit == 50
     assert config.reversal_grace_seconds == 45
     assert config.reversal_processing_timeout_seconds == 60
     assert config.worker_poll_interval_seconds == Decimal("1")
@@ -87,6 +89,7 @@ def test_repository_reports_missing_default() -> None:
             0,
             "stale_pending_authorization",
         ),
+        ("stale_pending_batch_limit", 0, "stale_pending_batch_limit"),
         ("reversal_grace_seconds", 0, "reversal_grace"),
         (
             "reversal_processing_timeout_seconds",

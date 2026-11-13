@@ -52,11 +52,11 @@ def test_change_password_success_clears_must_change_flag() -> None:
     use_case.execute(
         user_id=user.id,
         current_password="current12",
-        new_password="newpass12",
+        new_password="Nueva4567!",
     )
 
     hasher.verify.assert_called_once_with("current12", "hashed-current")
-    hasher.hash.assert_called_once_with("newpass12")
+    hasher.hash.assert_called_once_with("Nueva4567!")
     users.update_password.assert_called_once_with(
         user.id,
         password_hash="hashed-new",
@@ -73,7 +73,7 @@ def test_change_password_rejects_wrong_current() -> None:
         use_case.execute(
             user_id=user.id,
             current_password="wrong-pass",
-            new_password="newpass12",
+            new_password="Nueva4567!",
         )
 
     users.update_password.assert_not_called()
@@ -88,24 +88,10 @@ def test_change_password_rejects_missing_user() -> None:
         use_case.execute(
             user_id=user_id,
             current_password="current12",
-            new_password="newpass12",
+            new_password="Nueva4567!",
         )
 
     users.update_password.assert_not_called()
-
-
-def test_change_password_rejects_short_new_password() -> None:
-    use_case, users, _hasher, user = _build_use_case()
-    assert user is not None
-
-    with pytest.raises(WeakPassword):
-        use_case.execute(
-            user_id=user.id,
-            current_password="current12",
-            new_password="short",
-        )
-
-    users.get_by_id.assert_not_called()
 
 
 def test_change_password_rejects_same_as_current() -> None:
@@ -115,8 +101,35 @@ def test_change_password_rejects_same_as_current() -> None:
     with pytest.raises(WeakPassword, match="distinta"):
         use_case.execute(
             user_id=user.id,
-            current_password="samepass1",
-            new_password="samepass1",
+            current_password="Nueva4567!",
+            new_password="Nueva4567!",
+        )
+
+    users.get_by_id.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("new_password", "message"),
+    [
+        ("12345678", "mayúscula"),
+        ("NUEVA4567!", "minúscula"),
+        ("NuevaClave!", "número"),
+        ("NuevaClave1", "especial"),
+        ("short", "entre 8 y 128"),
+    ],
+)
+def test_change_password_rejects_weak_new_password(
+    new_password: str,
+    message: str,
+) -> None:
+    use_case, users, _hasher, user = _build_use_case()
+    assert user is not None
+
+    with pytest.raises(WeakPassword, match=message):
+        use_case.execute(
+            user_id=user.id,
+            current_password="current12",
+            new_password=new_password,
         )
 
     users.get_by_id.assert_not_called()

@@ -17,6 +17,11 @@ from domain.exceptions import (
     ProcessorUnreachable,
 )
 from domain.reversal import ReversalResult, ReverseCommand
+from infrastructure.iso.audit_log import (
+    log_iso_exchange,
+    result_auth_id,
+    result_retrieval_reference,
+)
 from infrastructure.iso.message_builder import (
     build_balance_request,
     build_purchase_request,
@@ -38,22 +43,38 @@ class TcpIsoProcessor:
 
     def authorize(self, command: AuthorizeCommand) -> AuthorizationResult:
         request = build_purchase_request(command, self._settings)
-        return self._send(request, map_iso_response, _invalid_authorization)
+        return self._send(
+            "authorize",
+            request,
+            map_iso_response,
+            _invalid_authorization,
+        )
 
     def void(self, command: VoidCommand) -> AuthorizationResult:
         request = build_void_request(command, self._settings)
-        return self._send(request, map_iso_response, _invalid_authorization)
+        return self._send("void", request, map_iso_response, _invalid_authorization)
 
     def reverse(self, command: ReverseCommand) -> ReversalResult:
         request = build_reversal_request(command, self._settings)
-        return self._send(request, map_reversal_response, invalid_reversal_result)
+        return self._send(
+            "reverse",
+            request,
+            map_reversal_response,
+            invalid_reversal_result,
+        )
 
     def balance(self, command: BalanceCommand) -> BalanceResult:
         request = build_balance_request(command, self._settings)
-        return self._send(request, map_balance_response, _invalid_balance)
+        return self._send(
+            "balance",
+            request,
+            map_balance_response,
+            _invalid_balance,
+        )
 
     def _send[T: (AuthorizationResult, BalanceResult, ReversalResult)](
         self,
+        operation: str,
         request: IsoMessage,
         mapper: Callable[[IsoMessage], T],
         fallback: Callable[[], T],
@@ -61,18 +82,62 @@ class TcpIsoProcessor:
         try:
             frame = pack_iso(request)
         except (ValueError, UnicodeEncodeError) as exc:
+            self._audit(operation, request, outcome="not_sent")
             raise IsoPackError("No se pudo armar el mensaje ISO") from exc
 
         try:
             response_frame = self._exchange(frame)
+        except ProcessorUnreachable:
+            self._audit(operation, request, outcome="not_sent")
+            raise
         except (TimeoutError, OSError, ConnectionError) as exc:
+            self._audit(operation, request, outcome="indeterminate")
             raise ProcessorUnavailable() from exc
 
         try:
             response = unpack_iso(response_frame)
         except IsoPackError:
-            return fallback()
-        return mapper(response)
+            result = fallback()
+            self._audit(
+                operation,
+                request,
+                outcome="invalid_response",
+                response_code=result.response_code,
+            )
+            return result
+        result = mapper(response)
+        self._audit(
+            operation,
+            request,
+            outcome="sent",
+            response_mti=response.mtype,
+            response_code=result.response_code,
+            auth_id=result_auth_id(result),
+            retrieval_reference=result_retrieval_reference(result),
+        )
+        return result
+
+    def _audit(
+        self,
+        operation: str,
+        request: IsoMessage,
+        *,
+        outcome: str,
+        response_mti: str | None = None,
+        response_code: str | None = None,
+        auth_id: str | None = None,
+        retrieval_reference: str | None = None,
+    ) -> None:
+        log_iso_exchange(
+            operation=operation,
+            transport="tcp",
+            request=request,
+            outcome=outcome,
+            response_mti=response_mti,
+            response_code=response_code,
+            auth_id=auth_id,
+            retrieval_reference=retrieval_reference,
+        )
 
     def _exchange(self, frame: bytes) -> bytes:
         host = self._settings.iso_host

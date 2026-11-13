@@ -66,6 +66,10 @@ class PaymentProcessingConfig(Base):
             name="ck_payment_config_stale_pending_authorization",
         ),
         CheckConstraint(
+            "stale_pending_batch_limit >= 1",
+            name="ck_payment_config_stale_pending_batch_limit",
+        ),
+        CheckConstraint(
             "reversal_grace_seconds > 0",
             name="ck_payment_config_reversal_grace",
         ),
@@ -115,6 +119,10 @@ class PaymentProcessingConfig(Base):
     jitter_percentage: Mapped[int] = mapped_column(Integer, nullable=False)
     authorization_budget_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
     stale_pending_authorization_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+    stale_pending_batch_limit: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
     )

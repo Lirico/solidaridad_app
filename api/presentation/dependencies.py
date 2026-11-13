@@ -40,6 +40,7 @@ class CurrentUser:
     user_id: int
     email: str
     installation_id: str
+    must_change_password: bool = False
 
 
 def get_settings_dep() -> Settings:
@@ -227,4 +228,16 @@ def get_current_user(
         user_id=user.id,
         email=email,
         installation_id=installation_id.strip(),
+        must_change_password=user.must_change_password,
     )
+
+
+def require_operable_session(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> CurrentUser:
+    if current_user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debe cambiar la contraseña antes de operar",
+        )
+    return current_user

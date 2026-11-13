@@ -43,10 +43,10 @@ from presentation.dependencies import (
     CurrentUser,
     get_close_batch,
     get_create_transaction,
-    get_current_user,
     get_list_transactions,
     get_void_operation,
     get_void_transaction,
+    require_operable_session,
 )
 from presentation.dependencies import (
     get_transaction_status as get_transaction_status_use_case,
@@ -125,7 +125,7 @@ def _void_response(
     },
 )
 def list_transactions(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     use_case: Annotated[ListTransactions, Depends(get_list_transactions)],
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -170,7 +170,7 @@ def list_transactions(
 )
 def get_transaction(
     transaction_number: str,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     use_case: Annotated[
         GetTransactionStatus,
         Depends(get_transaction_status_use_case),
@@ -243,7 +243,7 @@ def get_transaction(
 )
 def create_transaction(
     body: CreateTransactionRequest,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     use_case: Annotated[CreateTransaction, Depends(get_create_transaction)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> PublicTransactionResponse | JSONResponse:
@@ -321,7 +321,7 @@ def create_transaction(
     },
 )
 def close_batch(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     use_case: Annotated[CloseBatch, Depends(get_close_batch)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> BatchCloseResponse | JSONResponse:
@@ -382,7 +382,7 @@ def close_batch(
 def void_transaction(
     transaction_number: str,
     body: VoidTransactionRequest,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     use_case: Annotated[VoidTransaction, Depends(get_void_transaction)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> VoidOperationResponse | JSONResponse:
@@ -433,7 +433,7 @@ def void_transaction(
 )
 def get_void_operation_status(
     transaction_number: str,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_operable_session)],
     use_case: Annotated[GetVoidOperation, Depends(get_void_operation)],
 ) -> VoidOperationResponse | JSONResponse:
     try:

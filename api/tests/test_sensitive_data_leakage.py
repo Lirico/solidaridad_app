@@ -69,6 +69,7 @@ def test_operational_responses_do_not_echo_a_synthetic_pan() -> None:
         create_router(),
         settings=Settings(),
         recovery_worker=worker,
+        reencrypt_cards=lambda: None,
     )
 
     with TestClient(app) as client:

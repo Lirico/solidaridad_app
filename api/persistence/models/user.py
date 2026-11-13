@@ -20,6 +20,10 @@ class User(Base):
         default=False,
         server_default="false",
     )
+    sessions_revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

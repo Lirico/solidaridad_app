@@ -155,7 +155,16 @@ class AuthCubit extends Cubit<AuthState> {
     }
 
     if (response.isSuccess) {
-      final updated = (_session ?? baseline)?.copyWith(
+      final current = _session ?? baseline;
+      final replacement = response.user?.token;
+      final updated = current?.copyWith(
+        user: replacement == null || replacement.isEmpty
+            ? current.user
+            : User(
+                name: current.user.name,
+                email: current.user.email,
+                token: replacement,
+              ),
         mustChangePassword: false,
       );
       if (updated != null) {
@@ -320,8 +329,9 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> logout() async {
+    final token = _session?.user.token;
+    await _authRepository.logout(token: token);
     await _forget(const AuthInitial());
-    await _authRepository.logout();
   }
 
   /// Limpia un error de formulario. Si la sesión sigue guardada, la vuelve a

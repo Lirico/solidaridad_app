@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
+from application.auth.logout_user import LogoutUser
 from application.auth.token_service import TokenService
 from application.payments.check_balance import CheckBalance
 from application.payments.close_batch import CloseBatch
@@ -33,6 +35,20 @@ from persistence.repositories.user_repository import UserRepository
 from persistence.repositories.void_operation_repository import VoidOperationRepository
 
 _bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _as_utc_seconds(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).replace(microsecond=0)
+
+
+def _issued_at(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return _as_utc_seconds(value)
+    if isinstance(value, int | float):
+        return datetime.fromtimestamp(value, UTC).replace(microsecond=0)
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,11 +86,19 @@ def get_login_user(
 
 def get_change_password(
     db: Annotated[Session, Depends(get_db)],
+    tokens: Annotated[TokenService, Depends(get_token_service)],
 ) -> ChangePassword:
     return ChangePassword(
         session=db,
         users=UserRepository(db),
+        tokens=tokens,
     )
+
+
+def get_logout_user(
+    db: Annotated[Session, Depends(get_db)],
+) -> LogoutUser:
+    return LogoutUser(session=db, users=UserRepository(db))
 
 
 def get_payment_gateway(
@@ -217,6 +241,17 @@ def get_current_user(
 
     user = UserRepository(db).get_by_id(user_id)
     if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    issued_at = _issued_at(payload.get("iat"))
+    revoked_at = user.sessions_revoked_at
+    if issued_at is None or (
+        revoked_at is not None and issued_at <= _as_utc_seconds(revoked_at)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado",

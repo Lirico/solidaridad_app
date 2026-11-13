@@ -49,5 +49,10 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class ChangePasswordResponse(BaseModel):
+    message: str
+    token: str
+
+
 class ErrorMessage(BaseModel):
     message: str

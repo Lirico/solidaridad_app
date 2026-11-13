@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from application.auth.change_password import ChangePassword
 from application.auth.login_user import LoginUser
+from application.auth.logout_user import LogoutUser
 from domain.exceptions import (
     InvalidCredentials,
     InvalidCurrentPassword,
@@ -18,9 +19,11 @@ from presentation.dependencies import (
     get_change_password,
     get_current_user,
     get_login_user,
+    get_logout_user,
 )
 from presentation.schemas.auth import (
     ChangePasswordRequest,
+    ChangePasswordResponse,
     LoginRequest,
     LoginTokenResponse,
     MerchantResponse,
@@ -86,7 +89,7 @@ def login(
 @router.post(
     "/change-password",
     status_code=status.HTTP_200_OK,
-    response_model=MessageResponse,
+    response_model=ChangePasswordResponse,
     responses={
         status.HTTP_400_BAD_REQUEST: {
             "description": "Validation error",
@@ -112,10 +115,12 @@ def change_password(
     body: ChangePasswordRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     use_case: Annotated[ChangePassword, Depends(get_change_password)],
-) -> MessageResponse | JSONResponse:
+) -> ChangePasswordResponse | JSONResponse:
     try:
-        use_case.execute(
+        token = use_case.execute(
             user_id=current_user.user_id,
+            email=current_user.email,
+            installation_id=current_user.installation_id,
             current_password=body.current_password,
             new_password=body.new_password,
         )
@@ -130,4 +135,31 @@ def change_password(
             content={"message": str(exc)},
         )
 
-    return MessageResponse(message="Contraseña actualizada correctamente")
+    return ChangePasswordResponse(
+        message="Contraseña actualizada correctamente",
+        token=token,
+    )
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    response_model=MessageResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Missing or invalid token",
+        },
+    },
+)
+def logout(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    use_case: Annotated[LogoutUser, Depends(get_logout_user)],
+) -> MessageResponse | JSONResponse:
+    try:
+        use_case.execute(user_id=current_user.user_id)
+    except InvalidCurrentPassword as exc:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"message": str(exc)},
+        )
+    return MessageResponse(message="Sesión cerrada")

@@ -1,6 +1,7 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Protocol
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
@@ -15,7 +16,10 @@ from application.payments.embedded_recovery_worker import (
     EmbeddedRecoveryWorker,
     RecoveryWorkerHealth,
 )
+from application.payments.recovery_metrics import summarize_recovery_metrics
 from config import Settings, get_settings
+from persistence.repositories.processor_job_repository import ProcessorJobRepository
+from persistence.repositories.recovery_alert_repository import RecoveryAlertRepository
 from presentation import create_router
 
 logger = logging.getLogger(__name__)
@@ -54,13 +58,30 @@ def _http_exception_message(exc: HTTPException) -> str:
     return str(detail)
 
 
+def load_recovery_metrics() -> dict[str, object]:
+    """Read recovery counters from the application database."""
+    from persistence.database import SessionLocal
+
+    session = SessionLocal()
+    try:
+        return summarize_recovery_metrics(
+            ProcessorJobRepository(session).recovery_state_aggregates(),
+            open_alerts=RecoveryAlertRepository(session).count_open(),
+            now=datetime.now(UTC),
+        )
+    finally:
+        session.close()
+
+
 def create_app(
     router: APIRouter,
     *,
     settings: Settings | None = None,
     recovery_worker: ManagedRecoveryWorker | None = None,
+    recovery_metrics: Callable[[], dict[str, object]] | None = None,
 ) -> FastAPI:
     runtime_settings = settings or get_settings()
+    read_metrics = recovery_metrics or load_recovery_metrics
     worker = recovery_worker or EmbeddedRecoveryWorker(
         run_iteration=create_embedded_recovery_iteration(settings=runtime_settings),
         enabled=runtime_settings.embedded_recovery_worker_enabled,
@@ -123,6 +144,18 @@ def create_app(
             ),
             content=body,
         )
+
+    @app.get("/health/recovery")
+    def recovery_metrics_endpoint() -> JSONResponse:
+        try:
+            body = read_metrics()
+        except Exception:
+            logger.warning("recovery_metrics_unavailable")
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"message": "No se pudieron leer las métricas de recuperación"},
+            )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=body)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(

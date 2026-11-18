@@ -7,11 +7,13 @@ import '../../data/merchant_store.dart';
 import '../../data/session_store.dart';
 import '../../domain/access_token.dart';
 import '../../domain/auth_model.dart';
+import '../../../sales/data/product_catalog_store.dart';
 import 'auth_state.dart';
 
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository _authRepository;
   final MerchantStore _merchantStore;
+  final ProductCatalogStore? _productCatalogStore;
   final SessionStore _sessionStore;
   final Duration _merchantRefreshInterval;
   final Duration _merchantRetryDelay;
@@ -28,6 +30,7 @@ class AuthCubit extends Cubit<AuthState> {
   AuthCubit({
     required this._authRepository,
     MerchantStore? merchantStore,
+    this._productCatalogStore,
     SessionStore? sessionStore,
     this._merchantRefreshInterval = const Duration(minutes: 15),
     this._merchantRetryDelay = const Duration(seconds: 1),
@@ -65,6 +68,7 @@ class AuthCubit extends Cubit<AuthState> {
             AccessTokenStatus.valid) {
       if (saved != null) await _clearStoredSession();
       _session = null;
+      _productCatalogStore?.stop(clear: true);
       _merchantStore.clear();
       if (!isClosed) emit(const AuthInitial());
       return;
@@ -74,6 +78,7 @@ class AuthCubit extends Cubit<AuthState> {
     if (isClosed) return;
     emit(_successFrom(saved));
     _startMerchantRefresh(saved.user);
+    _startProductCatalog(saved.user);
   }
 
   Future<void> login({
@@ -99,6 +104,7 @@ class AuthCubit extends Cubit<AuthState> {
       if (isClosed) return;
       emit(_successFrom(session, message: response.message));
       _startMerchantRefresh(response.user!);
+      _startProductCatalog(response.user!);
     } else {
       emit(AuthError(message: response.message));
     }
@@ -121,6 +127,7 @@ class AuthCubit extends Cubit<AuthState> {
 
     if (response.isSuccess && response.user != null) {
       emit(AuthSuccess(user: response.user!, message: response.message));
+      _startProductCatalog(response.user!);
     } else {
       emit(AuthError(message: response.message));
     }
@@ -180,6 +187,29 @@ class AuthCubit extends Cubit<AuthState> {
     final generation = ++_merchantRefreshGeneration;
     _activeMerchantToken = user.token;
     _scheduleNextMerchantRefresh(user.token, generation);
+  }
+
+  void _startProductCatalog(User user) {
+    final store = _productCatalogStore;
+    if (store == null) return;
+    unawaited(
+      store.start(
+        token: user.token,
+        onSessionExpired: () async {
+          final current = state;
+          if (isClosed ||
+              current is! AuthSuccess ||
+              current.user?.token != user.token) {
+            return;
+          }
+          await _forget(
+            const AuthSessionExpired(
+              message: 'Su sesión ha expirado. Vuelva a iniciar sesión.',
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _scheduleNextMerchantRefresh(String token, int generation) {
@@ -301,6 +331,7 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> _dropMemoryAndStorage() async {
     _session = null;
+    _productCatalogStore?.stop(clear: true);
     _stopMerchantRefresh(clearMerchant: true);
     await _clearStoredSession();
   }
@@ -329,16 +360,19 @@ class AuthCubit extends Cubit<AuthState> {
   void resetState() {
     final session = _session;
     if (session == null) {
+      _productCatalogStore?.stop(clear: true);
       _stopMerchantRefresh(clearMerchant: true);
       emit(const AuthInitial());
       return;
     }
     _merchantStore.replace(session.merchant);
     emit(_successFrom(session));
+    _startProductCatalog(session.user);
   }
 
   @override
   Future<void> close() {
+    _productCatalogStore?.stop(clear: true);
     _stopMerchantRefresh(clearMerchant: true);
     return super.close();
   }

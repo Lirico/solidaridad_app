@@ -13,8 +13,8 @@ import 'package:solidaridad_app/features/balance/domain/balance_model.dart';
 import 'package:solidaridad_app/features/balance/presentation/cubit/balance_cubit.dart';
 import 'package:solidaridad_app/features/balance/presentation/cubit/balance_state.dart';
 import 'package:solidaridad_app/features/balance/presentation/screens/balance_status_screen.dart';
+import 'package:solidaridad_app/features/sales/data/product_catalog_store.dart';
 import 'package:solidaridad_app/features/sales/data/receipt_printer.dart';
-import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
 import 'package:solidaridad_app/features/sales/domain/receipt_defaults.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 
@@ -22,7 +22,7 @@ class _Client extends Fake implements http.Client {}
 
 class _ReceiptPrinter extends Mock implements ReceiptPrinter {}
 
-class _SalesRepository extends Mock implements SalesRepository {}
+class _ProductCatalogStore extends Mock implements ProductCatalogStore {}
 
 const Merchant _merchant = Merchant(
   code: '014114',
@@ -81,9 +81,9 @@ void main() {
     tester,
   ) async {
     final printer = _ReceiptPrinter();
-    final productsRepository = _SalesRepository();
+    final productCatalogStore = _ProductCatalogStore();
     when(
-      () => productsRepository.fetchProducts(token: 'tok'),
+      () => productCatalogStore.getOrLoad(token: 'tok'),
     ).thenAnswer((_) async => _products);
     when(
       () => printer.printBalanceTicket(
@@ -123,7 +123,7 @@ void main() {
         child: MaterialApp(
           home: BalanceStatusScreen(
             printer: printer,
-            productsRepository: productsRepository,
+            productCatalogStore: productCatalogStore,
           ),
         ),
       ),
@@ -153,12 +153,12 @@ void main() {
     expect(balances.single.product.label, 'Garrafa 10 kg');
     expect(balances.single.quantity, closeTo(10.1, 0.001));
     expect(balances.single.unitLabel, 'unidades');
-    verify(() => productsRepository.fetchProducts(token: 'tok')).called(1);
+    verify(() => productCatalogStore.getOrLoad(token: 'tok')).called(1);
   });
 
   testWidgets('una consulta rechazada no imprime', (tester) async {
     final printer = _ReceiptPrinter();
-    final productsRepository = _SalesRepository();
+    final productCatalogStore = _ProductCatalogStore();
     final cubit = _SeededBalanceCubit(
       const BalanceCompleted(
         cardNumber: '6063007014007403',
@@ -182,7 +182,7 @@ void main() {
         child: MaterialApp(
           home: BalanceStatusScreen(
             printer: printer,
-            productsRepository: productsRepository,
+            productCatalogStore: productCatalogStore,
           ),
         ),
       ),
@@ -200,15 +200,15 @@ void main() {
       ),
     );
     verifyNever(
-      () => productsRepository.fetchProducts(token: any(named: 'token')),
+      () => productCatalogStore.getOrLoad(token: any(named: 'token')),
     );
   });
 
   testWidgets('sin comercio muestra error y no imprime', (tester) async {
     final printer = _ReceiptPrinter();
-    final productsRepository = _SalesRepository();
+    final productCatalogStore = _ProductCatalogStore();
     when(
-      () => productsRepository.fetchProducts(token: 'tok'),
+      () => productCatalogStore.getOrLoad(token: 'tok'),
     ).thenAnswer((_) async => _products);
     final cubit = _SeededBalanceCubit(
       const BalanceCompleted(
@@ -231,7 +231,7 @@ void main() {
         child: MaterialApp(
           home: BalanceStatusScreen(
             printer: printer,
-            productsRepository: productsRepository,
+            productCatalogStore: productCatalogStore,
           ),
         ),
       ),
@@ -252,6 +252,6 @@ void main() {
         balances: any(named: 'balances'),
       ),
     );
-    verify(() => productsRepository.fetchProducts(token: 'tok')).called(1);
+    verify(() => productCatalogStore.getOrLoad(token: 'tok')).called(1);
   });
 }

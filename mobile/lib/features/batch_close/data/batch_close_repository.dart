@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/api_config.dart';
+import '../../sales/data/product_catalog_store.dart';
+import '../../sales/data/sales_repository.dart';
 import '../../sales/domain/sale_model.dart';
 
 /// Resultado de la carga de operaciones para el resumen del lote.
@@ -70,10 +72,14 @@ class BatchCloseRepository {
 
   final http.Client _httpClient;
   final String _baseUrl;
+  final ProductCatalogStore _productCatalogStore;
 
-  BatchCloseRepository({http.Client? httpClient, String? baseUrl})
-    : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+  BatchCloseRepository({
+    required this._productCatalogStore,
+    http.Client? httpClient,
+    String? baseUrl,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   /// Carga las operaciones de la ventana del lote.
   ///
@@ -90,40 +96,11 @@ class BatchCloseRepository {
     bool isPartial = false;
 
     try {
+      final products = await _productCatalogStore.getOrLoad(token: token);
       final Map<String, String> headers = <String, String>{
         HttpHeaders.contentTypeHeader: 'application/json',
         HttpHeaders.authorizationHeader: 'Bearer $token',
       };
-      final productsResponse = await _httpClient
-          .get(Uri.parse('$_baseUrl/products'), headers: headers)
-          .timeout(_timeout);
-      if (productsResponse.statusCode == 401) {
-        return const BatchCloseLoadResult(
-          operations: <OperationModel>[],
-          sessionExpired: true,
-        );
-      }
-      if (productsResponse.statusCode != 200) {
-        return BatchCloseLoadResult(
-          operations: const <OperationModel>[],
-          connectionError: true,
-          errorMessage:
-              'No se pudo obtener el catálogo de productos '
-              '(HTTP ${productsResponse.statusCode}).',
-        );
-      }
-      final List<ProductInfo> products =
-          (jsonDecode(productsResponse.body) as List<dynamic>)
-              .map((item) => ProductInfo.fromJson(item as Map<String, dynamic>))
-              .toList();
-      if (products.isEmpty) {
-        return const BatchCloseLoadResult(
-          operations: <OperationModel>[],
-          connectionError: true,
-          errorMessage: 'El catálogo de productos está vacío. Reintente.',
-        );
-      }
-
       for (int page = 0; page < maxPages; page++) {
         final response = await _httpClient
             .get(
@@ -183,6 +160,17 @@ class BatchCloseRepository {
         operations: collected,
         products: products,
         isPartial: isPartial,
+      );
+    } on SessionExpiredException {
+      return const BatchCloseLoadResult(
+        operations: <OperationModel>[],
+        sessionExpired: true,
+      );
+    } on DataLoadException catch (error) {
+      return BatchCloseLoadResult(
+        operations: const <OperationModel>[],
+        connectionError: true,
+        errorMessage: error.message,
       );
     } on TimeoutException {
       return const BatchCloseLoadResult(

@@ -10,6 +10,7 @@ import '../../../../core/widgets/load_error_notice.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
+import '../../data/product_catalog_store.dart';
 import '../../data/sales_repository.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
@@ -42,13 +43,12 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
     return null;
   }
 
-  String get _quantityUnit => _selectedProduct?.unit.plural ?? 'unidades';
+  String get _quantityUnit => _selectedProduct?.unit.plural ?? '';
 
   bool get _canContinue =>
       !_loadingProducts && _productsError == null && _products.isNotEmpty;
 
-  bool get _allowsDecimals =>
-      _selectedProduct?.unit.allowsDecimals ?? _selectedProductCode == 'GRANEL';
+  bool get _allowsDecimals => _selectedProduct?.unit.allowsDecimals ?? false;
 
   @override
   void initState() {
@@ -59,7 +59,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
   Future<void> _loadProducts() async {
     final authState = context.read<AuthCubit>().state;
     final token = authState is AuthSuccess ? authState.user!.token : '';
-    final repo = context.read<SalesCubit>().salesRepository;
+    final store = context.read<ProductCatalogStore>();
     if (_productsError != null || !_loadingProducts) {
       setState(() {
         _loadingProducts = true;
@@ -67,7 +67,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
       });
     }
     try {
-      final products = await repo.fetchProducts(token: token);
+      final products = await store.getOrLoad(token: token);
       if (!mounted) return;
       setState(() {
         _products = products;

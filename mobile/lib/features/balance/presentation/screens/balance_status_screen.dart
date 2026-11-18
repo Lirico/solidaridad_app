@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
+import '../../../sales/data/product_catalog_store.dart';
 import '../../../sales/data/receipt_printer.dart';
 import '../../../sales/data/sales_repository.dart';
 import '../../../sales/domain/receipt_defaults.dart';
@@ -21,9 +22,13 @@ import '../widgets/balance_status_content.dart';
 
 class BalanceStatusScreen extends StatefulWidget {
   final ReceiptPrinter? printer;
-  final SalesRepository? productsRepository;
+  final ProductCatalogStore? productCatalogStore;
 
-  const BalanceStatusScreen({super.key, this.printer, this.productsRepository});
+  const BalanceStatusScreen({
+    super.key,
+    this.printer,
+    this.productCatalogStore,
+  });
 
   @override
   State<BalanceStatusScreen> createState() => _BalanceStatusScreenState();
@@ -31,8 +36,6 @@ class BalanceStatusScreen extends StatefulWidget {
 
 class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
   late final ReceiptPrinter _printer = widget.printer ?? ReceiptPrinter();
-  late final SalesRepository _productsRepository =
-      widget.productsRepository ?? SalesRepository();
   PrintStatus _printStatus = PrintStatus.idle;
   String _printMessage = '';
   bool _started = false;
@@ -73,9 +76,10 @@ class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
 
     final List<ProductInfo> products;
     try {
-      products = await _productsRepository.fetchProducts(
-        token: authState.user!.token,
-      );
+      products =
+          await (widget.productCatalogStore ??
+                  context.read<ProductCatalogStore>())
+              .getOrLoad(token: authState.user!.token);
     } on SessionExpiredException {
       if (!mounted) return;
       context.read<AuthCubit>().logout();

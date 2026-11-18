@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:solidaridad_app/features/batch_close/data/batch_close_repository.dart';
+import 'package:solidaridad_app/features/sales/data/product_catalog_store.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 
 import 'helpers/mock_http_client.dart';
@@ -43,23 +44,25 @@ Map<String, dynamic> _page({
   required int total,
 }) => <String, dynamic>{'items': items, 'total': total};
 
-List<Map<String, dynamic>> _products() => <Map<String, dynamic>>[
-  <String, dynamic>{
-    'code': 'GARRAFA_10',
-    'label': 'Garrafa 10 kg',
-    'unit': <String, String>{'singular': 'unidad', 'plural': 'unidades'},
-  },
-  <String, dynamic>{
-    'code': 'TUBO_45',
-    'label': 'Tubo 45 kg',
-    'unit': <String, String>{'singular': 'unidad', 'plural': 'unidades'},
-  },
-  <String, dynamic>{
-    'code': 'GARRAFA_30',
-    'label': 'Garrafa 30 kg',
-    'unit': <String, String>{'singular': 'unidad', 'plural': 'unidades'},
-  },
+const List<ProductInfo> _products = <ProductInfo>[
+  ProductInfo(
+    code: 'GARRAFA_10',
+    label: 'Garrafa 10 kg',
+    unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+  ),
+  ProductInfo(
+    code: 'TUBO_45',
+    label: 'Tubo 45 kg',
+    unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+  ),
+  ProductInfo(
+    code: 'GARRAFA_30',
+    label: 'Garrafa 30 kg',
+    unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+  ),
 ];
+
+class MockProductCatalogStore extends Mock implements ProductCatalogStore {}
 
 /// Stubea `GET /transactions` respondiendo según el `offset` pedido.
 void _stubGet(
@@ -70,15 +73,13 @@ void _stubGet(
     invocation,
   ) async {
     final Uri uri = invocation.positionalArguments.first as Uri;
-    if (uri.path.endsWith('/products')) {
-      return jsonListResponse(_products());
-    }
     return responder(int.parse(uri.queryParameters['offset'] ?? '0'));
   });
 }
 
 void main() {
   late MockHttpClient client;
+  late MockProductCatalogStore productCatalogStore;
   late BatchCloseRepository repository;
 
   setUpAll(() {
@@ -87,7 +88,15 @@ void main() {
 
   setUp(() {
     client = MockHttpClient();
-    repository = BatchCloseRepository(httpClient: client, baseUrl: _baseUrl);
+    productCatalogStore = MockProductCatalogStore();
+    when(
+      () => productCatalogStore.getOrLoad(token: any(named: 'token')),
+    ).thenAnswer((_) async => _products);
+    repository = BatchCloseRepository(
+      productCatalogStore: productCatalogStore,
+      httpClient: client,
+      baseUrl: _baseUrl,
+    );
   });
 
   test('devuelve las operaciones y corta con una sola página', () async {
@@ -115,6 +124,7 @@ void main() {
     expect(result.operations.first.productCode, 'GARRAFA_10');
     expect(result.operations.first.result, PaymentResult.approved);
     expect(result.operations.first.amount, 15);
+    verify(() => productCatalogStore.getOrLoad(token: 'tok')).called(1);
     verify(
       () => client.get(
         Uri.parse('$_baseUrl/transactions?limit=100&offset=0'),
@@ -212,7 +222,7 @@ void main() {
     // La fecha no corta el resumen: el servidor ya delimitó el lote.
     expect(result.operations.length, 200);
     expect(result.isPartial, isFalse);
-    verify(() => client.get(any(), headers: any(named: 'headers'))).called(3);
+    verify(() => client.get(any(), headers: any(named: 'headers'))).called(2);
   });
 
   test(
@@ -246,7 +256,7 @@ void main() {
         101,
         reason: 'no debe haber ventas contadas dos veces',
       );
-      verify(() => client.get(any(), headers: any(named: 'headers'))).called(3);
+      verify(() => client.get(any(), headers: any(named: 'headers'))).called(2);
     },
   );
 
@@ -267,7 +277,7 @@ void main() {
 
     expect(result.operations.length, 1000);
     expect(result.isPartial, isTrue);
-    verify(() => client.get(any(), headers: any(named: 'headers'))).called(11);
+    verify(() => client.get(any(), headers: any(named: 'headers'))).called(10);
   });
 
   test('una lista vacía no genera más pedidos', () async {
@@ -279,7 +289,7 @@ void main() {
 
     expect(result.operations, isEmpty);
     expect(result.isPartial, isFalse);
-    verify(() => client.get(any(), headers: any(named: 'headers'))).called(2);
+    verify(() => client.get(any(), headers: any(named: 'headers'))).called(1);
   });
 
   test('cierra el lote y conserva sus operaciones para imprimirlo', () async {

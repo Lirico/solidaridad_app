@@ -285,7 +285,7 @@ App Flutter (Verifone)
 | Confirmación de venta | No hay pantalla intermedia: una captura válida por banda o ingreso manual inicia el cobro y abre **Procesando Transacción**. Los medios futuros deben conservar el mismo comportamiento. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
-| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |
+| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. Mobile carga el catálogo al iniciar o restaurar una sesión, lo mantiene en un store de sesión con refresco cada 15 minutos y fuerza una carga al primer acceso si todavía no fue inicializado. |
 
 ---
 

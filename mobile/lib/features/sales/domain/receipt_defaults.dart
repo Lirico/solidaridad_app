@@ -66,6 +66,32 @@ class ReceiptDefaults {
     );
   }
 
+  /// Comercio de la cuenta, sin cupón ni autorización.
+  factory ReceiptDefaults.forMerchant({
+    required String merchantCode,
+    required String merchantName,
+    required String merchantAddress,
+    required String merchantCity,
+    required String merchantTaxId,
+  }) {
+    return ReceiptDefaults.forSale(
+      merchantCode: merchantCode,
+      merchantName: merchantName,
+      merchantAddress: merchantAddress,
+      merchantCity: merchantCity,
+      merchantTaxId: merchantTaxId,
+      operation: OperationModel(
+        id: '',
+        productCode: '',
+        productLabel: '',
+        amount: 0,
+        cardNumber: '',
+        result: PaymentResult.approved,
+        date: DateTime.utc(2026),
+      ),
+    );
+  }
+
   static String printedAddress(String address, String city) {
     final street = address.trim();
     final locality = city.trim();

@@ -46,11 +46,13 @@ class BatchCloseCloseFailed extends BatchCloseState {
 }
 
 class BatchCloseClosed extends BatchCloseState {
-  final int? batchCloseId;
+  final int batchCloseId;
+  final DateTime closedAt;
   final List<OperationModel> operations;
 
   const BatchCloseClosed({
     required this.batchCloseId,
+    required this.closedAt,
     required this.operations,
   });
 }

@@ -324,10 +324,11 @@ void main() {
   });
 
   test('cierra el lote y conserva sus operaciones para imprimirlo', () async {
+    final DateTime closedAt = DateTime.utc(2026, 11, 12, 21, 15, 30);
     when(() => client.post(any(), headers: any(named: 'headers'))).thenAnswer(
       (_) async => jsonMapResponse(<String, dynamic>{
         'batch_close_id': 42,
-        'closed_at': _today.toIso8601String(),
+        'closed_at': closedAt.toIso8601String(),
         'items': [_item(amount: 3)],
         'total': 1,
       }, statusCode: 201),
@@ -340,6 +341,7 @@ void main() {
 
     expect(result.connectionError, isFalse);
     expect(result.batchCloseId, 42);
+    expect(result.closedAt, closedAt.toLocal());
     expect(result.operations.single.amount, 3);
     verify(
       () => client.post(
@@ -347,6 +349,29 @@ void main() {
         headers: any(named: 'headers'),
       ),
     ).called(1);
+  });
+
+  test('rechaza un cierre exitoso sin closed_at válido', () async {
+    when(() => client.post(any(), headers: any(named: 'headers'))).thenAnswer(
+      (_) async => jsonMapResponse(<String, dynamic>{
+        'batch_close_id': 42,
+        'closed_at': 'fecha-inválida',
+        'items': [_item()],
+        'total': 1,
+      }, statusCode: 201),
+    );
+
+    final BatchCloseSubmitResult result = await repository.closeCurrentBatch(
+      token: 'tok',
+      idempotencyKey: 'close-1',
+    );
+
+    expect(result.connectionError, isTrue);
+    expect(result.closedAt, isNull);
+    expect(
+      result.errorMessage,
+      'Respuesta inesperada del servidor. Reintente.',
+    );
   });
 
   test(

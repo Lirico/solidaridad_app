@@ -126,7 +126,7 @@ las pantallas interactivas incluyen:
   terminal, no un cierre financiero contra el procesador. `GET
   /v1/transactions` muestra exclusivamente el lote vigente; `POST
   /v1/transactions/batch-close` asocia de forma atómica sus operaciones al corte
-  persistido y devuelve el listado que integrará la impresión futura. Después del
+  persistido y devuelve el listado que integra el ticket impreso. Después del
   corte esas operaciones ya no aparecen en el historial actual ni se pueden
   anular desde la terminal. El botón pide confirmación y rechaza el cierre si hay
   pagos o anulaciones en recuperación (`PENDING` / `UNDER_REVIEW`), para no
@@ -135,7 +135,12 @@ las pantallas interactivas incluyen:
   unidades y `m3` requiere una conversión de negocio no definida.
   `GET /v1/products` es la fuente de verdad del código, etiqueta, orden y
   unidad; saldo y cierre rechazan un código que no exista en ese catálogo. El
-  ticket de cierre queda pendiente (ver `docs/gaps.md`, G-P2-10).
+  ticket agrupa ventas brutas y anulaciones por producto; como la API representa
+  una anulación cambiando la venta original a `VOIDED`, esa operación suma en
+  ventas y también resta en anulaciones. La fecha y hora impresas son el
+  `closed_at` persistido por la API, por lo que no cambian al reintentar la
+  impresión. Los totales generales suman sólo cantidades de operaciones, no las
+  magnitudes incompatibles de productos distintos (ver `docs/gaps.md`, G-P2-10).
 
 Excepciones: la pantalla de presentación (splash), la pantalla "Iniciando"
 (spinner) y **Login/Registro** no llevan la barra inferior (en auth no hay

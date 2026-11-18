@@ -213,4 +213,19 @@ void main() {
     expect(html, isNot(contains('ORIGINAL COMERCIO')));
     expect(html, isNot(contains('Gas Austral')));
   });
+
+  test('el cierre de lote imprime una sola copia del HTML recibido', () async {
+    when(
+      () => bridge.getStatus(),
+    ).thenAnswer((_) async => <String, dynamic>{'sdiReady': true});
+    when(
+      () => bridge.printHtml(any()),
+    ).thenAnswer((_) async => <String, dynamic>{'ok': true});
+
+    const html = '<html><body>CIERRE DE LOTE</body></html>';
+    final result = await printer.printBatchClose(html);
+
+    expect(result.ok, isTrue);
+    verify(() => bridge.printHtml(html)).called(1);
+  });
 }

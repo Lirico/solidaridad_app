@@ -91,10 +91,23 @@ class BatchCloseCubit extends Cubit<BatchCloseState> {
       );
       return;
     }
+    final int? batchCloseId = result.batchCloseId;
+    final DateTime? closedAt = result.closedAt;
+    if (batchCloseId == null || closedAt == null) {
+      emit(
+        BatchCloseCloseFailed(
+          summary: summary,
+          message: 'La respuesta del cierre no incluyó su fecha y hora.',
+        ),
+      );
+      return;
+    }
     emit(
       BatchCloseClosed(
-        batchCloseId: result.batchCloseId,
+        batchCloseId: batchCloseId,
+        closedAt: closedAt,
         operations: result.operations,
+        products: summary.catalog,
       ),
     );
   }

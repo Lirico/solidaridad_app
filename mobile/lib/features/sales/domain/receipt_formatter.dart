@@ -1,5 +1,6 @@
 import '../../../core/formatters/amount_formatter.dart';
 import '../../../core/formatters/quantity_formatter.dart';
+import '../../batch_close/domain/batch_close_model.dart';
 import 'receipt_defaults.dart';
 import 'sale_model.dart';
 
@@ -309,6 +310,128 @@ class ReceiptFormatter {
 $body</body>
 </html>
 ''';
+  }
+
+  /// Ticket de un corte cerrado. Un solo comprobante, sin firma.
+  static String batchCloseToHtml({
+    required DateTime date,
+    required ReceiptDefaults defaults,
+    required String batchNumber,
+    required BatchCloseTicket ticket,
+  }) {
+    final StringBuffer products = StringBuffer();
+    for (final BatchCloseProductSlip product in ticket.products) {
+      products
+        ..write('<div class="band">${_esc(product.label.toUpperCase())}</div>')
+        ..write('<div class="rows">')
+        ..write(
+          _batchProductRow(
+            'VENTAS',
+            product.salesCount,
+            product.salesQuantity,
+            product.unitLabel(product.salesQuantity),
+          ),
+        )
+        ..write(_batchProductRow('N. CREDITO', 0, 0, product.unitLabel(0)))
+        ..write(
+          _batchProductRow(
+            'ANULACIONES',
+            product.voidCount,
+            product.voidQuantity,
+            product.unitLabel(product.voidQuantity),
+          ),
+        )
+        ..write(
+          _batchProductRow(
+            'TOTAL',
+            product.totalCount,
+            product.totalQuantity,
+            product.unitLabel(product.totalQuantity),
+            emphasize: true,
+          ),
+        )
+        ..write('</div>');
+    }
+
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  * { font: 18px monospace, monospace; }
+  body { margin: 0; padding: 8px; width: 100%; }
+  .c { text-align: center; }
+  .b { font-weight: bold; }
+  .big { font-size: 22px; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; padding: 2px 0; width: 33%; }
+  .l { text-align: left; }
+  .r { text-align: right; }
+  .merchant { margin-top: 22px; }
+  .detail { text-align: left; padding-top: 28px; }
+  .status { margin-top: 32px; margin-bottom: 44px; }
+  .firma { text-align: left; white-space: nowrap; }
+  hr { border: none; border-top: 1px dashed #000; margin: 22px 0 8px; }
+  .band { margin-top: 22px; padding: 6px 8px; background: #000; color: #fff; text-align: center; font-weight: bold; }
+  .rows { text-align: left; padding-top: 8px; }
+  .issuer { text-align: left; font-weight: bold; padding-bottom: 28px; }
+  .ok { text-align: center; font-weight: bold; margin-top: 32px; }
+</style>
+</head>
+<body>
+  <table>
+    <tr>
+      <td class="l">${_esc(_formatDate(date))}</td>
+      <td class="c b">${_esc(defaults.issuerName)}<br/><span>CIERRE DE LOTE</span></td>
+      <td class="r">${_esc(_formatTime(date))}</td>
+    </tr>
+  </table>
+  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
+  <div class="c">${_esc(defaults.establishmentAddress)}</div>
+  <div class="c">${_esc(defaults.establishmentCuit)}</div>
+  <div class="detail">
+    ${_line('Terminal', terminalId)}
+    ${_line('Comercio', defaults.establishmentCode)}
+    ${_line('Lote', batchNumber)}
+  </div>
+  $products
+  <hr/>
+  <div class="issuer">TOTALES POR EMISOR</div>
+  <div class="rows">
+    ${_batchCountRow('VENTAS', ticket.salesCount)}
+    ${_batchCountRow('N. CREDITO', 0)}
+    ${_batchCountRow('ANULACIONES', ticket.voidCount)}
+    ${_batchCountRow('TOTAL', ticket.totalCount, emphasize: true)}
+  </div>
+  <div class="ok">Cierre de lote OK</div>
+  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+</body>
+</html>
+''';
+  }
+
+  static String _batchProductRow(
+    String label,
+    int count,
+    double quantity,
+    String unit, {
+    bool emphasize = false,
+  }) {
+    final String css = emphasize ? ' class="b"' : '';
+    final String countText = count.toString().padLeft(3, '0');
+    final String amount = '${formatQuantityEsExact(quantity)} $unit';
+    return '<div$css>${_esc(label)} $countText - ${_esc(amount)}</div>';
+  }
+
+  static String _batchCountRow(
+    String label,
+    int count, {
+    bool emphasize = false,
+  }) {
+    final String css = emphasize ? ' class="b"' : '';
+    final String countText = count.toString().padLeft(3, '0');
+    return '<div$css>${_esc(label)} $countText</div>';
   }
 
   static String _line(String label, String value, {bool emphasize = false}) {

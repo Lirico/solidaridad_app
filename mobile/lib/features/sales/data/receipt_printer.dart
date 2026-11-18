@@ -89,7 +89,7 @@ class ReceiptPrinter {
           );
         }
 
-        return await _printHtml(ReceiptFormatter.toHtml(operation, defaults));
+        return _printHtml(ReceiptFormatter.toHtml(operation, defaults));
       },
       initAttempts: initAttempts,
       initRetryDelay: initRetryDelay,
@@ -120,6 +120,21 @@ class ReceiptPrinter {
           ),
         );
       },
+      initAttempts: initAttempts,
+      initRetryDelay: initRetryDelay,
+      readyTimeoutSec: readyTimeoutSec,
+    );
+  }
+
+  /// Imprime un solo ticket de cierre de lote.
+  Future<PrintResult> printBatchClose(
+    String html, {
+    int initAttempts = 3,
+    Duration initRetryDelay = const Duration(milliseconds: 400),
+    int readyTimeoutSec = 8,
+  }) {
+    return _printWhenReady(
+      () => _printHtml(html),
       initAttempts: initAttempts,
       initRetryDelay: initRetryDelay,
       readyTimeoutSec: readyTimeoutSec,

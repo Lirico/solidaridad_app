@@ -381,6 +381,7 @@ class SalesRepository {
         pendingReason = null;
     }
 
+    final receipt = SaleReceipt.fromJson(data['receipt']);
     return SaleResponse(
       isApproved: authorizationStatus == SaleAuthorizationStatus.approved,
       operationNumber: data['transaction_number'] as String? ?? '',
@@ -393,6 +394,8 @@ class SalesRepository {
       pendingReason: pendingReason,
       pollAfterSeconds: data['poll_after_seconds'] as int?,
       mayStartNewSale: data['may_start_new_sale'] as bool? ?? true,
+      couponNumber: receipt.couponNumber,
+      authorizationCode: receipt.authorizationCode,
     );
   }
 }

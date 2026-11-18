@@ -70,9 +70,13 @@ La distinción 503 / 502 es parte del contrato: la API traduce 503 a `FAILED`
 
 ## Transportes
 
+`ISO_TRANSPORT` debe elegirse explícitamente. Si falta, está vacío o contiene
+un valor desconocido, el gateway no arranca. `mock` queda restringido al
+ambiente `local`; los demás ambientes deben usar `tcp`.
+
 | `ISO_TRANSPORT` | Comportamiento |
 |-----------------|----------------|
-| `mock` (default) | Sin red. Decline si PAN = `4000000000000002` |
+| `mock` | Sin red. Decline si PAN = `4000000000000002`; solo con `APP_ENV=local` |
 | `tcp` | Pack ISO + TCP a `ISO_HOST:ISO_PORT` |
 
 ## Capas

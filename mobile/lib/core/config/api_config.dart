@@ -1,36 +1,118 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 
-/// Configuration for the API connection.
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
+
+/// Resultado de elegir la URL de la API.
 ///
-/// The base URL can be overridden at build time via `--dart-define=API_BASE_URL=...`.
-/// Detection logic (only applies when no `--dart-define` is set):
-/// - **Web**: uses `localhost`
-/// - **Android emulator**: uses `10.0.2.2` (Android host loopback)
-/// - **Android real device / iOS**: uses `localhost`
+/// [baseUrl] está presente cuando la app puede llamar a la red.
+/// [error] está presente cuando un release no tiene una URL `https`.
+class ApiConfigResolution {
+  const ApiConfigResolution._({this.baseUrl, this.error});
+
+  final String? baseUrl;
+  final String? error;
+
+  bool get isOk => error == null && baseUrl != null;
+}
+
+/// Configuración de la conexión con la API.
 ///
-/// For a real device on the same WiFi network, you MUST pass
-/// `--dart-define=API_BASE_URL=http://<YOUR_PC_IP>:8000/v1` at build time.
+/// La URL se pasa en el build con `--dart-define=API_BASE_URL=...`.
+///
+/// Sin ese define:
+/// - **Release:** no hay default. La app no llama a la red.
+/// - **Debug y profile:** web y escritorio usan `localhost`; Android usa
+///   `10.0.2.2`, que es el loopback del emulador.
+///
+/// Un release además exige que la URL empiece con `https://`.
 class ApiConfig {
   ApiConfig._();
 
-  static String get baseUrl {
+  static const String labAndroidBaseUrl = 'http://10.0.2.2:8000/v1';
+  static const String labLocalBaseUrl = 'http://localhost:8000/v1';
+
+  static const String releaseMissingUrlError =
+      'Este APK de release no tiene servidor. '
+      'Recompilá con --dart-define=API_BASE_URL=https://<servidor>/v1';
+
+  static const String releaseHttpError =
+      'Este APK de release no puede usar HTTP. '
+      'Recompilá con --dart-define=API_BASE_URL=https://<servidor>/v1';
+
+  static const String releaseInvalidUrlError =
+      'Este APK de release no tiene una URL HTTPS válida. '
+      'Recompilá con --dart-define=API_BASE_URL=https://<servidor>/v1';
+
+  static ApiConfigResolution resolve({
+    required String fromDefine,
+    required bool releaseMode,
+    required bool isWeb,
+    required bool isAndroid,
+  }) {
+    final configured = fromDefine.trim();
+    if (releaseMode) {
+      if (configured.isEmpty) {
+        return const ApiConfigResolution._(error: releaseMissingUrlError);
+      }
+      final uri = Uri.tryParse(configured);
+      if (uri == null) {
+        return const ApiConfigResolution._(error: releaseInvalidUrlError);
+      }
+      if (uri.scheme.toLowerCase() != 'https') {
+        return const ApiConfigResolution._(error: releaseHttpError);
+      }
+      if (!uri.hasAuthority ||
+          uri.host.isEmpty ||
+          uri.userInfo.isNotEmpty ||
+          uri.hasQuery ||
+          uri.hasFragment) {
+        return const ApiConfigResolution._(error: releaseInvalidUrlError);
+      }
+      return ApiConfigResolution._(baseUrl: _withoutTrailingSlash(configured));
+    }
+
+    if (configured.isNotEmpty) {
+      return ApiConfigResolution._(baseUrl: configured);
+    }
+    if (isWeb) {
+      return const ApiConfigResolution._(baseUrl: labLocalBaseUrl);
+    }
+    if (isAndroid) {
+      return const ApiConfigResolution._(baseUrl: labAndroidBaseUrl);
+    }
+    return const ApiConfigResolution._(baseUrl: labLocalBaseUrl);
+  }
+
+  static ApiConfigResolution get resolution {
     const fromDefine = String.fromEnvironment('API_BASE_URL');
-    if (fromDefine.isNotEmpty) {
-      return fromDefine;
-    }
-
     if (kIsWeb) {
-      return 'http://localhost:8000/v1';
+      return resolve(
+        fromDefine: fromDefine,
+        releaseMode: kReleaseMode,
+        isWeb: true,
+        isAndroid: false,
+      );
     }
+    return resolve(
+      fromDefine: fromDefine,
+      releaseMode: kReleaseMode,
+      isWeb: false,
+      isAndroid: Platform.isAndroid,
+    );
+  }
 
-    // Android / iOS / others
-    if (Platform.isAndroid) {
-      // 10.0.2.2 is the Android emulator's alias for the host machine
-      return 'http://10.0.2.2:8000/v1';
+  /// URL lista para llamar. Falla si el release no está configurado:
+  /// en ese caso hay que usar [resolution] y no abrir la red.
+  static String get baseUrl {
+    final decision = resolution;
+    final url = decision.baseUrl;
+    if (url == null) {
+      throw StateError(decision.error ?? releaseMissingUrlError);
     }
+    return url;
+  }
 
-    // iOS simulator / others
-    return 'http://localhost:8000/v1';
+  static String _withoutTrailingSlash(String url) {
+    return url.replaceFirst(RegExp(r'/+$'), '');
   }
 }

@@ -59,7 +59,8 @@ class SaleDetailTicket extends StatelessWidget {
     final rows = <String>[
       'Cód. establecimiento: ${defaults.establishmentCode}',
       'Cupón: ${defaults.couponNumber}',
-      'Lote: ${defaults.batchNumber}',
+      if (defaults.batchNumber.trim().isNotEmpty)
+        'Lote: ${defaults.batchNumber}',
       'Terminal: ${ReceiptFormatter.terminalId}',
       'Tarjeta: ${ReceiptFormatter.maskPan(operation.cardNumber)}',
       'Autorización: ${defaults.authorizationCode}',
@@ -69,7 +70,8 @@ class SaleDetailTicket extends StatelessWidget {
       'Moneda: ${defaults.currency}',
       'Cuotas: ${defaults.installments}',
       'Plan: ${defaults.installmentPlan}',
-      if (operation.result == PaymentResult.voided)
+      if (operation.result == PaymentResult.voided &&
+          defaults.originalChargeNumber.trim().isNotEmpty)
         'Cargo original: ${defaults.originalChargeNumber}',
       if (operation.result != PaymentResult.declined &&
           operation.userMessage != null &&
@@ -161,11 +163,7 @@ class SaleDetailTicket extends StatelessWidget {
             children: [
               const Text('Firma: '),
               Expanded(
-                child: Text(
-                  '.' * 80,
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
-                ),
+                child: Text('.' * 80, maxLines: 1, overflow: TextOverflow.clip),
               ),
             ],
           ),

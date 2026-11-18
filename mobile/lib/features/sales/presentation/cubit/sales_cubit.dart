@@ -401,6 +401,8 @@ class SalesCubit extends Cubit<SalesState> {
             ? response.errorCode
             : null,
         responseCode: response.responseCode,
+        couponNumber: response.couponNumber,
+        authorizationCode: response.authorizationCode,
       ),
     );
   }
@@ -429,6 +431,8 @@ class SalesCubit extends Cubit<SalesState> {
       date: _now(),
       userMessage: response.message,
       responseCode: response.responseCode,
+      couponNumber: response.couponNumber,
+      authorizationCode: response.authorizationCode,
     );
   }
 
@@ -534,6 +538,8 @@ class SalesCubit extends Cubit<SalesState> {
           date: op.date,
           userMessage: result.message,
           responseCode: op.responseCode,
+          couponNumber: op.couponNumber,
+          authorizationCode: op.authorizationCode,
         );
       }
       return op;
@@ -547,5 +553,4 @@ class SalesCubit extends Cubit<SalesState> {
   void appendHistory(List<OperationModel> items) {
     emit(SalesInitialWithHistory(history: [...state.history, ...items]));
   }
-
 }

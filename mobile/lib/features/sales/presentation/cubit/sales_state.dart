@@ -124,6 +124,8 @@ class SalesCompleted extends SalesState {
   final String? errorMessage;
   final String? errorCode;
   final String? responseCode;
+  final String? couponNumber;
+  final String? authorizationCode;
 
   const SalesCompleted({
     required super.productCode,
@@ -139,6 +141,8 @@ class SalesCompleted extends SalesState {
     this.errorMessage,
     this.errorCode,
     this.responseCode,
+    this.couponNumber,
+    this.authorizationCode,
   });
 
   bool get isSuccess => result == PaymentResult.approved;

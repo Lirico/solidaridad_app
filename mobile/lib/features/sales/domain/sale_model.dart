@@ -33,6 +33,8 @@ class OperationModel {
   final DateTime date;
   final String? userMessage;
   final String? responseCode;
+  final String? couponNumber;
+  final String? authorizationCode;
 
   const OperationModel({
     required this.id,
@@ -44,6 +46,8 @@ class OperationModel {
     required this.date,
     this.userMessage,
     this.responseCode,
+    this.couponNumber,
+    this.authorizationCode,
     SaleAuthorizationStatus? authorizationStatus,
     this.pendingReason,
     this.pollAfterSeconds,
@@ -64,6 +68,7 @@ class OperationModel {
 
   factory OperationModel.fromJson(Map<String, dynamic> json) {
     final code = json['product'] as String? ?? '';
+    final receipt = SaleReceipt.fromJson(json['receipt']);
     return OperationModel(
       id: json['transaction_number'] as String? ?? '',
       productCode: code,
@@ -83,6 +88,8 @@ class OperationModel {
 
       userMessage: json['user_message'] as String?,
       responseCode: json['response_code'] as String?,
+      couponNumber: receipt.couponNumber,
+      authorizationCode: receipt.authorizationCode,
       pendingReason: _parsePendingReason(json['reason'] as String?),
       pollAfterSeconds: json['poll_after_seconds'] as int?,
       mayStartNewSale: json['may_start_new_sale'] as bool? ?? true,
@@ -157,6 +164,30 @@ class OperationModel {
 
 /// Resultado de una anulación. Reemplaza el mock en el Paso 5 con la respuesta
 /// real del repositorio.
+/// Cupón y autorización publicados en `receipt`. Ausentes cuando es null.
+class SaleReceipt {
+  final String? couponNumber;
+  final String? authorizationCode;
+
+  const SaleReceipt({this.couponNumber, this.authorizationCode});
+
+  static const empty = SaleReceipt();
+
+  factory SaleReceipt.fromJson(Object? raw) {
+    if (raw is! Map) return empty;
+    return SaleReceipt(
+      couponNumber: _text(raw['coupon_number']),
+      authorizationCode: _text(raw['authorization_code']),
+    );
+  }
+
+  static String? _text(Object? value) {
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+}
+
 class VoidResult {
   final bool isVoided;
   final bool isDeclined;
@@ -240,6 +271,8 @@ class SaleResponse {
   final PendingSaleReason? pendingReason;
   final int? pollAfterSeconds;
   final bool mayStartNewSale;
+  final String? couponNumber;
+  final String? authorizationCode;
 
   const SaleResponse({
     required this.isApproved,
@@ -253,6 +286,8 @@ class SaleResponse {
     this.pendingReason,
     this.pollAfterSeconds,
     this.mayStartNewSale = true,
+    this.couponNumber,
+    this.authorizationCode,
   }) : authorizationStatus =
            authorizationStatus ??
            (isApproved

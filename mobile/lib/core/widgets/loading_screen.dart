@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../constants/app_routes.dart';
 import '../theme/app_colors.dart';
+import '../../features/auth/presentation/cubit/auth_cubit.dart';
+import '../../features/auth/presentation/cubit/auth_state.dart';
 
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key});
@@ -14,11 +17,29 @@ class _LoadingScreenState extends State<LoadingScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.login);
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_restoreAndRoute());
     });
+  }
+
+  Future<void> _restoreAndRoute() async {
+    final cubit = context.read<AuthCubit>();
+    await cubit.restore();
+    if (!mounted) return;
+    final state = cubit.state;
+    if (state is AuthSuccess && state.mustChangePassword) {
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.changePassword,
+        arguments: <String, dynamic>{'isFirstLogin': true},
+      );
+      return;
+    }
+    if (state is AuthSuccess) {
+      Navigator.pushReplacementNamed(context, AppRoutes.saleForm);
+      return;
+    }
+    Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
   @override

@@ -300,13 +300,16 @@ flutter run
 ```bash
 cd mobile
 
-# Android APK Release
-flutter build apk --release
+# Android APK Release. API_BASE_URL es obligatorio y debe ser HTTPS.
+flutter build apk --release \
+  --dart-define=API_BASE_URL=https://api.solidaridad-prod.aws.com/v1 \
+  --dart-define=INSTALLATION_ID=TERM01A
 
-# iOS (no es target primario)
-flutter build ios --release
+# iOS (no es target primario; también exige una API HTTPS en release)
+flutter build ios --release \
+  --dart-define=API_BASE_URL=https://api.solidaridad-prod.aws.com/v1
 
-# Web (solo testing local)
+# Web debug (solo testing local)
 flutter build web
 ```
 
@@ -318,8 +321,8 @@ La app acepta overrides en tiempo de compilación vía `--dart-define`.
 
 | Variable | Default | Descripción |
 |----------|---------|-------------|
-| `API_BASE_URL` | Auto-detectado | URL base de la API (ej: `http://192.168.1.100:8000/v1`) |
-| `INSTALLATION_ID` | `dev-term` | ID de terminal (hasta 8 caracteres) |
+| `API_BASE_URL` | Debug/profile: auto-detectado. Release: ninguno. | URL base de la API. En release es obligatoria, debe ser HTTPS, tener host y no incluir credenciales, query ni fragmento. |
+| `INSTALLATION_ID` | `05000001` | ID de terminal (hasta 8 caracteres). El default corresponde al terminal de demo. |
 
 ```bash
 # Ejemplo: apuntar a servidor en red local
@@ -334,9 +337,10 @@ flutter build apk --release \
   --dart-define=INSTALLATION_ID=TERM01A
 ```
 
-### Detección automática de `API_BASE_URL`
+### Detección automática de `API_BASE_URL` en laboratorio
 
-Cuando **no** se pasa `--dart-define=API_BASE_URL`, el sistema detecta la plataforma:
+En debug y profile, cuando **no** se pasa
+`--dart-define=API_BASE_URL`, el sistema detecta la plataforma:
 
 | Plataforma | URL por defecto |
 |------------|-----------------|
@@ -344,7 +348,13 @@ Cuando **no** se pasa `--dart-define=API_BASE_URL`, el sistema detecta la plataf
 | **Android emulador** | `http://10.0.2.2:8000/v1` (loopback del host) |
 | **Android real / iOS** | `http://localhost:8000/v1` |
 
-> Para un dispositivo real en la misma red WiFi, **siempre** pasar `--dart-define=API_BASE_URL=http://<IP_DEL_PC>:8000/v1`.
+> Para un dispositivo real de laboratorio en la misma red WiFi, ejecutar un
+> build debug/profile y pasar
+> `--dart-define=API_BASE_URL=http://<IP_DEL_PC>:8000/v1`.
+
+Un release no usa estos defaults. Si `API_BASE_URL` falta, usa HTTP o no es una
+URL HTTPS válida, la app muestra el error de configuración y no crea los
+repositorios ni abre el login.
 
 ---
 

@@ -6,17 +6,17 @@ import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 ReceiptDefaults _defaults() {
   return const ReceiptDefaults(
     issuerName: 'Solidaridad',
-    establishmentName: 'GAS Terminal — Solidaridad',
-    establishmentAddress: 'Av. San Martín 100, Ushuaia',
-    establishmentCuit: '30-00000000-0',
-    establishmentCode: '00000001',
-    couponNumber: '00000001',
-    batchNumber: '000001',
-    authorizationCode: 'MOCK01',
+    establishmentName: 'COMERCIO REAL',
+    establishmentAddress: 'Alem 100, Tolhuin',
+    establishmentCuit: '30-71234567-8',
+    establishmentCode: '014114',
+    couponNumber: '00000042',
+    batchNumber: '000007',
+    authorizationCode: 'A99881',
     currency: 'ARS',
     installments: '1',
     installmentPlan: 'Contado',
-    originalChargeNumber: '00000000',
+    originalChargeNumber: '00000042',
   );
 }
 
@@ -63,14 +63,19 @@ void main() {
       expect(text, contains('Firma:'));
       expect(text, contains('.' * 48));
       expect(html, contains('Firma: ${'.' * 32}'));
-      expect(html, contains('<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>'));
+      expect(
+        html,
+        contains(
+          '<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>',
+        ),
+      );
       expect(text, isNot(contains('Gracias')));
       expect(text, isNot(contains('Tipo:')));
       expect(text, isNot(contains('Cargo original')));
     },
   );
 
-  test('el texto y el HTML incluyen los datos del perfil mock', () {
+  test('el texto y el HTML incluyen el comercio y la autorización', () {
     final defaults = _defaults();
     final text = ReceiptFormatter.toPlainText(_operation(), defaults);
     final html = ReceiptFormatter.toHtml(_operation(), defaults);
@@ -110,8 +115,8 @@ void main() {
     expect(html, isNot(contains('Mensaje:')));
     expect(text, isNot(contains('Firma:')));
     expect(html, isNot(contains('Firma:')));
-    expect(text, contains('Cupón: 00000001'));
-    expect(text, contains('Autorización: MOCK01'));
+    expect(text, contains('Cupón: 00000042'));
+    expect(text, contains('Autorización: A99881'));
   });
 
   test('un rechazo sin código queda en Denegada', () {
@@ -139,43 +144,80 @@ void main() {
     expect(sale, isNot(contains('Tipo:')));
     expect(sale, isNot(contains('Cargo original')));
     expect(voided, contains('Anulación'));
-    expect(voided, contains('Cargo original: 00000000'));
+    expect(voided, contains('Cargo original: 00000042'));
   });
 
-  test('la venta aprobada separa original del comercio y copia del cliente', () {
+  test('sin lote ni cargo original esas líneas no se imprimen', () {
+    final defaults = ReceiptDefaults(
+      issuerName: 'Solidaridad',
+      establishmentName: 'COMERCIO REAL',
+      establishmentAddress: 'Alem 100, Tolhuin',
+      establishmentCuit: '30-71234567-8',
+      establishmentCode: '014114',
+      couponNumber: '',
+      batchNumber: '',
+      authorizationCode: '',
+      currency: 'ARS',
+      installments: '1',
+      installmentPlan: 'Contado',
+      originalChargeNumber: '',
+    );
     final operation = _operation(
-      result: PaymentResult.approved,
+      result: PaymentResult.voided,
       userMessage: null,
     );
-    final defaults = _defaults();
-    final original = ReceiptFormatter.toHtml(
-      operation,
-      defaults,
-      copy: ReceiptCopy.merchant,
-    );
-    final customer = ReceiptFormatter.toHtml(
-      operation,
-      defaults,
-      copy: ReceiptCopy.customer,
-    );
+    final text = ReceiptFormatter.toPlainText(operation, defaults);
+    final html = ReceiptFormatter.toHtml(operation, defaults);
 
-    expect(original, contains('Aprobada'));
-    expect(
-      original.indexOf('Firma:'),
-      lessThan(original.indexOf('ORIGINAL COMERCIO')),
-    );
-    expect(original, isNot(contains('COPIA CLIENTE')));
-
-    expect(
-      customer.indexOf('Aprobada'),
-      lessThan(customer.indexOf('COPIA CLIENTE')),
-    );
-    expect(customer, isNot(contains('Firma:')));
-    expect(
-      customer,
-      contains('<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>'),
-    );
+    expect(text, contains('Cupón:'));
+    expect(text, contains('Autorización:'));
+    expect(text, isNot(contains('Lote:')));
+    expect(text, isNot(contains('Cargo original')));
+    expect(html, isNot(contains('Lote:')));
+    expect(html, isNot(contains('Cargo original')));
+    expect(text, isNot(contains('Gas Austral')));
+    expect(text, isNot(contains('MOCK01')));
   });
+
+  test(
+    'la venta aprobada separa original del comercio y copia del cliente',
+    () {
+      final operation = _operation(
+        result: PaymentResult.approved,
+        userMessage: null,
+      );
+      final defaults = _defaults();
+      final original = ReceiptFormatter.toHtml(
+        operation,
+        defaults,
+        copy: ReceiptCopy.merchant,
+      );
+      final customer = ReceiptFormatter.toHtml(
+        operation,
+        defaults,
+        copy: ReceiptCopy.customer,
+      );
+
+      expect(original, contains('Aprobada'));
+      expect(
+        original.indexOf('Firma:'),
+        lessThan(original.indexOf('ORIGINAL COMERCIO')),
+      );
+      expect(original, isNot(contains('COPIA CLIENTE')));
+
+      expect(
+        customer.indexOf('Aprobada'),
+        lessThan(customer.indexOf('COPIA CLIENTE')),
+      );
+      expect(customer, isNot(contains('Firma:')));
+      expect(
+        customer,
+        contains(
+          '<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>',
+        ),
+      );
+    },
+  );
 
   test('verificación y anulación siguen en un ticket con firma', () {
     final defaults = _defaults();

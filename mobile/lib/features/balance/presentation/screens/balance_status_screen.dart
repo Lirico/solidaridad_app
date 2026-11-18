@@ -6,8 +6,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/data/receipt_printer.dart';
+import '../../../sales/domain/receipt_defaults.dart';
 import '../../../sales/domain/sale_model.dart';
 import '../../domain/balance_kilograms.dart';
 import '../../domain/balance_model.dart';
@@ -16,22 +18,16 @@ import '../cubit/balance_state.dart';
 import '../widgets/balance_status_content.dart';
 
 class BalanceStatusScreen extends StatefulWidget {
-  final Future<PrintResult> Function({
-    required DateTime date,
-    required String cardNumber,
-    required String expirationDate,
-    required double kilograms,
-  })?
-  printReceipt;
+  final ReceiptPrinter? printer;
 
-  const BalanceStatusScreen({super.key, this.printReceipt});
+  const BalanceStatusScreen({super.key, this.printer});
 
   @override
   State<BalanceStatusScreen> createState() => _BalanceStatusScreenState();
 }
 
 class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
-  final ReceiptPrinter _printer = ReceiptPrinter();
+  late final ReceiptPrinter _printer = widget.printer ?? ReceiptPrinter();
   PrintStatus _printStatus = PrintStatus.idle;
   String _printMessage = '';
   bool _started = false;
@@ -53,7 +49,6 @@ class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
   Future<void> _printTicket() async {
     final state = context.read<BalanceCubit>().state;
     if (state is! BalanceCompleted) return;
-    final print = widget.printReceipt;
     final date = _printedAt ?? DateTime.now();
 
     setState(() {
@@ -61,25 +56,41 @@ class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
       _printMessage = '';
     });
 
-    final PrintResult result = print == null
-        ? await _printer.printBalanceTicket(
-            date: date,
-            cardNumber: state.cardNumber,
-            expirationDate: state.expirationDate,
-            kilograms: balanceKilograms(state.result.balances),
-          )
-        : await print(
-            date: date,
-            cardNumber: state.cardNumber,
-            expirationDate: state.expirationDate,
-            kilograms: balanceKilograms(state.result.balances),
-          );
+    final defaults = _receiptDefaults();
+    if (defaults == null) {
+      setState(() {
+        _printStatus = PrintStatus.error;
+        _printMessage = 'La cuenta no tiene un comercio configurado.';
+      });
+      return;
+    }
+
+    final PrintResult result = await _printer.printBalanceTicket(
+      date: date,
+      defaults: defaults,
+      cardNumber: state.cardNumber,
+      expirationDate: state.expirationDate,
+      kilograms: balanceKilograms(state.result.balances),
+    );
 
     if (!mounted) return;
     setState(() {
       _printStatus = result.ok ? PrintStatus.printed : PrintStatus.error;
       _printMessage = result.message;
     });
+  }
+
+  ReceiptDefaults? _receiptDefaults() {
+    final merchant = context.read<AuthCubit>().merchant;
+    if (merchant == null) return null;
+    return ReceiptDefaults.forMerchant(
+      merchantCode: merchant.code,
+      merchantName: merchant.name,
+      merchantAddress: merchant.address,
+      merchantCity: merchant.city,
+      merchantTaxId: merchant.taxId,
+      batchNumber: 'ACTUAL',
+    );
   }
 
   @override

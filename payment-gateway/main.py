@@ -1,7 +1,11 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from config.settings import get_settings
 from presentation import create_router
 
 
@@ -30,8 +34,14 @@ def _http_exception_message(exc: HTTPException) -> str:
     return str(detail)
 
 
+@asynccontextmanager
+async def _load_settings(_app: FastAPI) -> AsyncIterator[None]:
+    get_settings()
+    yield
+
+
 def create_app(router: APIRouter) -> FastAPI:
-    app = FastAPI(title="Solidaridad Payment Gateway")
+    app = FastAPI(title="Solidaridad Payment Gateway", lifespan=_load_settings)
     app.include_router(router)
 
     @app.exception_handler(RequestValidationError)

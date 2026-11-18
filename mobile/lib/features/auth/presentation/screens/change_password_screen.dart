@@ -24,6 +24,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _confirmPasswordController = TextEditingController();
 
   bool _isFirstLogin = false;
+  bool _accepted = false;
 
   @override
   void didChangeDependencies() {
@@ -45,6 +46,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
+    _accepted = true;
     context.read<AuthCubit>().changePassword(
       currentPassword: _currentPasswordController.text,
       newPassword: _newPasswordController.text,
@@ -64,6 +66,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         child: BlocConsumer<AuthCubit, AuthState>(
           listener: (context, state) {
             if (state is AuthSessionExpired) {
+              _accepted = false;
               context.read<AuthCubit>().logout();
               Navigator.pushNamedAndRemoveUntil(
                 context,
@@ -71,6 +74,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 (route) => false,
               );
             } else if (state is AuthSuccess) {
+              if (!_accepted) return;
+              _accepted = false;
               if (_isFirstLogin) {
                 // El backend ya marcó must_change_password=false,
                 // navegar directamente al formulario de ventas
@@ -85,6 +90,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Navigator.pop(context);
               }
             } else if (state is AuthError) {
+              _accepted = false;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(

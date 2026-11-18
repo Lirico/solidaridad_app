@@ -58,6 +58,7 @@ class AuthRepository {
             email: data['email'] ?? '',
             token: data['token'] ?? '',
           ),
+          merchant: Merchant.tryParse(data['merchant']),
           message: 'Inicio de sesión exitoso',
           mustChangePassword: mustChange,
         );
@@ -139,6 +140,41 @@ class AuthRepository {
         isSuccess: false,
         message: 'Ocurrió un error inesperado. Reintente.',
       );
+    }
+  }
+
+  /// Comercio vigente de la cuenta. Un fallo de red no borra el del login.
+  Future<MerchantLookup> fetchCurrentMerchant({required String token}) async {
+    final url = Uri.parse('$_baseUrl/me/merchant');
+
+    try {
+      final response = await _httpClient
+          .get(url, headers: {HttpHeaders.authorizationHeader: 'Bearer $token'})
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 401) {
+        return const MerchantLookup.sessionExpired();
+      }
+      if (response.statusCode == 403) {
+        return const MerchantLookup.missing();
+      }
+      if (response.statusCode != 200) {
+        return const MerchantLookup.unavailable();
+      }
+
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic>) {
+        return const MerchantLookup.unavailable();
+      }
+      final merchant = Merchant.tryParse(data['merchant']);
+      if (merchant == null) return const MerchantLookup.unavailable();
+      return MerchantLookup.found(merchant);
+    } on TimeoutException {
+      return const MerchantLookup.unavailable();
+    } on SocketException {
+      return const MerchantLookup.unavailable();
+    } catch (_) {
+      return const MerchantLookup.unavailable();
     }
   }
 

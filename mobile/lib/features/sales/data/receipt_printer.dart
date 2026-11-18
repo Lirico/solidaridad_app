@@ -5,7 +5,6 @@ import '../../../psdk/psdk_card_reader.dart';
 import '../domain/receipt_defaults.dart';
 import '../domain/receipt_formatter.dart';
 import '../domain/sale_model.dart';
-import 'receipt_defaults_repository.dart';
 
 /// Resultado de una impresión de ticket.
 class PrintResult {
@@ -27,17 +26,12 @@ class PrintResult {
 /// pantallas de lectura de banda. Un `success` del SDK sin `sdiReady` no
 /// alcanza: la térmica se usa recién cuando el manager de SDI está listo.
 class ReceiptPrinter {
-  ReceiptPrinter({
-    PsdkBridge? psdk,
-    PsdkCardReader? reader,
-    ReceiptDefaultsRepository? defaultsRepository,
-  }) : _psdk = psdk ?? PsdkBridge(),
-       _defaults = defaultsRepository ?? ReceiptDefaultsRepository() {
+  ReceiptPrinter({PsdkBridge? psdk, PsdkCardReader? reader})
+    : _psdk = psdk ?? PsdkBridge() {
     _reader = reader ?? PsdkCardReader(psdk: _psdk);
   }
 
   final PsdkBridge _psdk;
-  final ReceiptDefaultsRepository _defaults;
   late final PsdkCardReader _reader;
 
   /// Imprime el ticket de [operation] en la térmica.
@@ -55,13 +49,13 @@ class ReceiptPrinter {
   /// sola la copia.
   Future<PrintResult> printTicket(
     OperationModel operation, {
+    required ReceiptDefaults defaults,
     int initAttempts = 3,
     Duration initRetryDelay = const Duration(milliseconds: 400),
     int readyTimeoutSec = 8,
   }) {
     return _printWhenReady(
       () async {
-        final defaults = await _defaults.load();
         if (operation.result == PaymentResult.approved) {
           final PrintResult original = await _printHtml(
             ReceiptFormatter.toHtml(
@@ -106,6 +100,7 @@ class ReceiptPrinter {
   /// Imprime un solo ticket de consulta de saldo, la copia del cliente.
   Future<PrintResult> printBalanceTicket({
     required DateTime date,
+    required ReceiptDefaults defaults,
     required String cardNumber,
     required String expirationDate,
     required double kilograms,
@@ -115,7 +110,6 @@ class ReceiptPrinter {
   }) {
     return _printWhenReady(
       () async {
-        final ReceiptDefaults defaults = await _defaults.load();
         return _printHtml(
           ReceiptFormatter.balanceToHtml(
             date: date,

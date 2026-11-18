@@ -136,8 +136,15 @@ Copy `.env.example` → `.env` (`.env` is gitignored).
 | `DATABASE_URL` | SQLAlchemy URL | `postgresql+psycopg://solidaridad:solidaridad@localhost:5434/solidaridad` |
 | `JWT_SECRET` | JWT signing secret | long local-only string |
 | `JWT_ALGORITHM` | JWT algorithm | `HS256` |
-| `JWT_EXPIRE_MINUTES` | Access token TTL | `1440` |
+| `JWT_EXPIRE_DAYS` | Access token lifetime | `90` |
 | `EMBEDDED_RECOVERY_WORKER_ENABLED` | Worker durable embebido; desactivar sólo para mantenimiento/tests deterministas | `true` |
+
+`APP_ENV` es obligatorio (`local`, `dev`, `test`, `staging`, `prod` o
+`production`). Si no está definido, el proceso no arranca y no asume `local`.
+Fuera de `local` se rechazan el `JWT_SECRET` de laboratorio, cualquier secreto
+de menos de 32 caracteres y una `DATABASE_URL` con usuario y contraseña
+`solidaridad` / `solidaridad`. `POSTGRES_PASSWORD` no tiene default en Compose:
+si falta, el contenedor no levanta.
 
 ### Hitting the API from a device / emulator
 

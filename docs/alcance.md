@@ -91,9 +91,11 @@ impresión de ticket.
   (cuando corresponda).
 - Una consulta de saldo aprobada imprime automáticamente un único ticket para
   el cliente con el comercio vigente de la sesión, el lote administrativo
-  actual, la tarjeta enmascarada, el vencimiento y el saldo total en kg. Una
-  consulta rechazada no imprime; un fallo de la térmica permite reintentar sin
-  cambiar la fecha ni los datos del comprobante.
+  actual, la tarjeta enmascarada, el vencimiento y el saldo por producto en la
+  unidad publicada por `GET /v1/products`: unidades para garrafas/tubos y `m3`
+  para granel. No convierte ni suma cantidades heterogéneas en kg. Una consulta
+  rechazada no imprime; un fallo de la térmica permite reintentar sin cambiar
+  la fecha ni los datos del comprobante.
 - Comprobante en pantalla (respaldo / reimpresión visual).
 - Listado básico de transacciones y detalle/comprobante.
 - Manejo básico de carga, errores y reintentos (incluida idempotencia).
@@ -128,10 +130,12 @@ las pantallas interactivas incluyen:
   corte esas operaciones ya no aparecen en el historial actual ni se pueden
   anular desde la terminal. El botón pide confirmación y rechaza el cierre si hay
   pagos o anulaciones en recuperación (`PENDING` / `UNDER_REVIEW`), para no
-  imprimir un resumen que pueda cambiar. El
-  total se expresa en **kg**: la API no publica importe/precio por producto. El
-  ticket impreso y el peso por producto desde backend quedan pendientes (ver
-  `docs/gaps.md`, G-P2-10).
+  imprimir un resumen que pueda cambiar. El resumen agrupa cantidades por
+  producto y conserva su unidad; no calcula un total en kg porque mezclar
+  unidades y `m3` requiere una conversión de negocio no definida.
+  `GET /v1/products` es la fuente de verdad del código, etiqueta, orden y
+  unidad; saldo y cierre rechazan un código que no exista en ese catálogo. El
+  ticket de cierre queda pendiente (ver `docs/gaps.md`, G-P2-10).
 
 Excepciones: la pantalla de presentación (splash), la pantalla "Iniciando"
 (spinner) y **Login/Registro** no llevan la barra inferior (en auth no hay

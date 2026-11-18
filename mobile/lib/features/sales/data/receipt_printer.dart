@@ -103,7 +103,7 @@ class ReceiptPrinter {
     required ReceiptDefaults defaults,
     required String cardNumber,
     required String expirationDate,
-    required double kilograms,
+    required List<ProductQuantity> balances,
     int initAttempts = 3,
     Duration initRetryDelay = const Duration(milliseconds: 400),
     int readyTimeoutSec = 8,
@@ -116,7 +116,7 @@ class ReceiptPrinter {
             defaults: defaults,
             cardNumber: cardNumber,
             expirationDate: expirationDate,
-            kilograms: kilograms,
+            balances: balances,
           ),
         );
       },

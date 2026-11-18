@@ -1,4 +1,5 @@
 import '../../../core/formatters/amount_formatter.dart';
+import '../../../core/formatters/quantity_formatter.dart';
 import 'receipt_defaults.dart';
 import 'sale_model.dart';
 
@@ -199,7 +200,7 @@ class ReceiptFormatter {
     required ReceiptDefaults defaults,
     required String cardNumber,
     required String expirationDate,
-    required double kilograms,
+    required List<ProductQuantity> balances,
   }) {
     final lines = <String>[
       _line('Terminal', terminalId),
@@ -208,6 +209,15 @@ class ReceiptFormatter {
       _line('Tarjeta', maskPan(cardNumber)),
       _line('Vencimiento', formatCardExpiry(expirationDate)),
     ];
+    final balanceLines = balances
+        .map(
+          (item) => _line(
+            item.product.label,
+            '${formatQuantityEsExact(item.quantity)} ${item.unitLabel}',
+            emphasize: true,
+          ),
+        )
+        .join('\n    ');
     return _document(
       body:
           '''
@@ -223,8 +233,10 @@ class ReceiptFormatter {
   <div class="c">${_esc(defaults.establishmentCuit)}</div>
   <div class="detail">
     ${lines.join('\n    ')}
+    <hr/>
+    <div class="b">SALDOS POR PRODUCTO</div>
+    $balanceLines
   </div>
-  <div class="b status">${_esc(balanceAmountLine(kilograms))}</div>
   <div class="c b">COPIA CLIENTE</div>
   <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
 ''',
@@ -237,7 +249,7 @@ class ReceiptFormatter {
     required ReceiptDefaults defaults,
     required String cardNumber,
     required String expirationDate,
-    required double kilograms,
+    required List<ProductQuantity> balances,
   }) {
     return [
       '${_formatDate(date)}  ${defaults.issuerName}  ${_formatTime(date)}',
@@ -250,14 +262,15 @@ class ReceiptFormatter {
       'Lote: ${defaults.batchNumber}',
       'Tarjeta: ${maskPan(cardNumber)}',
       'Vencimiento: ${formatCardExpiry(expirationDate)}',
-      balanceAmountLine(kilograms),
+      'SALDOS POR PRODUCTO',
+      ...balances.map(productQuantityLine),
       'COPIA CLIENTE',
     ].join('\n');
   }
 
-  /// `SALDO:` más diecisiete puntos, como en el comprobante aprobado.
-  static String balanceAmountLine(double kilograms) {
-    return 'SALDO:${'.' * 17} KG ${kilograms.toStringAsFixed(2)}';
+  static String productQuantityLine(ProductQuantity item) {
+    return '${item.product.label}: '
+        '${formatQuantityEsExact(item.quantity)} ${item.unitLabel}';
   }
 
   /// El vencimiento de la tarjeta llega como `YYMM`. En el papel se lee `MM/YY`.

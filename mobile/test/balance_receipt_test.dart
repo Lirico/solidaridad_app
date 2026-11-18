@@ -1,26 +1,45 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:solidaridad_app/features/balance/domain/balance_kilograms.dart';
+import 'package:solidaridad_app/features/balance/domain/balance_product_quantities.dart';
 import 'package:solidaridad_app/features/balance/domain/balance_model.dart';
 import 'package:solidaridad_app/features/sales/domain/receipt_defaults.dart';
 import 'package:solidaridad_app/features/sales/domain/receipt_formatter.dart';
+import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 
 void main() {
   test('el ticket de saldo usa el armado del comprobante de venta', () {
     final defaults = _defaults();
     final date = DateTime(2026, 11, 12, 17, 27, 4);
+    const balances = <ProductQuantity>[
+      ProductQuantity(
+        product: ProductInfo(
+          code: 'GARRAFA_10',
+          label: 'Garrafa 10 kg',
+          unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+        ),
+        quantity: 10,
+      ),
+      ProductQuantity(
+        product: ProductInfo(
+          code: 'GRANEL',
+          label: 'Granel',
+          unit: ProductUnit(singular: 'm3', plural: 'm3'),
+        ),
+        quantity: 2.5,
+      ),
+    ];
     final text = ReceiptFormatter.balanceToPlainText(
       date: date,
       defaults: defaults,
       cardNumber: '6063007014007403',
       expirationDate: '2808',
-      kilograms: 101,
+      balances: balances,
     );
     final html = ReceiptFormatter.balanceToHtml(
       date: date,
       defaults: defaults,
       cardNumber: '6063007014007403',
       expirationDate: '2808',
-      kilograms: 101,
+      balances: balances,
     );
 
     expect(text, contains('12/11/2026  Solidaridad  17:27:04'));
@@ -34,7 +53,10 @@ void main() {
     expect(text, contains('Lote: ${defaults.batchNumber}'));
     expect(text, contains('Tarjeta: 6063007*****7403'));
     expect(text, contains('Vencimiento: 08/28'));
-    expect(text, contains('SALDO:${'.' * 17} KG 101.00'));
+    expect(text, contains('SALDOS POR PRODUCTO'));
+    expect(text, contains('Garrafa 10 kg: 10 unidades'));
+    expect(text, contains('Granel: 2,5 m3'));
+    expect(text, isNot(contains('KG 101.00')));
     expect(text, endsWith('COPIA CLIENTE'));
     expect(text, isNot(contains('Cupón')));
     expect(text, isNot(contains('Autorización')));
@@ -55,21 +77,60 @@ void main() {
     expect(html, contains('class="detail"'));
     expect(html, contains('padding-top: 28px'));
     expect(html, contains('margin-top: 22px'));
-    expect(html, contains('class="b status">SALDO:${'.' * 17} KG 101.00'));
-    expect(html, contains('margin-top: 32px; margin-bottom: 44px'));
+    expect(html, contains('<div class="b">SALDOS POR PRODUCTO</div>'));
+    expect(html, contains('Garrafa 10 kg: 10 unidades'));
+    expect(html, contains('Granel: 2,5 m3'));
     expect(html, contains('class="c b">COPIA CLIENTE'));
     expect(html, isNot(contains('class="c big status"')));
     expect(html, isNot(contains('Firma:')));
   });
 
-  test('el saldo en kg usa la equivalencia del cierre de lote', () {
-    final total = balanceKilograms(const [
-      BalanceItem(product: 'GARRAFA_10', label: '10 kg', availableBalance: 10),
-      BalanceItem(product: 'GARRAFA_15', label: '15 kg', availableBalance: 0.1),
-      BalanceItem(product: 'DESCONOCIDO', label: 'otro', availableBalance: 50),
-    ]);
+  test('combina cantidades con etiqueta y unidad de /products', () {
+    final balances = balanceProductQuantities(
+      const [
+        BalanceItem(
+          product: 'GARRAFA_10',
+          label: '10 kg',
+          availableBalance: 10,
+        ),
+        BalanceItem(
+          product: 'GARRAFA_15',
+          label: '15 kg',
+          availableBalance: 0.1,
+        ),
+      ],
+      const [
+        ProductInfo(
+          code: 'GARRAFA_10',
+          label: 'Garrafa 10 kg',
+          unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+        ),
+        ProductInfo(
+          code: 'GARRAFA_15',
+          label: 'Garrafa 15 kg',
+          unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+        ),
+      ],
+    );
 
-    expect(total, closeTo(101.5, 0.001));
+    expect(balances, hasLength(2));
+    expect(balances.first.product.label, 'Garrafa 10 kg');
+    expect(balances.first.quantity, 10);
+    expect(balances.first.unitLabel, 'unidades');
+    expect(balances.last.quantity, 0.1);
+  });
+
+  test('rechaza un saldo cuyo producto no existe en /products', () {
+    expect(
+      () => balanceProductQuantities(const [
+        BalanceItem(
+          product: 'DESCONOCIDO',
+          label: 'Otro',
+          availableBalance: 50,
+        ),
+      ], const []),
+      throwsStateError,
+    );
   });
 }
 

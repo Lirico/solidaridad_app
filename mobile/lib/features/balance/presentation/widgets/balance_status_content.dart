@@ -10,6 +10,7 @@ class BalanceStatusContent extends StatelessWidget {
   final PrintStatus printStatus;
   final String printMessage;
   final VoidCallback? onRetryPrint;
+  final List<ProductInfo> products;
 
   const BalanceStatusContent({
     super.key,
@@ -18,6 +19,7 @@ class BalanceStatusContent extends StatelessWidget {
     this.printStatus = PrintStatus.idle,
     this.printMessage = '',
     this.onRetryPrint,
+    this.products = const <ProductInfo>[],
   });
 
   @override
@@ -29,6 +31,9 @@ class BalanceStatusContent extends StatelessWidget {
   }
 
   Widget _buildTable(BuildContext context) {
+    final productsByCode = <String, ProductInfo>{
+      for (final product in products) product.code: product,
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -52,9 +57,25 @@ class BalanceStatusContent extends StatelessWidget {
           ),
           child: Column(
             children: [
-              const _BalanceHeaderRow(),
-              const Divider(height: 1),
-              for (final item in result.balances) _BalanceRow(item: item),
+              if (products.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    printStatus == PrintStatus.printing
+                        ? 'Cargando catálogo de productos...'
+                        : 'Catálogo de productos no disponible.',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                )
+              else ...[
+                const _BalanceHeaderRow(),
+                const Divider(height: 1),
+                for (final item in result.balances)
+                  _BalanceRow(
+                    item: item,
+                    product: productsByCode[item.product],
+                  ),
+              ],
             ],
           ),
         ),
@@ -236,10 +257,9 @@ class _BalanceHeaderRow extends StatelessWidget {
 
 class _BalanceRow extends StatelessWidget {
   final BalanceItem item;
+  final ProductInfo? product;
 
-  const _BalanceRow({required this.item});
-
-  String get _unit => item.product == 'GRANEL' ? 'm3' : 'unidades';
+  const _BalanceRow({required this.item, required this.product});
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +270,7 @@ class _BalanceRow extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              item.label,
+              product?.label ?? item.product,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13, color: Colors.black87),
@@ -262,7 +282,11 @@ class _BalanceRow extends StatelessWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerRight,
               child: Text(
-                '${item.availableBalance.toStringAsFixed(2)} $_unit',
+                [
+                  item.availableBalance.toStringAsFixed(2),
+                  if (product != null)
+                    product!.unit.labelFor(item.availableBalance),
+                ].join(' '),
                 maxLines: 1,
                 style: const TextStyle(
                   fontSize: 13,

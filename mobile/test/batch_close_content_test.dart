@@ -34,43 +34,37 @@ BatchSummary _mockupSummary({bool isPartial = false}) {
   return BatchSummary(
     batchNumber: '000123',
     salesCount: 45,
-    totalKg: 2055,
     isPartial: isPartial,
     products: const [
       BatchProductItem(
         productCode: 'GARRAFA_10',
         label: 'Garrafa 10 kg',
         quantity: 15,
-        kg: 150,
         unitLabel: 'unidades',
       ),
       BatchProductItem(
         productCode: 'GARRAFA_15',
         label: 'Garrafa 15 kg',
         quantity: 10,
-        kg: 150,
         unitLabel: 'unidades',
       ),
       BatchProductItem(
         productCode: 'GARRAFA_30',
         label: 'Garrafa 30 kg',
         quantity: 8,
-        kg: 240,
         unitLabel: 'unidades',
       ),
       BatchProductItem(
         productCode: 'TUBO_45',
         label: 'Tubo 45 kg',
         quantity: 7,
-        kg: 315,
         unitLabel: 'unidades',
       ),
       BatchProductItem(
         productCode: 'GRANEL',
         label: 'Granel',
         quantity: 1200,
-        kg: 1200,
-        unitLabel: 'm³',
+        unitLabel: 'm3',
       ),
     ],
   );
@@ -116,13 +110,16 @@ Future<void> _pumpScreen(
   tester.view.devicePixelRatio = 2.0;
   addTearDown(tester.view.reset);
 
-  when(
-    () => repository.loadOperations(
-      token: any(named: 'token'),
-    ),
-  ).thenAnswer(
+  when(() => repository.loadOperations(token: any(named: 'token'))).thenAnswer(
     (_) async => BatchCloseLoadResult(
       operations: sessionExpired ? const <OperationModel>[] : [_approvedSale()],
+      products: const <ProductInfo>[
+        ProductInfo(
+          code: 'GARRAFA_10',
+          label: 'Garrafa 10 kg',
+          unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+        ),
+      ],
       sessionExpired: sessionExpired,
     ),
   );
@@ -187,17 +184,17 @@ void main() {
     expect(find.text('Resumen de Ventas'), findsOneWidget);
     expect(find.text('Cantidad de Ventas'), findsOneWidget);
     expect(find.text('45'), findsOneWidget);
-    expect(find.text('Total de Ventas'), findsOneWidget);
-    expect(find.text('2.055 kg'), findsOneWidget);
+    expect(find.text('Total de Ventas'), findsNothing);
     expect(find.text('Ventas por Producto'), findsOneWidget);
 
-    // Una fila por producto, con su cantidad y su equivalente en kg.
+    // Una fila por producto, con la unidad publicada por /products.
     expect(find.byIcon(Icons.propane_tank_outlined), findsNWidgets(5));
     expect(find.text('Garrafa 10 kg'), findsOneWidget);
-    expect(find.text('150 Kg'), findsNWidgets(2));
-    expect(find.text('240 Kg'), findsOneWidget);
-    expect(find.text('315 Kg'), findsOneWidget);
-    expect(find.text('1.200 Kg'), findsOneWidget);
+    expect(find.text('15 unidades'), findsOneWidget);
+    expect(find.text('10 unidades'), findsOneWidget);
+    expect(find.text('8 unidades'), findsOneWidget);
+    expect(find.text('7 unidades'), findsOneWidget);
+    expect(find.text('1.200 m3'), findsOneWidget);
 
     expect(find.text('CERRAR LOTE'), findsOneWidget);
     // Regla del alcance: las pantallas operativas entran en 360×720 sin
@@ -215,7 +212,7 @@ void main() {
     expect(closes, 1);
   });
 
-  testWidgets('muestra la precisión decimal de cantidades, kg y total', (
+  testWidgets('muestra la precisión decimal con la unidad del catálogo', (
     tester,
   ) async {
     await _pumpContent(
@@ -223,23 +220,19 @@ void main() {
       const BatchSummary(
         batchNumber: '000001',
         salesCount: 1,
-        totalKg: 37.5,
         products: [
           BatchProductItem(
             productCode: 'GARRAFA_15',
             label: 'Garrafa 15 kg',
             quantity: 2.5,
-            kg: 37.5,
             unitLabel: 'unidades',
           ),
         ],
       ),
     );
 
-    // Una venta de 2,5 unidades no son 3 ni 38 kg.
-    expect(find.text('2,5'), findsOneWidget);
-    expect(find.text('37,5 Kg'), findsOneWidget);
-    expect(find.text('37,5 kg'), findsOneWidget);
+    expect(find.text('2,5 unidades'), findsOneWidget);
+    expect(find.textContaining('Kg'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -248,16 +241,11 @@ void main() {
   ) async {
     await _pumpContent(
       tester,
-      const BatchSummary(
-        batchNumber: '000001',
-        salesCount: 0,
-        totalKg: 0,
-        products: [],
-      ),
+      const BatchSummary(batchNumber: '000001', salesCount: 0, products: []),
     );
 
     expect(find.text('No hay ventas registradas en el lote.'), findsOneWidget);
-    expect(find.text('0 kg'), findsOneWidget);
+    expect(find.textContaining('kg'), findsNothing);
     expect(find.text('CERRAR LOTE'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

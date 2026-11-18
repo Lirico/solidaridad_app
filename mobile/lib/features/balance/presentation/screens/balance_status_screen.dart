@@ -7,11 +7,13 @@ import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/app_sheet_panel.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
 import '../../../sales/data/receipt_printer.dart';
+import '../../../sales/data/sales_repository.dart';
 import '../../../sales/domain/receipt_defaults.dart';
 import '../../../sales/domain/sale_model.dart';
-import '../../domain/balance_kilograms.dart';
+import '../../domain/balance_product_quantities.dart';
 import '../../domain/balance_model.dart';
 import '../cubit/balance_cubit.dart';
 import '../cubit/balance_state.dart';
@@ -19,8 +21,9 @@ import '../widgets/balance_status_content.dart';
 
 class BalanceStatusScreen extends StatefulWidget {
   final ReceiptPrinter? printer;
+  final SalesRepository? productsRepository;
 
-  const BalanceStatusScreen({super.key, this.printer});
+  const BalanceStatusScreen({super.key, this.printer, this.productsRepository});
 
   @override
   State<BalanceStatusScreen> createState() => _BalanceStatusScreenState();
@@ -28,10 +31,13 @@ class BalanceStatusScreen extends StatefulWidget {
 
 class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
   late final ReceiptPrinter _printer = widget.printer ?? ReceiptPrinter();
+  late final SalesRepository _productsRepository =
+      widget.productsRepository ?? SalesRepository();
   PrintStatus _printStatus = PrintStatus.idle;
   String _printMessage = '';
   bool _started = false;
   DateTime? _printedAt;
+  List<ProductInfo> _products = const <ProductInfo>[];
 
   @override
   void didChangeDependencies() {
@@ -56,6 +62,54 @@ class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
       _printMessage = '';
     });
 
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess || authState.user == null) {
+      setState(() {
+        _printStatus = PrintStatus.error;
+        _printMessage = 'No hay una sesión activa para cargar los productos.';
+      });
+      return;
+    }
+
+    final List<ProductInfo> products;
+    try {
+      products = await _productsRepository.fetchProducts(
+        token: authState.user!.token,
+      );
+    } on SessionExpiredException {
+      if (!mounted) return;
+      context.read<AuthCubit>().logout();
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false,
+      );
+      return;
+    } on DataLoadException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _printStatus = PrintStatus.error;
+        _printMessage = error.message;
+      });
+      return;
+    }
+
+    final List<ProductQuantity> balances;
+    try {
+      balances = balanceProductQuantities(state.result.balances, products);
+    } on StateError {
+      if (!mounted) return;
+      setState(() {
+        _printStatus = PrintStatus.error;
+        _printMessage =
+            'El catálogo de productos no coincide con el saldo consultado.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _products = products);
+
     final defaults = _receiptDefaults();
     if (defaults == null) {
       setState(() {
@@ -70,7 +124,7 @@ class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
       defaults: defaults,
       cardNumber: state.cardNumber,
       expirationDate: state.expirationDate,
-      kilograms: balanceKilograms(state.result.balances),
+      balances: balances,
     );
 
     if (!mounted) return;
@@ -117,6 +171,7 @@ class _BalanceStatusScreenState extends State<BalanceStatusScreen> {
           padding: const EdgeInsets.all(24),
           child: BalanceStatusContent(
             result: result,
+            products: _products,
             printStatus: approved ? _printStatus : PrintStatus.idle,
             printMessage: _printMessage,
             onRetryPrint: approved ? _printTicket : null,

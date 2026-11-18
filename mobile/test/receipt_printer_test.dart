@@ -178,7 +178,24 @@ void main() {
       ),
       cardNumber: '6063007014007403',
       expirationDate: '2808',
-      kilograms: 101,
+      balances: const <ProductQuantity>[
+        ProductQuantity(
+          product: ProductInfo(
+            code: 'GARRAFA_10',
+            label: 'Garrafa 10 kg',
+            unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+          ),
+          quantity: 10,
+        ),
+        ProductQuantity(
+          product: ProductInfo(
+            code: 'GRANEL',
+            label: 'Granel',
+            unit: ProductUnit(singular: 'm3', plural: 'm3'),
+          ),
+          quantity: 2.5,
+        ),
+      ],
     );
 
     expect(result.ok, isTrue);
@@ -190,7 +207,9 @@ void main() {
     expect(html, contains('Alem 100, Tolhuin'));
     expect(html, contains('Comercio: 014114'));
     expect(html, contains('Lote: ACTUAL'));
-    expect(html, contains('SALDO:${'.' * 17} KG 101.00'));
+    expect(html, contains('Garrafa 10 kg: 10 unidades'));
+    expect(html, contains('Granel: 2,5 m3'));
+    expect(html, isNot(contains('KG 101.00')));
     expect(html, isNot(contains('ORIGINAL COMERCIO')));
     expect(html, isNot(contains('Gas Austral')));
   });

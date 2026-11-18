@@ -307,12 +307,7 @@ class ProductUnit {
 
   bool get allowsDecimals => singular == 'm3';
 
-  static const unidades = ProductUnit(singular: 'unidad', plural: 'unidades');
-  static const metrosCubicos = ProductUnit(singular: 'm3', plural: 'm3');
-
-  static ProductUnit forProductCode(String code) {
-    return code == 'GRANEL' ? metrosCubicos : unidades;
-  }
+  String labelFor(double quantity) => quantity == 1 ? singular : plural;
 }
 
 class ProductInfo {
@@ -323,23 +318,36 @@ class ProductInfo {
   const ProductInfo({
     required this.code,
     required this.label,
-    this.unit = ProductUnit.unidades,
+    required this.unit,
   });
 
   factory ProductInfo.fromJson(Map<String, dynamic> json) {
     final code = json['code'] as String;
     final rawUnit = json['unit'];
-    final ProductUnit unit;
-    if (rawUnit is Map) {
-      unit = ProductUnit(
-        singular: rawUnit['singular'] as String? ?? 'unidad',
-        plural: rawUnit['plural'] as String? ?? 'unidades',
-      );
-    } else {
-      unit = ProductUnit.forProductCode(code);
+    final singular = rawUnit is Map ? rawUnit['singular'] : null;
+    final plural = rawUnit is Map ? rawUnit['plural'] : null;
+    if (singular is! String ||
+        singular.isEmpty ||
+        plural is! String ||
+        plural.isEmpty) {
+      throw const FormatException('Producto sin unidad completa');
     }
-    return ProductInfo(code: code, label: json['label'] as String, unit: unit);
+    return ProductInfo(
+      code: code,
+      label: json['label'] as String,
+      unit: ProductUnit(singular: singular, plural: plural),
+    );
   }
+}
+
+/// Cantidad de un producto con etiqueta y unidad tomadas de `/products`.
+class ProductQuantity {
+  final ProductInfo product;
+  final double quantity;
+
+  const ProductQuantity({required this.product, required this.quantity});
+
+  String get unitLabel => product.unit.labelFor(quantity);
 }
 
 /// Valida la cantidad del formulario.

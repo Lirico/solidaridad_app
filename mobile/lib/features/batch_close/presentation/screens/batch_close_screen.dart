@@ -92,7 +92,7 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
     setState(() => _printing = true);
     final PrintResult result = await _printer.printBatchClose(
       ReceiptFormatter.batchCloseToHtml(
-        date: DateTime.now(),
+        date: closed.closedAt,
         defaults: ReceiptDefaults.forMerchant(
           merchantCode: merchant.code,
           merchantName: merchant.name,
@@ -100,7 +100,7 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
           merchantCity: merchant.city,
           merchantTaxId: merchant.taxId,
         ),
-        batchNumber: closed.batchCloseId?.toString() ?? '',
+        batchNumber: closed.batchCloseId.toString(),
         ticket: BatchCloseTicket.fromOperations(closed.operations),
       ),
     );

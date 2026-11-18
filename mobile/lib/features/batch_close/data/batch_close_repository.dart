@@ -30,6 +30,7 @@ class BatchCloseLoadResult {
 class BatchCloseSubmitResult {
   final List<OperationModel> operations;
   final int? batchCloseId;
+  final DateTime? closedAt;
   final bool sessionExpired;
   final bool connectionError;
 
@@ -40,6 +41,7 @@ class BatchCloseSubmitResult {
   const BatchCloseSubmitResult({
     this.operations = const <OperationModel>[],
     this.batchCloseId,
+    this.closedAt,
     this.sessionExpired = false,
     this.connectionError = false,
     this.rejected = false,
@@ -222,10 +224,22 @@ class BatchCloseRepository {
         );
       }
 
-      final List<dynamic> items = body?['items'] as List<dynamic>? ??
-          const <dynamic>[];
+      final int? batchCloseId = (body?['batch_close_id'] as num?)?.toInt();
+      final DateTime? closedAt = DateTime.tryParse(
+        body?['closed_at'] as String? ?? '',
+      )?.toLocal();
+      if (batchCloseId == null || closedAt == null) {
+        return const BatchCloseSubmitResult(
+          connectionError: true,
+          errorMessage: 'Respuesta inesperada del servidor. Reintente.',
+        );
+      }
+
+      final List<dynamic> items =
+          body?['items'] as List<dynamic>? ?? const <dynamic>[];
       return BatchCloseSubmitResult(
-        batchCloseId: (body?['batch_close_id'] as num?)?.toInt(),
+        batchCloseId: batchCloseId,
+        closedAt: closedAt,
         operations: items
             .map(
               (item) => OperationModel.fromJson(item as Map<String, dynamic>),

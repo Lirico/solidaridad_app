@@ -93,8 +93,10 @@ class _Schedule {
 }
 
 class _AuthRepository extends AuthRepository {
-  _AuthRepository()
+  _AuthRepository({this.changePasswordPending})
     : super(httpClient: MockHttpClient(), baseUrl: 'http://localhost');
+
+  final Completer<AuthResponse>? changePasswordPending;
 
   @override
   Future<AuthResponse> login({
@@ -112,6 +114,20 @@ class _AuthRepository extends AuthRepository {
         taxId: '30-71234567-8',
       ),
       message: 'OK',
+    );
+  }
+
+  @override
+  Future<AuthResponse> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String token,
+  }) async {
+    final pending = changePasswordPending;
+    if (pending != null) return pending.future;
+    return const AuthResponse(
+      isSuccess: false,
+      message: 'Cambio de contraseña no configurado para el test.',
     );
   }
 }
@@ -222,6 +238,54 @@ void main() {
     expect(store.current, isNull);
     expect(schedule.timers.last.isActive, isFalse);
   });
+
+  test(
+    'un 401 durante cambio de contraseña expira la sesión sin resucitarla',
+    () async {
+      final repository = _ProductsRepository([_catalogA]);
+      final productSchedule = _Schedule();
+      final store = ProductCatalogStore(
+        repository: repository,
+        schedule: productSchedule.call,
+      );
+      final passwordResponse = Completer<AuthResponse>();
+      final sessions = MemorySessionStore();
+      final cubit = AuthCubit(
+        authRepository: _AuthRepository(
+          changePasswordPending: passwordResponse,
+        ),
+        productCatalogStore: store,
+        sessionStore: sessions,
+        schedule: _Schedule().call,
+      );
+
+      await cubit.login(usernameOrEmail: 'ana@test.com', password: 'secret');
+      await pumpEventQueue();
+      repository.enqueue(const SessionExpiredException());
+
+      final passwordChange = cubit.changePassword(
+        currentPassword: 'secret',
+        newPassword: 'new-secret',
+      );
+      expect(cubit.state, isA<AuthLoading>());
+
+      productSchedule.fireLatest();
+      await pumpEventQueue();
+
+      expect(cubit.state, isA<AuthSessionExpired>());
+      expect(store.current, isNull);
+      expect(await sessions.read(), isNull);
+
+      passwordResponse.complete(
+        const AuthResponse(isSuccess: true, message: 'Contraseña actualizada.'),
+      );
+      await passwordChange;
+
+      expect(cubit.state, isA<AuthSessionExpired>());
+      expect(await sessions.read(), isNull);
+      await cubit.close();
+    },
+  );
 
   test('login y restore disparan la primera carga del catálogo', () async {
     final repository = _ProductsRepository([_catalogA, _catalogB]);

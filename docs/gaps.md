@@ -19,7 +19,9 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > El store se limpia al cerrar o cambiar la sesión. Evidencia:
 > `mobile/lib/features/{sales/data/product_catalog_store.dart,sales/domain/
 > sale_model.dart,balance,batch_close}` y tests de store, sesión, saldo,
-> impresión y cierre.
+> impresión y cierre. **2026-11-18:** un `401` del refresh también invalida la
+> sesión durante estados transitorios como el cambio de contraseña, y una
+> respuesta tardía de esa operación no puede restaurar la sesión invalidada.
 
 > **2026-11-12 — sesión y comercio entre reinicios (G-P0-20):** el access
 > token incluye `exp` a 90 días. Mobile guarda usuario, token, cambio de

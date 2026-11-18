@@ -97,7 +97,36 @@ class ReceiptPrinter {
     );
   }
 
-  /// Un solo ticket de cierre de lote.
+  /// Imprime un solo ticket de consulta de saldo, la copia del cliente.
+  Future<PrintResult> printBalanceTicket({
+    required DateTime date,
+    required ReceiptDefaults defaults,
+    required String cardNumber,
+    required String expirationDate,
+    required List<ProductQuantity> balances,
+    int initAttempts = 3,
+    Duration initRetryDelay = const Duration(milliseconds: 400),
+    int readyTimeoutSec = 8,
+  }) {
+    return _printWhenReady(
+      () async {
+        return _printHtml(
+          ReceiptFormatter.balanceToHtml(
+            date: date,
+            defaults: defaults,
+            cardNumber: cardNumber,
+            expirationDate: expirationDate,
+            balances: balances,
+          ),
+        );
+      },
+      initAttempts: initAttempts,
+      initRetryDelay: initRetryDelay,
+      readyTimeoutSec: readyTimeoutSec,
+    );
+  }
+
+  /// Imprime un solo ticket de cierre de lote.
   Future<PrintResult> printBatchClose(
     String html, {
     int initAttempts = 3,

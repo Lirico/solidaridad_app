@@ -89,6 +89,13 @@ impresión de ticket.
 - Mensajes de error comprensibles a partir de la respuesta del backend/procesador.
 - **Impresión de ticket** en la térmica del Verifone al completar la operación
   (cuando corresponda).
+- Una consulta de saldo aprobada imprime automáticamente un único ticket para
+  el cliente con el comercio vigente de la sesión, el lote administrativo
+  actual, la tarjeta enmascarada, el vencimiento y el saldo por producto en la
+  unidad publicada por `GET /v1/products`: unidades para garrafas/tubos y `m3`
+  para granel. No convierte ni suma cantidades heterogéneas en kg. Una consulta
+  rechazada no imprime; un fallo de la térmica permite reintentar sin cambiar
+  la fecha ni los datos del comprobante.
 - Comprobante en pantalla (respaldo / reimpresión visual).
 - Listado básico de transacciones y detalle/comprobante.
 - Manejo básico de carga, errores y reintentos (incluida idempotencia).
@@ -123,14 +130,17 @@ las pantallas interactivas incluyen:
   corte esas operaciones ya no aparecen en el historial actual ni se pueden
   anular desde la terminal. El botón pide confirmación y rechaza el cierre si hay
   pagos o anulaciones en recuperación (`PENDING` / `UNDER_REVIEW`), para no
-  imprimir un resumen que pueda cambiar. El
-  total se expresa en **kg**: la API no publica importe/precio por producto. El
+  imprimir un resumen que pueda cambiar. El resumen agrupa cantidades por
+  producto y conserva su unidad; no calcula un total en kg porque mezclar
+  unidades y `m3` requiere una conversión de negocio no definida.
+  `GET /v1/products` es la fuente de verdad del código, etiqueta, orden y
+  unidad; saldo y cierre rechazan un código que no exista en ese catálogo. El
   ticket agrupa ventas brutas y anulaciones por producto; como la API representa
   una anulación cambiando la venta original a `VOIDED`, esa operación suma en
   ventas y también resta en anulaciones. La fecha y hora impresas son el
   `closed_at` persistido por la API, por lo que no cambian al reintentar la
-  impresión. El peso por producto continúa en un mapa local hasta que el backend
-  lo publique (ver `docs/gaps.md`, G-P2-10).
+  impresión. Los totales generales suman sólo cantidades de operaciones, no las
+  magnitudes incompatibles de productos distintos (ver `docs/gaps.md`, G-P2-10).
 
 Excepciones: la pantalla de presentación (splash), la pantalla "Iniciando"
 (spinner) y **Login/Registro** no llevan la barra inferior (en auth no hay
@@ -280,7 +290,7 @@ App Flutter (Verifone)
 | Confirmación de venta | No hay pantalla intermedia: una captura válida por banda o ingreso manual inicia el cobro y abre **Procesando Transacción**. Los medios futuros deben conservar el mismo comportamiento. |
 | Comprobante principal | Ticket impreso en térmica. |
 | Comprobante secundario | Visualización en pantalla / historial. |
-| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. |
+| Moneda/producto | Catálogo de productos de gas del backend (no ARS/USD genéricos del borrador mobile). Cada producto informa su unidad de medida con textos `singular` y `plural`: `unidad`/`unidades` para garrafas y tubos, y `m3`/`m3` para granel. Mobile carga el catálogo al iniciar o restaurar una sesión, lo mantiene en un store de sesión con refresco cada 15 minutos y fuerza una carga al primer acceso si todavía no fue inicializado. |
 
 ---
 

@@ -10,6 +10,7 @@ import '../../../../core/widgets/load_error_notice.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../auth/presentation/widgets/user_menu_button.dart';
+import '../../data/product_catalog_store.dart';
 import '../../data/sales_repository.dart';
 import '../../domain/sale_model.dart';
 import '../cubit/sales_cubit.dart';
@@ -26,6 +27,7 @@ class SaleFormScreen extends StatefulWidget {
 
 class _SaleFormScreenState extends State<SaleFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  late final ProductCatalogStore _productCatalogStore;
 
   String _selectedProductCode = '';
   String _selectedProductLabel = '';
@@ -42,24 +44,52 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
     return null;
   }
 
-  String get _quantityUnit => _selectedProduct?.unit.plural ?? 'unidades';
+  String get _quantityUnit => _selectedProduct?.unit.plural ?? '';
 
   bool get _canContinue =>
       !_loadingProducts && _productsError == null && _products.isNotEmpty;
 
-  bool get _allowsDecimals =>
-      _selectedProduct?.unit.allowsDecimals ?? _selectedProductCode == 'GRANEL';
+  bool get _allowsDecimals => _selectedProduct?.unit.allowsDecimals ?? false;
 
   @override
   void initState() {
     super.initState();
+    _productCatalogStore = context.read<ProductCatalogStore>();
+    _productCatalogStore.addListener(_onCatalogUpdated);
     _loadProducts();
+  }
+
+  void _onCatalogUpdated() {
+    final products = _productCatalogStore.current;
+    if (!mounted || products == null) return;
+    setState(() => _replaceProducts(products));
+  }
+
+  void _replaceProducts(List<ProductInfo> products) {
+    _products = products;
+    _loadingProducts = false;
+    _productsError = null;
+    if (products.isEmpty) {
+      _selectedProductCode = '';
+      _selectedProductLabel = '';
+      return;
+    }
+
+    ProductInfo? selected;
+    for (final product in products) {
+      if (product.code == _selectedProductCode) {
+        selected = product;
+        break;
+      }
+    }
+    selected ??= products.first;
+    _selectedProductCode = selected.code;
+    _selectedProductLabel = selected.label;
   }
 
   Future<void> _loadProducts() async {
     final authState = context.read<AuthCubit>().state;
     final token = authState is AuthSuccess ? authState.user!.token : '';
-    final repo = context.read<SalesCubit>().salesRepository;
     if (_productsError != null || !_loadingProducts) {
       setState(() {
         _loadingProducts = true;
@@ -67,17 +97,9 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
       });
     }
     try {
-      final products = await repo.fetchProducts(token: token);
+      final products = await _productCatalogStore.getOrLoad(token: token);
       if (!mounted) return;
-      setState(() {
-        _products = products;
-        _loadingProducts = false;
-        _productsError = null;
-        if (products.isNotEmpty) {
-          _selectedProductCode = products.first.code;
-          _selectedProductLabel = products.first.label;
-        }
-      });
+      setState(() => _replaceProducts(products));
     } on SessionExpiredException {
       if (!mounted) return;
       context.read<AuthCubit>().logout();
@@ -105,6 +127,7 @@ class _SaleFormScreenState extends State<SaleFormScreen> {
 
   @override
   void dispose() {
+    _productCatalogStore.removeListener(_onCatalogUpdated);
     _unitsController.dispose();
     super.dispose();
   }

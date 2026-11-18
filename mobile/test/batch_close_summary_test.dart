@@ -7,6 +7,34 @@ final DateTime _todayMorning = DateTime(2026, 9, 22, 9, 0);
 final DateTime _todayAfternoon = DateTime(2026, 9, 22, 14, 0);
 final DateTime _yesterday = DateTime(2026, 9, 21, 23, 59);
 
+const List<ProductInfo> _products = <ProductInfo>[
+  ProductInfo(
+    code: 'GARRAFA_10',
+    label: 'Garrafa 10 kg',
+    unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+  ),
+  ProductInfo(
+    code: 'GARRAFA_15',
+    label: 'Garrafa 15 kg',
+    unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+  ),
+  ProductInfo(
+    code: 'GARRAFA_30',
+    label: 'Garrafa 30 kg',
+    unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+  ),
+  ProductInfo(
+    code: 'TUBO_45',
+    label: 'Tubo 45 kg',
+    unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+  ),
+  ProductInfo(
+    code: 'GRANEL',
+    label: 'Granel',
+    unit: ProductUnit(singular: 'm3', plural: 'm3'),
+  ),
+];
+
 OperationModel _operation({
   required String productCode,
   required double amount,
@@ -27,9 +55,10 @@ OperationModel _operation({
 
 void main() {
   group('BatchSummary.fromOperations', () {
-    test('agrupa las ventas aprobadas y calcula kg por producto', () {
+    test('agrupa ventas y usa etiqueta, orden y unidad de /products', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000123',
+        products: _products,
         operations: [
           _operation(
             productCode: 'GARRAFA_10',
@@ -61,20 +90,18 @@ void main() {
       expect(garrafa.productCode, 'GARRAFA_10');
       expect(garrafa.label, 'Garrafa 10 kg');
       expect(garrafa.quantity, 15);
-      expect(garrafa.kg, closeTo(150, 0.001));
       expect(garrafa.unitLabel, 'unidades');
 
       final BatchProductItem granel = summary.products.last;
       expect(granel.productCode, 'GRANEL');
-      expect(granel.kg, closeTo(1200, 0.001));
-      expect(granel.unitLabel, 'm³');
-
-      expect(summary.totalKg, closeTo(1665, 0.001));
+      expect(granel.quantity, closeTo(1200, 0.001));
+      expect(granel.unitLabel, 'm3');
     });
 
     test('acumula varias ventas del mismo producto', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
+        products: _products,
         operations: [
           _operation(productCode: 'GARRAFA_15', amount: 3, date: _todayMorning),
           _operation(
@@ -88,12 +115,13 @@ void main() {
       expect(summary.salesCount, 2);
       expect(summary.products.length, 1);
       expect(summary.products.single.quantity, closeTo(5.5, 0.001));
-      expect(summary.products.single.kg, closeTo(82.5, 0.001));
+      expect(summary.products.single.unitLabel, 'unidades');
     });
 
     test('ignora ventas rechazadas, anuladas y con error de conexión', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
+        products: _products,
         operations: [
           _operation(
             productCode: 'GARRAFA_10',
@@ -118,12 +146,12 @@ void main() {
 
       expect(summary.salesCount, 0);
       expect(summary.products, isEmpty);
-      expect(summary.totalKg, 0);
     });
 
     test('incluye ventas de cualquier fecha del lote actual', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
+        products: _products,
         operations: [
           _operation(productCode: 'GARRAFA_10', amount: 5, date: _yesterday),
           _operation(productCode: 'GARRAFA_10', amount: 2, date: _todayMorning),
@@ -137,6 +165,7 @@ void main() {
     test('ordena los productos según el catálogo', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000001',
+        products: _products,
         operations: [
           _operation(productCode: 'GRANEL', amount: 1, date: _todayMorning),
           _operation(productCode: 'TUBO_45', amount: 1, date: _todayMorning),
@@ -155,23 +184,23 @@ void main() {
       ]);
     });
 
-    test('un producto fuera del catálogo usa kg 1:1 y queda al final', () {
-      final BatchSummary summary = BatchSummary.fromOperations(
-        batchNumber: '000001',
-        operations: [
-          _operation(productCode: 'OTRO', amount: 3, date: _todayMorning),
-          _operation(productCode: 'GARRAFA_10', amount: 1, date: _todayMorning),
-        ],
+    test('rechaza un producto ausente de /products', () {
+      expect(
+        () => BatchSummary.fromOperations(
+          batchNumber: '000001',
+          products: _products,
+          operations: [
+            _operation(productCode: 'OTRO', amount: 3, date: _todayMorning),
+          ],
+        ),
+        throwsStateError,
       );
-
-      expect(summary.products.last.productCode, 'OTRO');
-      expect(summary.products.last.kg, closeTo(3, 0.001));
-      expect(summary.products.last.unitLabel, 'unidades');
     });
 
     test('conserva el número de lote y la marca de resumen parcial', () {
       final BatchSummary summary = BatchSummary.fromOperations(
         batchNumber: '000007',
+        products: _products,
         isPartial: true,
         operations: [
           _operation(productCode: 'GARRAFA_10', amount: 1, date: _todayMorning),

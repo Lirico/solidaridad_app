@@ -38,15 +38,25 @@ class BatchCloseCubit extends Cubit<BatchCloseState> {
       return;
     }
 
-    emit(
-      BatchCloseLoaded(
-        summary: BatchSummary.fromOperations(
-          operations: result.operations,
-          batchNumber: currentBatchNumber,
-          isPartial: result.isPartial,
+    try {
+      emit(
+        BatchCloseLoaded(
+          summary: BatchSummary.fromOperations(
+            operations: result.operations,
+            products: result.products,
+            batchNumber: currentBatchNumber,
+            isPartial: result.isPartial,
+          ),
         ),
-      ),
-    );
+      );
+    } on StateError {
+      emit(
+        const BatchCloseFailed(
+          message:
+              'El catálogo de productos no coincide con las operaciones del lote.',
+        ),
+      );
+    }
   }
 
   /// Cierra el lote actual. La misma clave se conserva para reintentar una
@@ -97,6 +107,7 @@ class BatchCloseCubit extends Cubit<BatchCloseState> {
         batchCloseId: batchCloseId,
         closedAt: closedAt,
         operations: result.operations,
+        products: summary.catalog,
       ),
     );
   }

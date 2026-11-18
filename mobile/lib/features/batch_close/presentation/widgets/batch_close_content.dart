@@ -166,7 +166,7 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// Card "Resumen de Ventas": cantidad de ventas y total del lote.
+/// Card "Resumen de Ventas": cantidad de operaciones aprobadas.
 class _SummaryCard extends StatelessWidget {
   final BatchSummary summary;
 
@@ -180,20 +180,10 @@ class _SummaryCard extends StatelessWidget {
         border: Border.all(color: Colors.grey.shade200),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        children: [
-          _SummaryRow(
-            label: 'Cantidad de Ventas',
-            value: '${summary.salesCount}',
-            valueColor: AppColors.successGreen,
-          ),
-          const SizedBox(height: 10),
-          _SummaryRow(
-            label: 'Total de Ventas',
-            value: '${formatQuantityEsExact(summary.totalKg)} kg',
-            valueColor: AppColors.successStrong,
-          ),
-        ],
+      child: _SummaryRow(
+        label: 'Cantidad de Ventas',
+        value: '${summary.salesCount}',
+        valueColor: AppColors.successGreen,
       ),
     );
   }
@@ -267,14 +257,7 @@ class _PartialWarning extends StatelessWidget {
   }
 }
 
-// Anchos de columna pensados para el peor caso con decimales (p. ej.
-// "10.001,25 Kg" ≈ 86px en Roboto 14 bold): al dejar de redondear, la columna
-// de kg pasó de 78 a 92 y la de cantidad de 60 a 68. No hay test que lo mida
-// porque `flutter test` usa una fuente de prueba donde cada glifo mide el tamaño
-// de fuente (mediría ~1,8× el ancho real); la verificación es visual en el
-// dispositivo con un resumen que tenga fracciones.
-const double _qtyColumnWidth = 68;
-const double _kgColumnWidth = 92;
+const double _qtyColumnWidth = 120;
 
 /// Cabecera de la tabla de productos (mismos anchos que [_ProductRow]).
 class _ProductsHeaderRow extends StatelessWidget {
@@ -297,16 +280,6 @@ class _ProductsHeaderRow extends StatelessWidget {
               style: _headerStyle,
             ),
           ),
-          SizedBox(
-            width: _kgColumnWidth,
-            child: Text(
-              'Kg',
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: _headerStyle,
-            ),
-          ),
         ],
       ),
     );
@@ -319,7 +292,7 @@ const TextStyle _headerStyle = TextStyle(
   color: AppColors.textSecondary,
 );
 
-/// Fila de "Ventas por Producto": producto, cantidad vendida y kg.
+/// Fila de "Ventas por Producto": producto, cantidad y unidad del catálogo.
 class _ProductRow extends StatelessWidget {
   final BatchProductItem item;
 
@@ -352,20 +325,7 @@ class _ProductRow extends StatelessWidget {
           SizedBox(
             width: _qtyColumnWidth,
             child: Text(
-              formatQuantityEsExact(item.quantity),
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: _kgColumnWidth,
-            child: Text(
-              '${formatQuantityEsExact(item.kg)} Kg',
+              '${formatQuantityEsExact(item.quantity)} ${item.unitLabel}',
               textAlign: TextAlign.right,
               maxLines: 1,
               style: const TextStyle(

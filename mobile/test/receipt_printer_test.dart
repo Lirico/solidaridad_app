@@ -157,4 +157,75 @@ void main() {
     verify(() => bridge.printHtml(any())).called(1);
     verifyNever(() => bridge.tearDown());
   });
+
+  test('la consulta de saldo imprime una sola copia cliente', () async {
+    when(
+      () => bridge.getStatus(),
+    ).thenAnswer((_) async => <String, dynamic>{'sdiReady': true});
+    when(
+      () => bridge.printHtml(any()),
+    ).thenAnswer((_) async => <String, dynamic>{'ok': true});
+
+    final PrintResult result = await printer.printBalanceTicket(
+      date: DateTime(2026, 11, 12, 17, 27, 4),
+      defaults: ReceiptDefaults.forMerchant(
+        merchantCode: '014114',
+        merchantName: 'COMERCIO REAL',
+        merchantAddress: 'Alem 100',
+        merchantCity: 'Tolhuin',
+        merchantTaxId: '30-71234567-8',
+        batchNumber: 'ACTUAL',
+      ),
+      cardNumber: '6063007014007403',
+      expirationDate: '2808',
+      balances: const <ProductQuantity>[
+        ProductQuantity(
+          product: ProductInfo(
+            code: 'GARRAFA_10',
+            label: 'Garrafa 10 kg',
+            unit: ProductUnit(singular: 'unidad', plural: 'unidades'),
+          ),
+          quantity: 10,
+        ),
+        ProductQuantity(
+          product: ProductInfo(
+            code: 'GRANEL',
+            label: 'Granel',
+            unit: ProductUnit(singular: 'm3', plural: 'm3'),
+          ),
+          quantity: 2.5,
+        ),
+      ],
+    );
+
+    expect(result.ok, isTrue);
+    final String html =
+        verify(() => bridge.printHtml(captureAny())).captured.single as String;
+    expect(html, contains('CONSULTA SALDO'));
+    expect(html, contains('COPIA CLIENTE'));
+    expect(html, contains('COMERCIO REAL'));
+    expect(html, contains('Alem 100, Tolhuin'));
+    expect(html, contains('Comercio: 014114'));
+    expect(html, contains('Lote: ACTUAL'));
+    expect(html, contains('Garrafa 10 kg: 10 unidades'));
+    expect(html, contains('Granel: 2,5 m3'));
+    expect(html, isNot(contains('KG 101.00')));
+    expect(html, isNot(contains('ORIGINAL COMERCIO')));
+    expect(html, isNot(contains('Gas Austral')));
+  });
+
+  test('el cierre de lote imprime una sola copia del HTML recibido', () async {
+    when(
+      () => bridge.getStatus(),
+    ).thenAnswer((_) async => <String, dynamic>{'sdiReady': true});
+    when(
+      () => bridge.printHtml(any()),
+    ).thenAnswer((_) async => <String, dynamic>{'ok': true});
+
+    const html = '<html><body>CIERRE DE LOTE</body></html>';
+    final result = await printer.printBatchClose(html);
+
+    expect(result.ok, isTrue);
+    verify(() => bridge.printHtml(html)).called(1);
+  });
 }

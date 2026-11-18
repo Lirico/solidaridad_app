@@ -1,41 +1,12 @@
 import '../../sales/domain/sale_model.dart';
 
-/// Equivalencia en kg por unidad vendida.
-///
-/// El catálogo (`packages/catalog`) expone código, etiqueta y unidad
-/// (`unidades` / `m3`) pero **no** el peso por producto. Este mapa replica la
-/// equivalencia que usa el mockup del cliente (15 garrafas de 10 kg = 150 Kg).
-/// `GRANEL` se mide en m³ y el mockup lo muestra en Kg, así que vale 1:1.
-/// **Pendiente:** cuando se confirme el endpoint del backend que expone el peso
-/// por producto, este mapa se reemplaza por el valor del catálogo. Ver
-/// `docs/gaps.md` (G-P2-10).
-const Map<String, double> batchKgPerUnit = <String, double>{
-  'GARRAFA_10': 10,
-  'GARRAFA_15': 15,
-  'GARRAFA_30': 30,
-  'TUBO_45': 45,
-  'GRANEL': 1,
-};
-
-/// Orden de las filas de "Ventas por Producto" (mismo orden del catálogo).
-const List<String> _productOrder = <String>[
-  'GARRAFA_10',
-  'GARRAFA_15',
-  'GARRAFA_30',
-  'TUBO_45',
-  'GRANEL',
-];
-
-/// Fila de "Ventas por Producto": cantidad vendida y su equivalente en kg.
+/// Fila de "Ventas por Producto" con la unidad publicada por `/products`.
 class BatchProductItem {
   final String productCode;
   final String label;
 
   /// Cantidad vendida: unidades (o m³ para `GRANEL`).
   final double quantity;
-
-  /// Equivalente en kg (para `GRANEL`, m³ 1:1 como en el mockup).
-  final double kg;
 
   /// Unidad de [quantity] para mensajes y detalle.
   final String unitLabel;
@@ -44,21 +15,18 @@ class BatchProductItem {
     required this.productCode,
     required this.label,
     required this.quantity,
-    required this.kg,
     required this.unitLabel,
   });
 
-  factory BatchProductItem.fromCode({
-    required String productCode,
-    required String label,
+  factory BatchProductItem.fromProduct({
+    required ProductInfo product,
     required double quantity,
   }) {
     return BatchProductItem(
-      productCode: productCode,
-      label: label,
+      productCode: product.code,
+      label: product.label,
       quantity: quantity,
-      kg: quantity * (batchKgPerUnit[productCode] ?? 1),
-      unitLabel: productCode == 'GRANEL' ? 'm³' : 'unidades',
+      unitLabel: product.unit.labelFor(quantity),
     );
   }
 }
@@ -76,15 +44,11 @@ class BatchSummary {
   /// Cantidad de ventas aprobadas del lote.
   final int salesCount;
 
-  /// Suma de kg de todas las ventas aprobadas del lote.
-  ///
-  /// Es la única magnitud agregable hoy: `amount` en la API es **cantidad**
-  /// (`api/docs/payments-plan.md`), no importe, así que no hay un total en
-  /// pesos hasta que se resuelva la decisión D-3 de `docs/errores-ventas.md`.
-  final double totalKg;
-
   /// Ventas por producto, en orden de catálogo. Solo productos con ventas.
   final List<BatchProductItem> products;
+
+  /// Catálogo vigente usado para validar y ordenar el resumen y su ticket.
+  final List<ProductInfo> catalog;
 
   /// `true` si se alcanzó el tope de páginas y el resumen puede estar incompleto.
   final bool isPartial;
@@ -92,8 +56,8 @@ class BatchSummary {
   const BatchSummary({
     required this.batchNumber,
     required this.salesCount,
-    required this.totalKg,
     required this.products,
+    this.catalog = const <ProductInfo>[],
     this.isPartial = false,
   });
 
@@ -102,74 +66,87 @@ class BatchSummary {
   /// La API ya limita [operations] al lote administrativo actual.
   factory BatchSummary.fromOperations({
     required List<OperationModel> operations,
+    required List<ProductInfo> products,
     required String batchNumber,
     bool isPartial = false,
   }) {
     final Map<String, BatchProductItem> byProduct =
         <String, BatchProductItem>{};
     int salesCount = 0;
+    final Map<String, ProductInfo> productsByCode = <String, ProductInfo>{
+      for (final product in products) product.code: product,
+    };
+    final Map<String, int> productOrder = <String, int>{
+      for (final entry in products.indexed) entry.$2.code: entry.$1,
+    };
 
     for (final OperationModel operation in operations) {
       if (operation.result != PaymentResult.approved) continue;
+      final ProductInfo? product = productsByCode[operation.productCode];
+      if (product == null) {
+        throw StateError(
+          'Producto ${operation.productCode} ausente de /products',
+        );
+      }
 
       salesCount++;
       final double quantity =
           (byProduct[operation.productCode]?.quantity ?? 0) + operation.amount;
-      byProduct[operation.productCode] = BatchProductItem.fromCode(
-        productCode: operation.productCode,
-        label: operation.productLabel,
+      byProduct[operation.productCode] = BatchProductItem.fromProduct(
+        product: product,
         quantity: quantity,
       );
     }
 
-    final List<BatchProductItem> products = byProduct.values.toList()
+    final List<BatchProductItem> summaryProducts = byProduct.values.toList()
       ..sort(
-        (a, b) =>
-            _orderIndex(a.productCode).compareTo(_orderIndex(b.productCode)),
+        (a, b) => (productOrder[a.productCode] ?? products.length).compareTo(
+          productOrder[b.productCode] ?? products.length,
+        ),
       );
 
     return BatchSummary(
       batchNumber: batchNumber,
       salesCount: salesCount,
-      totalKg: products.fold<double>(0, (sum, item) => sum + item.kg),
-      products: products,
+      products: summaryProducts,
+      catalog: List<ProductInfo>.unmodifiable(products),
       isPartial: isPartial,
     );
   }
 }
 
-int _orderIndex(String productCode) {
-  final int index = _productOrder.indexOf(productCode);
-  return index < 0 ? _productOrder.length : index;
-}
-
 /// Un producto del ticket de cierre: ventas y anulaciones de ese corte.
 class BatchCloseProductSlip {
-  final String code;
-  final String label;
+  final ProductInfo product;
   final int salesCount;
-  final double salesKg;
+  final double salesQuantity;
   final int voidCount;
-  final double voidKg;
+  final double voidQuantity;
 
   const BatchCloseProductSlip({
-    required this.code,
-    required this.label,
+    required this.product,
     required this.salesCount,
-    required this.salesKg,
+    required this.salesQuantity,
     required this.voidCount,
-    required this.voidKg,
+    required this.voidQuantity,
   });
+
+  String get code => product.code;
+
+  String get label => product.label;
 
   int get totalCount => salesCount - voidCount;
 
-  double get totalKg => salesKg - voidKg;
+  double get totalQuantity => salesQuantity - voidQuantity;
+
+  String unitLabel(double quantity) => product.unit.labelFor(quantity);
 }
 
 /// Comprobante de un corte ya cerrado, agrupado por producto.
 ///
 /// Las notas de crédito no existen en la API: esa línea queda en cero.
-/// Los kilos usan [batchKgPerUnit], la misma equivalencia de la pantalla.
+/// Cada cantidad conserva la unidad publicada por `/products`; no suma
+/// magnitudes heterogéneas entre productos.
 class BatchCloseTicket {
   final List<BatchCloseProductSlip> products;
 
@@ -178,69 +155,77 @@ class BatchCloseTicket {
   int get salesCount =>
       products.fold<int>(0, (sum, item) => sum + item.salesCount);
 
-  double get salesKg =>
-      products.fold<double>(0, (sum, item) => sum + item.salesKg);
-
   int get voidCount =>
       products.fold<int>(0, (sum, item) => sum + item.voidCount);
 
-  double get voidKg =>
-      products.fold<double>(0, (sum, item) => sum + item.voidKg);
-
   int get totalCount => salesCount - voidCount;
 
-  double get totalKg => salesKg - voidKg;
-
-  factory BatchCloseTicket.fromOperations(List<OperationModel> operations) {
+  factory BatchCloseTicket.fromOperations({
+    required List<OperationModel> operations,
+    required List<ProductInfo> products,
+  }) {
     final Map<String, _ProductTally> byProduct = <String, _ProductTally>{};
+    final productsByCode = <String, ProductInfo>{
+      for (final product in products) product.code: product,
+    };
+    final productOrder = <String, int>{
+      for (final entry in products.indexed) entry.$2.code: entry.$1,
+    };
 
     for (final OperationModel operation in operations) {
       final bool approved = operation.result == PaymentResult.approved;
       final bool voided = operation.result == PaymentResult.voided;
       if (!approved && !voided) continue;
 
+      final product = productsByCode[operation.productCode];
+      if (product == null) {
+        throw StateError(
+          'Producto ${operation.productCode} ausente de /products',
+        );
+      }
       final _ProductTally tally = byProduct.putIfAbsent(
         operation.productCode,
-        () => _ProductTally(operation.productLabel),
+        () => _ProductTally(product),
       );
-      final double kg =
-          operation.amount * (batchKgPerUnit[operation.productCode] ?? 1);
       // La API representa una anulación actualizando la venta original a
       // VOIDED, no agregando una segunda operación. Por eso una anulada forma
       // parte de las ventas brutas y, además, resta en ANULACIONES.
       tally.salesCount += 1;
-      tally.salesKg += kg;
+      tally.salesQuantity += operation.amount;
       if (voided) {
         tally.voidCount += 1;
-        tally.voidKg += kg;
+        tally.voidQuantity += operation.amount;
       }
     }
 
-    final List<BatchCloseProductSlip> products =
+    final List<BatchCloseProductSlip> ticketProducts =
         byProduct.entries
             .map(
               (entry) => BatchCloseProductSlip(
-                code: entry.key,
-                label: entry.value.label,
+                product: entry.value.product,
                 salesCount: entry.value.salesCount,
-                salesKg: entry.value.salesKg,
+                salesQuantity: entry.value.salesQuantity,
                 voidCount: entry.value.voidCount,
-                voidKg: entry.value.voidKg,
+                voidQuantity: entry.value.voidQuantity,
               ),
             )
             .toList()
-          ..sort((a, b) => _orderIndex(a.code).compareTo(_orderIndex(b.code)));
+          ..sort(
+            (a, b) => (productOrder[a.code] ?? products.length).compareTo(
+              productOrder[b.code] ?? products.length,
+            ),
+          );
 
-    return BatchCloseTicket(products: products);
+    return BatchCloseTicket(products: ticketProducts);
   }
 }
 
 class _ProductTally {
-  final String label;
+  final ProductInfo product;
   int salesCount = 0;
-  double salesKg = 0;
+  double salesQuantity = 0;
   int voidCount = 0;
-  double voidKg = 0;
+  double voidQuantity = 0;
 
-  _ProductTally(this.label);
+  _ProductTally(this.product);
 }

@@ -5,11 +5,14 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/api_config.dart';
+import '../../sales/data/product_catalog_store.dart';
+import '../../sales/data/sales_repository.dart';
 import '../../sales/domain/sale_model.dart';
 
 /// Resultado de la carga de operaciones para el resumen del lote.
 class BatchCloseLoadResult {
   final List<OperationModel> operations;
+  final List<ProductInfo> products;
 
   /// `true` si se alcanzó el tope de páginas y el resumen puede estar incompleto.
   final bool isPartial;
@@ -19,6 +22,7 @@ class BatchCloseLoadResult {
 
   const BatchCloseLoadResult({
     required this.operations,
+    this.products = const <ProductInfo>[],
     this.isPartial = false,
     this.sessionExpired = false,
     this.connectionError = false,
@@ -70,18 +74,20 @@ class BatchCloseRepository {
 
   final http.Client _httpClient;
   final String _baseUrl;
+  final ProductCatalogStore _productCatalogStore;
 
-  BatchCloseRepository({http.Client? httpClient, String? baseUrl})
-    : _httpClient = httpClient ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+  BatchCloseRepository({
+    required this._productCatalogStore,
+    http.Client? httpClient,
+    String? baseUrl,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   /// Carga las operaciones de la ventana del lote.
   ///
   /// La API devuelve únicamente el lote administrativo actual: las
   /// transacciones ya cerradas no aparecen en este listado.
-  Future<BatchCloseLoadResult> loadOperations({
-    required String token,
-  }) async {
+  Future<BatchCloseLoadResult> loadOperations({required String token}) async {
     final List<OperationModel> collected = <OperationModel>[];
 
     // La paginación por offset sobre una lista que crece (ventas nuevas) puede
@@ -92,16 +98,18 @@ class BatchCloseRepository {
     bool isPartial = false;
 
     try {
+      final products = await _productCatalogStore.getOrLoad(token: token);
+      final Map<String, String> headers = <String, String>{
+        HttpHeaders.contentTypeHeader: 'application/json',
+        HttpHeaders.authorizationHeader: 'Bearer $token',
+      };
       for (int page = 0; page < maxPages; page++) {
         final response = await _httpClient
             .get(
               Uri.parse(
                 '$_baseUrl/transactions?limit=$pageSize&offset=$offset',
               ),
-              headers: <String, String>{
-                HttpHeaders.contentTypeHeader: 'application/json',
-                HttpHeaders.authorizationHeader: 'Bearer $token',
-              },
+              headers: headers,
             )
             .timeout(_timeout);
 
@@ -137,7 +145,7 @@ class BatchCloseRepository {
 
         // Si entró una venta entre dos páginas, el offset se corrió y la API
         // repite el último ítem de la página anterior: se descarta por Nº de
-        // operación para no contar la venta (ni sus kg) dos veces.
+        // operación para no contar la misma venta dos veces.
         collected.addAll(pageItems.where((item) => seenIds.add(item.id)));
         offset += pageItems.length;
 
@@ -150,7 +158,22 @@ class BatchCloseRepository {
         if (page == maxPages - 1) isPartial = true;
       }
 
-      return BatchCloseLoadResult(operations: collected, isPartial: isPartial);
+      return BatchCloseLoadResult(
+        operations: collected,
+        products: products,
+        isPartial: isPartial,
+      );
+    } on SessionExpiredException {
+      return const BatchCloseLoadResult(
+        operations: <OperationModel>[],
+        sessionExpired: true,
+      );
+    } on DataLoadException catch (error) {
+      return BatchCloseLoadResult(
+        operations: const <OperationModel>[],
+        connectionError: true,
+        errorMessage: error.message,
+      );
     } on TimeoutException {
       return const BatchCloseLoadResult(
         operations: <OperationModel>[],

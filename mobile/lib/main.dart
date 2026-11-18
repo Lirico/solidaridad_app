@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 
 import 'core/config/api_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
+import 'features/sales/data/product_catalog_store.dart';
 import 'features/sales/data/sales_repository.dart';
 import 'features/sales/presentation/cubit/sales_cubit.dart';
 import 'features/balance/data/balance_repository.dart';
@@ -51,31 +53,38 @@ void startApp(ApiConfigResolution config) {
   }
 
   final salesRepository = SalesRepository();
+  final productCatalogStore = ProductCatalogStore(repository: salesRepository);
   final balanceRepository = BalanceRepository();
-  final batchCloseRepository = BatchCloseRepository();
+  final batchCloseRepository = BatchCloseRepository(
+    productCatalogStore: productCatalogStore,
+  );
   final authRepository = AuthRepository();
 
   runApp(
-    MultiBlocProvider(
-      providers: [
-        BlocProvider<SalesCubit>(
-          create: (context) => SalesCubit(salesRepository: salesRepository),
-        ),
-        BlocProvider<BalanceCubit>(
-          create: (context) => BalanceCubit(repository: balanceRepository),
-        ),
-        BlocProvider<BatchCloseCubit>(
-          create: (context) =>
-              BatchCloseCubit(repository: batchCloseRepository),
-        ),
-        BlocProvider<AuthCubit>(
-          create: (context) => AuthCubit(
-            authRepository: authRepository,
-            sessionStore: SecureSessionStore(),
+    ChangeNotifierProvider<ProductCatalogStore>.value(
+      value: productCatalogStore,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<SalesCubit>(
+            create: (context) => SalesCubit(salesRepository: salesRepository),
           ),
-        ),
-      ],
-      child: const MyApp(),
+          BlocProvider<BalanceCubit>(
+            create: (context) => BalanceCubit(repository: balanceRepository),
+          ),
+          BlocProvider<BatchCloseCubit>(
+            create: (context) =>
+                BatchCloseCubit(repository: batchCloseRepository),
+          ),
+          BlocProvider<AuthCubit>(
+            create: (context) => AuthCubit(
+              authRepository: authRepository,
+              productCatalogStore: productCatalogStore,
+              sessionStore: SecureSessionStore(),
+            ),
+          ),
+        ],
+        child: const MyApp(),
+      ),
     ),
   );
 }

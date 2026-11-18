@@ -66,29 +66,28 @@ class ReceiptDefaults {
     );
   }
 
-  /// Comercio de la cuenta, sin cupón ni autorización.
+  /// Arma un comprobante no asociado a una venta con el comercio vigente.
   factory ReceiptDefaults.forMerchant({
     required String merchantCode,
     required String merchantName,
     required String merchantAddress,
     required String merchantCity,
     required String merchantTaxId,
+    String batchNumber = '',
   }) {
-    return ReceiptDefaults.forSale(
-      merchantCode: merchantCode,
-      merchantName: merchantName,
-      merchantAddress: merchantAddress,
-      merchantCity: merchantCity,
-      merchantTaxId: merchantTaxId,
-      operation: OperationModel(
-        id: '',
-        productCode: '',
-        productLabel: '',
-        amount: 0,
-        cardNumber: '',
-        result: PaymentResult.approved,
-        date: DateTime.utc(2026),
-      ),
+    return ReceiptDefaults(
+      issuerName: issuer,
+      establishmentName: merchantName,
+      establishmentAddress: printedAddress(merchantAddress, merchantCity),
+      establishmentCuit: merchantTaxId,
+      establishmentCode: merchantCode,
+      couponNumber: '',
+      batchNumber: batchNumber,
+      authorizationCode: '',
+      currency: currencyCode,
+      installments: installmentCount,
+      installmentPlan: planName,
+      originalChargeNumber: '',
     );
   }
 

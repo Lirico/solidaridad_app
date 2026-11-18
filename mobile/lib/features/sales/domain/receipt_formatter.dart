@@ -165,6 +165,125 @@ class ReceiptFormatter {
         ? '<div class="firma">ORIGINAL COMERCIO</div>'
         : '';
 
+    return _document(
+      body:
+          '''
+  <table>
+    <tr>
+      <td class="l">${_esc(_formatDate(op.date))}</td>
+      <td class="c b">${_esc(defaults.issuerName)}<br/><span>${_esc(operationTypeLabel(op.result))}</span></td>
+      <td class="r">${_esc(_formatTime(op.date))}</td>
+    </tr>
+  </table>
+  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
+  <div class="c">${_esc(defaults.establishmentAddress)}</div>
+  <div class="c">${_esc(defaults.establishmentCuit)}</div>
+  <div class="detail">
+    ${lines.join('\n    ')}
+  </div>
+  <div class="c big status">${_esc(_statusLabel(op))}</div>
+  $declineReason
+  $verificationWarning
+  $signature
+  $customerLegend
+  $merchantLegend
+  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+''',
+    );
+  }
+
+  /// Una consulta de saldo aprobada: un solo ticket, copia cliente.
+  ///
+  /// El encabezado, el comercio y los márgenes son los de [toHtml]. La línea
+  /// de saldo ocupa el lugar del resultado y queda a la izquierda, en negrita.
+  static String balanceToHtml({
+    required DateTime date,
+    required ReceiptDefaults defaults,
+    required String cardNumber,
+    required String expirationDate,
+    required List<ProductQuantity> balances,
+  }) {
+    final lines = <String>[
+      _line('Terminal', terminalId),
+      _line('Comercio', defaults.establishmentCode),
+      _line('Lote', defaults.batchNumber),
+      _line('Tarjeta', maskPan(cardNumber)),
+      _line('Vencimiento', formatCardExpiry(expirationDate)),
+    ];
+    final balanceLines = balances
+        .map(
+          (item) => _line(
+            item.product.label,
+            '${formatQuantityEsExact(item.quantity)} ${item.unitLabel}',
+            emphasize: true,
+          ),
+        )
+        .join('\n    ');
+    return _document(
+      body:
+          '''
+  <table>
+    <tr>
+      <td class="l">${_esc(_formatDate(date))}</td>
+      <td class="c b">${_esc(defaults.issuerName)}<br/><span>CONSULTA SALDO</span></td>
+      <td class="r">${_esc(_formatTime(date))}</td>
+    </tr>
+  </table>
+  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
+  <div class="c">${_esc(defaults.establishmentAddress)}</div>
+  <div class="c">${_esc(defaults.establishmentCuit)}</div>
+  <div class="detail">
+    ${lines.join('\n    ')}
+    <hr/>
+    <div class="b">SALDOS POR PRODUCTO</div>
+    $balanceLines
+  </div>
+  <div class="c b">COPIA CLIENTE</div>
+  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+''',
+    );
+  }
+
+  /// Texto de la consulta de saldo, para pruebas y registro.
+  static String balanceToPlainText({
+    required DateTime date,
+    required ReceiptDefaults defaults,
+    required String cardNumber,
+    required String expirationDate,
+    required List<ProductQuantity> balances,
+  }) {
+    return [
+      '${_formatDate(date)}  ${defaults.issuerName}  ${_formatTime(date)}',
+      'CONSULTA SALDO',
+      defaults.establishmentName,
+      defaults.establishmentAddress,
+      defaults.establishmentCuit,
+      'Terminal: $terminalId',
+      'Comercio: ${defaults.establishmentCode}',
+      'Lote: ${defaults.batchNumber}',
+      'Tarjeta: ${maskPan(cardNumber)}',
+      'Vencimiento: ${formatCardExpiry(expirationDate)}',
+      'SALDOS POR PRODUCTO',
+      ...balances.map(productQuantityLine),
+      'COPIA CLIENTE',
+    ].join('\n');
+  }
+
+  static String productQuantityLine(ProductQuantity item) {
+    return '${item.product.label}: '
+        '${formatQuantityEsExact(item.quantity)} ${item.unitLabel}';
+  }
+
+  /// El vencimiento de la tarjeta llega como `YYMM`. En el papel se lee `MM/YY`.
+  static String formatCardExpiry(String value) {
+    final trimmed = value.trim();
+    if (RegExp(r'^\d{4}$').hasMatch(trimmed)) {
+      return '${trimmed.substring(2)}/${trimmed.substring(0, 2)}';
+    }
+    return trimmed;
+  }
+
+  static String _document({required String body}) {
     return '''
 <!DOCTYPE html>
 <html>
@@ -188,27 +307,7 @@ class ReceiptFormatter {
 </style>
 </head>
 <body>
-  <table>
-    <tr>
-      <td class="l">${_esc(_formatDate(op.date))}</td>
-      <td class="c b">${_esc(defaults.issuerName)}<br/><span>${_esc(operationTypeLabel(op.result))}</span></td>
-      <td class="r">${_esc(_formatTime(op.date))}</td>
-    </tr>
-  </table>
-  <div class="c b merchant">${_esc(defaults.establishmentName)}</div>
-  <div class="c">${_esc(defaults.establishmentAddress)}</div>
-  <div class="c">${_esc(defaults.establishmentCuit)}</div>
-  <div class="detail">
-    ${lines.join('\n    ')}
-  </div>
-  <div class="c big status">${_esc(_statusLabel(op))}</div>
-  $declineReason
-  $verificationWarning
-  $signature
-  $customerLegend
-  $merchantLegend
-  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
-</body>
+$body</body>
 </html>
 ''';
   }
@@ -225,14 +324,29 @@ class ReceiptFormatter {
       products
         ..write('<div class="band">${_esc(product.label.toUpperCase())}</div>')
         ..write('<div class="rows">')
-        ..write(_batchRow('VENTAS', product.salesCount, product.salesKg))
-        ..write(_batchRow('N. CREDITO', 0, 0))
-        ..write(_batchRow('ANULACIONES', product.voidCount, product.voidKg))
         ..write(
-          _batchRow(
+          _batchProductRow(
+            'VENTAS',
+            product.salesCount,
+            product.salesQuantity,
+            product.unitLabel(product.salesQuantity),
+          ),
+        )
+        ..write(_batchProductRow('N. CREDITO', 0, 0, product.unitLabel(0)))
+        ..write(
+          _batchProductRow(
+            'ANULACIONES',
+            product.voidCount,
+            product.voidQuantity,
+            product.unitLabel(product.voidQuantity),
+          ),
+        )
+        ..write(
+          _batchProductRow(
             'TOTAL',
             product.totalCount,
-            product.totalKg,
+            product.totalQuantity,
+            product.unitLabel(product.totalQuantity),
             emphasize: true,
           ),
         )
@@ -285,10 +399,10 @@ class ReceiptFormatter {
   <hr/>
   <div class="issuer">TOTALES POR EMISOR</div>
   <div class="rows">
-    ${_batchRow('VENTAS', ticket.salesCount, ticket.salesKg)}
-    ${_batchRow('N. CREDITO', 0, 0)}
-    ${_batchRow('ANULACIONES', ticket.voidCount, ticket.voidKg)}
-    ${_batchRow('TOTAL', ticket.totalCount, ticket.totalKg, emphasize: true)}
+    ${_batchCountRow('VENTAS', ticket.salesCount)}
+    ${_batchCountRow('N. CREDITO', 0)}
+    ${_batchCountRow('ANULACIONES', ticket.voidCount)}
+    ${_batchCountRow('TOTAL', ticket.totalCount, emphasize: true)}
   </div>
   <div class="ok">Cierre de lote OK</div>
   <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
@@ -297,16 +411,27 @@ class ReceiptFormatter {
 ''';
   }
 
-  static String _batchRow(
+  static String _batchProductRow(
     String label,
     int count,
-    double kilograms, {
+    double quantity,
+    String unit, {
     bool emphasize = false,
   }) {
     final String css = emphasize ? ' class="b"' : '';
     final String countText = count.toString().padLeft(3, '0');
-    final String kg = '${formatQuantityEs(kilograms, decimals: 2)} kg';
-    return '<div$css>${_esc(label)} $countText - ${_esc(kg)}</div>';
+    final String amount = '${formatQuantityEsExact(quantity)} $unit';
+    return '<div$css>${_esc(label)} $countText - ${_esc(amount)}</div>';
+  }
+
+  static String _batchCountRow(
+    String label,
+    int count, {
+    bool emphasize = false,
+  }) {
+    final String css = emphasize ? ' class="b"' : '';
+    final String countText = count.toString().padLeft(3, '0');
+    return '<div$css>${_esc(label)} $countText</div>';
   }
 
   static String _line(String label, String value, {bool emphasize = false}) {

@@ -89,6 +89,23 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
       return;
     }
 
+    final BatchCloseTicket ticket;
+    try {
+      ticket = BatchCloseTicket.fromOperations(
+        operations: closed.operations,
+        products: closed.products,
+      );
+    } on StateError {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'El catálogo de productos no coincide con las operaciones cerradas.',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _printing = true);
     final PrintResult result = await _printer.printBatchClose(
       ReceiptFormatter.batchCloseToHtml(
@@ -101,7 +118,7 @@ class _BatchCloseScreenState extends State<BatchCloseScreen> {
           merchantTaxId: merchant.taxId,
         ),
         batchNumber: closed.batchCloseId.toString(),
-        ticket: BatchCloseTicket.fromOperations(closed.operations),
+        ticket: ticket,
       ),
     );
     if (!mounted) return;

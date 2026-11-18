@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 
 import 'core/config/api_config.dart';
 import 'core/theme/app_theme.dart';
@@ -60,7 +61,7 @@ void startApp(ApiConfigResolution config) {
   final authRepository = AuthRepository();
 
   runApp(
-    RepositoryProvider<ProductCatalogStore>.value(
+    ChangeNotifierProvider<ProductCatalogStore>.value(
       value: productCatalogStore,
       child: MultiBlocProvider(
         providers: [

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:solidaridad_app/features/batch_close/data/batch_close_repository.dart';
 import 'package:solidaridad_app/features/sales/data/product_catalog_store.dart';
+import 'package:solidaridad_app/features/sales/data/sales_repository.dart';
 import 'package:solidaridad_app/features/sales/domain/sale_model.dart';
 
 import 'helpers/mock_http_client.dart';
@@ -146,6 +147,36 @@ void main() {
     expect(result.sessionExpired, isTrue);
     expect(result.connectionError, isFalse);
     expect(result.operations, isEmpty);
+  });
+
+  test(
+    'un 401 del catálogo marca la sesión como expirada sin pedir ventas',
+    () async {
+      when(
+        () => productCatalogStore.getOrLoad(token: 'tok'),
+      ).thenThrow(const SessionExpiredException());
+
+      final result = await repository.loadOperations(token: 'tok');
+
+      expect(result.sessionExpired, isTrue);
+      expect(result.connectionError, isFalse);
+      expect(result.operations, isEmpty);
+      verifyNever(() => client.get(any(), headers: any(named: 'headers')));
+    },
+  );
+
+  test('un error del catálogo se propaga sin pedir ventas', () async {
+    when(
+      () => productCatalogStore.getOrLoad(token: 'tok'),
+    ).thenThrow(const DataLoadException('Catálogo temporalmente inaccesible.'));
+
+    final result = await repository.loadOperations(token: 'tok');
+
+    expect(result.sessionExpired, isFalse);
+    expect(result.connectionError, isTrue);
+    expect(result.errorMessage, 'Catálogo temporalmente inaccesible.');
+    expect(result.operations, isEmpty);
+    verifyNever(() => client.get(any(), headers: any(named: 'headers')));
   });
 
   test(

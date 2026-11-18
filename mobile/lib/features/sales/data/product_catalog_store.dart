@@ -11,7 +11,7 @@ import 'sales_repository.dart';
 /// llaman [getOrLoad], que devuelve la copia vigente o inicializa el store en
 /// ese momento si todavía no hubo una carga exitosa. Un solo request puede
 /// estar activo por sesión.
-class ProductCatalogStore {
+class ProductCatalogStore extends ChangeNotifier {
   ProductCatalogStore({
     required this._repository,
     this._refreshInterval = const Duration(minutes: 15),
@@ -97,13 +97,17 @@ class ProductCatalogStore {
   }
 
   void stop({required bool clear}) {
+    final hadCatalog = _current != null;
     _generation++;
     _activeToken = null;
     _refreshTimer?.cancel();
     _refreshTimer = null;
     _inFlight = null;
     _onSessionExpired = null;
-    if (clear) _current = null;
+    if (clear) {
+      _current = null;
+      if (hadCatalog) notifyListeners();
+    }
   }
 
   Future<List<ProductInfo>> _load(
@@ -145,6 +149,7 @@ class ProductCatalogStore {
           throw const DataLoadException('La sesión cambió durante la carga.');
         }
         _current = List<ProductInfo>.unmodifiable(products);
+        notifyListeners();
         return _current!;
       } on SessionExpiredException {
         await _expireSession(token, generation);

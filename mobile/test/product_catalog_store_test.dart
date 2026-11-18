@@ -48,6 +48,7 @@ class _ProductsRepository extends SalesRepository {
     }
     final next = _script.removeAt(0);
     if (next is Exception) throw next;
+    if (next is Completer<List<ProductInfo>>) return next.future;
     return next as List<ProductInfo>;
   }
 
@@ -191,6 +192,82 @@ void main() {
     expect(store.isInitialized, isTrue);
   });
 
+  test('start y el primer acceso concurrente comparten el request', () async {
+    final pending = Completer<List<ProductInfo>>();
+    final repository = _ProductsRepository([pending]);
+    final schedule = _Schedule();
+    final store = ProductCatalogStore(
+      repository: repository,
+      schedule: schedule.call,
+    );
+    addTearDown(() => store.stop(clear: true));
+
+    final start = store.start(token: 'tok');
+    final access = store.getOrLoad(token: 'tok');
+    expect(repository.fetchCount, 1);
+
+    pending.complete(_catalogA);
+    await start;
+    expect(await access, _catalogA);
+    expect(schedule.durations, [const Duration(minutes: 15)]);
+  });
+
+  test('un fallo post-login se recupera en el siguiente acceso', () async {
+    final repository = _ProductsRepository([
+      const DataLoadException('sin red'),
+      const DataLoadException('sin red'),
+      const DataLoadException('sin red'),
+      _catalogB,
+    ]);
+    final schedule = _Schedule();
+    final store = ProductCatalogStore(
+      repository: repository,
+      schedule: schedule.call,
+      retryWait: (_) async {},
+      log: (_) {},
+    );
+    final cubit = AuthCubit(
+      authRepository: _AuthRepository(),
+      productCatalogStore: store,
+      sessionStore: MemorySessionStore(),
+      schedule: _Schedule().call,
+    );
+
+    await cubit.login(usernameOrEmail: 'ana@test.com', password: 'secret');
+    await pumpEventQueue();
+    expect(store.current, isNull);
+    expect(repository.fetchCount, 3);
+
+    expect(await store.getOrLoad(token: 'tok'), _catalogB);
+    expect(repository.fetchCount, 4);
+    expect(schedule.durations, [const Duration(minutes: 15)]);
+    await cubit.close();
+  });
+
+  test(
+    'una respuesta de la sesión anterior no pisa el catálogo nuevo',
+    () async {
+      final oldResponse = Completer<List<ProductInfo>>();
+      final repository = _ProductsRepository([oldResponse, _catalogB]);
+      final store = ProductCatalogStore(
+        repository: repository,
+        schedule: _Schedule().call,
+        retryWait: (_) async {},
+      );
+      addTearDown(() => store.stop(clear: true));
+
+      final oldLoad = store.getOrLoad(token: 'old-token');
+      expect(repository.fetchCount, 1);
+      expect(await store.getOrLoad(token: 'new-token'), _catalogB);
+
+      oldResponse.complete(_catalogA);
+      await expectLater(oldLoad, throwsA(isA<DataLoadException>()));
+
+      expect(store.current, _catalogB);
+      expect(repository.fetchCount, 2);
+    },
+  );
+
   test('un fallo periódico conserva el catálogo y reintenta 1s/2s', () async {
     final repository = _ProductsRepository([_catalogA]);
     final schedule = _Schedule();
@@ -217,6 +294,55 @@ void main() {
     expect(store.current, _catalogA);
     expect(logs.single, contains('próxima ventana'));
     expect(schedule.durations.last, const Duration(minutes: 15));
+  });
+
+  test('un catálogo vacío durante el refresh conserva el anterior', () async {
+    final repository = _ProductsRepository([
+      _catalogA,
+      const <ProductInfo>[],
+      const <ProductInfo>[],
+      const <ProductInfo>[],
+    ]);
+    final schedule = _Schedule();
+    final store = ProductCatalogStore(
+      repository: repository,
+      schedule: schedule.call,
+      retryWait: (_) async {},
+      log: (_) {},
+    );
+    addTearDown(() => store.stop(clear: true));
+    await store.start(token: 'tok');
+
+    schedule.fireLatest();
+    await pumpEventQueue();
+
+    expect(repository.fetchCount, 4);
+    expect(store.current, _catalogA);
+    expect(schedule.durations.last, const Duration(minutes: 15));
+  });
+
+  test('un acceso durante el refresh no crea timers duplicados', () async {
+    final repository = _ProductsRepository([_catalogA]);
+    final schedule = _Schedule();
+    final store = ProductCatalogStore(
+      repository: repository,
+      schedule: schedule.call,
+    );
+    addTearDown(() => store.stop(clear: true));
+    await store.start(token: 'tok');
+
+    final refreshed = Completer<List<ProductInfo>>();
+    repository.pending = refreshed;
+    schedule.fireLatest();
+    expect(await store.getOrLoad(token: 'tok'), _catalogA);
+    expect(schedule.durations.length, 2);
+
+    refreshed.complete(_catalogB);
+    await pumpEventQueue();
+
+    expect(store.current, _catalogB);
+    expect(schedule.durations.length, 2);
+    expect(schedule.timers.where((timer) => timer.isActive).length, 1);
   });
 
   test('un 401 limpia el catálogo y notifica la sesión expirada', () async {
@@ -367,6 +493,28 @@ void main() {
     expect(store.current, isNull);
     expect(store.isInitialized, isFalse);
     expect(refreshTimer.isActive, isFalse);
+    await cubit.close();
+  });
+
+  test('restore sin sesión limpia un catálogo previamente cargado', () async {
+    final store = ProductCatalogStore(
+      repository: _ProductsRepository([_catalogA]),
+      schedule: _Schedule().call,
+    );
+    await store.start(token: 'tok');
+    expect(store.current, _catalogA);
+    final cubit = AuthCubit(
+      authRepository: _AuthRepository(),
+      productCatalogStore: store,
+      sessionStore: MemorySessionStore(),
+      schedule: _Schedule().call,
+    );
+
+    await cubit.restore();
+
+    expect(cubit.state, isA<AuthInitial>());
+    expect(store.current, isNull);
+    expect(store.isInitialized, isFalse);
     await cubit.close();
   });
 }

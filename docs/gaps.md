@@ -22,6 +22,11 @@ repositorio. **Actualizar este documento en cada cambio implementado** (ver
 > impresión y cierre. **2026-11-18:** un `401` del refresh también invalida la
 > sesión durante estados transitorios como el cambio de contraseña, y una
 > respuesta tardía de esa operación no puede restaurar la sesión invalidada.
+> El store notifica cada catálogo válido nuevo y el formulario de venta abierto
+> reconcilia su selección, etiqueta y unidad sin exigir reabrir la pantalla.
+> La cobertura incluye concurrencia, cambio de token con requests en vuelo,
+> recuperación tras fallo inicial, catálogo vacío, timers, restauración sin
+> sesión y propagación de errores hacia el cierre de lote.
 
 > **2026-11-12 — sesión y comercio entre reinicios (G-P0-20):** el access
 > token incluye `exp` a 90 días. Mobile guarda usuario, token, cambio de

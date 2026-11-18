@@ -58,19 +58,38 @@ void main() {
 
     expect(ticket.products, hasLength(2));
     expect(ticket.products.first.code, 'GARRAFA_10');
-    expect(ticket.products.first.salesCount, 2);
-    expect(ticket.products.first.salesKg, 20);
+    expect(ticket.products.first.salesCount, 3);
+    expect(ticket.products.first.salesKg, 30);
     expect(ticket.products.first.voidCount, 1);
     expect(ticket.products.first.voidKg, 10);
-    expect(ticket.products.first.totalCount, 1);
-    expect(ticket.products.first.totalKg, 10);
+    expect(ticket.products.first.totalCount, 2);
+    expect(ticket.products.first.totalKg, 20);
     expect(ticket.products.last.code, 'GRANEL');
-    expect(ticket.salesCount, 3);
-    expect(ticket.salesKg, 30);
+    expect(ticket.salesCount, 4);
+    expect(ticket.salesKg, 40);
     expect(ticket.voidCount, 1);
     expect(ticket.voidKg, 10);
-    expect(ticket.totalCount, 2);
-    expect(ticket.totalKg, 20);
+    expect(ticket.totalCount, 3);
+    expect(ticket.totalKg, 30);
+  });
+
+  test('una venta anulada cuenta como venta bruta y deja neto cero', () {
+    final BatchCloseTicket ticket = BatchCloseTicket.fromOperations([
+      _operation(
+        product: 'GARRAFA_10',
+        label: 'Garrafa 10 kg',
+        amount: 2,
+        result: PaymentResult.voided,
+      ),
+    ]);
+
+    expect(ticket.products, hasLength(1));
+    expect(ticket.salesCount, 1);
+    expect(ticket.salesKg, 20);
+    expect(ticket.voidCount, 1);
+    expect(ticket.voidKg, 20);
+    expect(ticket.totalCount, 0);
+    expect(ticket.totalKg, 0);
   });
 
   test('el html del cierre usa la cabecera del ticket y kilos', () {

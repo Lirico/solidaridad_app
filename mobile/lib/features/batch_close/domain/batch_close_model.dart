@@ -195,9 +195,9 @@ class BatchCloseTicket {
     final Map<String, _ProductTally> byProduct = <String, _ProductTally>{};
 
     for (final OperationModel operation in operations) {
-      final bool sale = operation.result == PaymentResult.approved;
+      final bool approved = operation.result == PaymentResult.approved;
       final bool voided = operation.result == PaymentResult.voided;
-      if (!sale && !voided) continue;
+      if (!approved && !voided) continue;
 
       final _ProductTally tally = byProduct.putIfAbsent(
         operation.productCode,
@@ -205,10 +205,12 @@ class BatchCloseTicket {
       );
       final double kg =
           operation.amount * (batchKgPerUnit[operation.productCode] ?? 1);
-      if (sale) {
-        tally.salesCount += 1;
-        tally.salesKg += kg;
-      } else {
+      // La API representa una anulación actualizando la venta original a
+      // VOIDED, no agregando una segunda operación. Por eso una anulada forma
+      // parte de las ventas brutas y, además, resta en ANULACIONES.
+      tally.salesCount += 1;
+      tally.salesKg += kg;
+      if (voided) {
         tally.voidCount += 1;
         tally.voidKg += kg;
       }
